@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:15
+    container_name: wazuh_db
+    environment:
+      POSTGRES_DB: wazuh_vulns
+      POSTGRES_USER: wazuh
+      POSTGRES_PASSWORD: wazuhpass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  api:
+    build: ./api
+    container_name: wazuh_api
+    environment:
+      DATABASE_URL: postgresql://wazuh:wazuhpass@db:5432/wazuh_vulns
+      WAZUH_API_URL: https://WAZUH_MANAGER:55000
+      WAZUH_USER: wazuh-user
+      WAZUH_PASSWORD: wazuh-pass
+      SECRET_KEY: supersecret
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+
+  jenkins:
+    build: ./jenkins
+    container_name: jenkins
+    ports:
+      - "8080:8080"
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - api
+
+  zap:
+    image: zaproxy/zap-stable
+    container_name: zap
+    command: >
+      zap-baseline.py
+      -t http://api:8000
+      -r zap_report.html
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  jenkins_data:
+
