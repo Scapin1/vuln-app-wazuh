@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  jenkins:
+    build: .
+    container_name: jenkins-server
+    restart: unless-stopped
+    privileged: true
+    user: root
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"  
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock 
+      - ./scripts:/scripts 
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false 
+    networks:
+      - jenkins-network
+
+volumes:
+  jenkins_home:
+    driver: local
+
+networks:
+  jenkins-network:
+    driver: bridge
