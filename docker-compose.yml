@@ -2,11 +2,11 @@ services:
   db:
     image: postgres:15
     environment:
+      POSTGRES_DB: postgres
       POSTGRES_USER: wazuh
       POSTGRES_PASSWORD: wazuhpass
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     networks:
       - app-network
 
@@ -30,7 +30,7 @@ services:
   api:
     build: ./vuln-api
     environment:
-      DATABASE_URL: postgresql://wazuh:wazuhpass@db:5432/wazuh_vulns
+      DATABASE_URL: postgresql://wazuh:wazuhpass@db:5432/postgres
 
       # Wazuh Manager API (si lo usas para login/consultas)
       WAZUH_USER: wazuh-user
