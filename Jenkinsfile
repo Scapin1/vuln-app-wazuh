@@ -42,6 +42,30 @@ pipeline {
             }
         }
 
+        stage('Tests & Coverage') {
+            steps {
+                sh '''
+                cd vuln-api
+                pip install -r requirements.txt
+                pytest --cov=. --cov-report=xml
+                '''
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                    sh '''
+                    docker run --rm \
+                    -e SONAR_HOST_URL=http://sonarqube:9000 \
+                    -e SONAR_LOGIN=$SONAR_TOKEN \
+                    -v "$PWD:/usr/src" \
+                    sonarsource/sonar-scanner-cli
+                    '''
+                }
+            }
+        }
+
         stage('OWASP ZAP baseline') {
             steps {
                 sh 'chmod +x scripts/run_zap.sh'
