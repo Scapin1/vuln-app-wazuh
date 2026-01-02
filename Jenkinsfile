@@ -14,25 +14,11 @@ pipeline {
             }
         }
 
-        stage('Deploy app (Docker)') {
+        stage('Deploy app (Docker Compose)') {
             steps {
-                // Parar contenedor viejo si existe
-                sh 'docker rm -f vuln-api || true'
-                // Levantar app conectada a la BD
-                withCredentials([
-                    string(credentialsId: 'vuln-db-url', variable: 'DATABASE_URL'),
-                    usernamePassword(credentialsId: 'wazuh-indexer-creds', usernameVariable: 'WZ_USER', passwordVariable: 'WZ_PASS')
-                ]) {
-                    sh """
-                    docker run -d --name vuln-api \
-                      -e DATABASE_URL=$DATABASE_URL \
-                      -e WAZUH_INDEXER_URL=https://wazuh-indexer:9200 \
-                      -e WZ_USER=$WZ_USER \
-                      -e WZ_PASS=$WZ_PASS \
-                      -p ${APP_PORT}:8000 \
-                      ${APP_IMAGE}
-                    """
-                }
+                sh '''
+                docker compose up -d --build
+                '''
             }
         }
 
