@@ -18,12 +18,8 @@ services:
       DATABASE_URL: postgresql://wazuh:wazuhpass@db:5432/wazuh_vulns
 
       # Wazuh Manager API (si lo usas para login/consultas)
-      WAZUH_API_URL: https://WAZUH_MANAGER:55000
-      WAZUH_USER: wazuh-user
-      WAZUH_PASSWORD: wazuh-pass
       WAZUH_API_URL: https://165.227.59.98:55000
 
-      # ⚠️ IMPORTANTE: tu app lo usa en wazuh_client.py (antes fallaba por None)
       # Ajusta al endpoint real del Indexer (o deja temporal mientras pruebas ZAP)
       WAZUH_INDEXER_URL: https://165.227.59.98:9200
 

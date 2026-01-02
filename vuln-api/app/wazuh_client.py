@@ -1,44 +1,33 @@
 # app/wazuh_client.py
 import os
 import requests
+from requests.auth import HTTPBasicAuth
 
-WAZUH_INDEXER_URL = os.getenv("WAZUH_INDEXER_URL").rstrip("/")  # ej: https://wazuh-indexer:9200
-WZ_USER = os.getenv("WZ_USER")
-WZ_PASS = os.getenv("WZ_PASS")
-VERIFY_SSL = os.getenv("WZ_VERIFY_SSL", "false").lower() == "true"
+WAZUH_INDEXER_URL = os.getenv("WAZUH_INDEXER_URL")
+WZ_USER = os.getenv("WAZUH_USER")
+WZ_PASS = os.getenv("WAZUH_PASSWORD")
 
 INDEX_PATTERN = "wazuh-states-vulnerabilities-*/_search"
 
-def fetch_all_vulns(page_size=1000):
-    """Obtiene todas las vulnerabilidades usando search_after."""
-    vulns = []
-    search_after = None
+def fetch_all_vulns():
+    url = f"{WAZUH_INDEXER_URL}/{INDEX_PATTERN}"
 
-    while True:
-        body = {
-            "size": page_size,
-            "sort": [{"_id": "asc"}],
-            "query": {"match_all": {}}
-        }
-        if search_after:
-            body["search_after"] = search_after
+    body = {
+        "size": 10000,
+        "_source": True
+    }
 
-        resp = requests.post(
-            f"{WAZUH_INDEXER_URL}/{INDEX_PATTERN}",
-            auth=(WZ_USER, WZ_PASS),
-            json=body,
-            verify=VERIFY_SSL,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        hits = data.get("hits", {}).get("hits", [])
-        if not hits:
-            break
+    resp = requests.post(
+        url,
+        json=body,
+        auth=HTTPBasicAuth(WZ_USER, WZ_PASS),
+        verify=False,
+        timeout=60
+    )
 
-        for h in hits:
-            vulns.append(h["_source"])
+    resp.raise_for_status()
 
-        search_after = hits[-1]["sort"]
+    hits = resp.json()["hits"]["hits"]
 
-    return vulns
-
+    # Devolvemos solo el _source
+    return [h["_source"] for h in hits]
