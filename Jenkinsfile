@@ -8,12 +8,6 @@ pipeline {
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                git url: 'https://github.com/FabianLizama/vuln-app-wazuh.git', branch: 'main'
-            }
-        }
-
         stage('Build Docker image') {
             steps {
                 sh "docker build -t ${APP_IMAGE} ."
