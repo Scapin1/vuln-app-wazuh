@@ -10,7 +10,7 @@ pipeline {
     stages {
         stage('Build Docker image') {
             steps {
-                sh "docker build -t ${APP_IMAGE} ."
+                sh 'docker build -t vuln-api:${BUILD_NUMBER} -f vuln-api/Dockerfile vuln-api'
             }
         }
 
@@ -39,12 +39,15 @@ pipeline {
         stage('Tests & Coverage') {
             steps {
                 sh '''
-                cd vuln-api
-                pip install -r requirements.txt
-                pytest --cov=. --cov-report=xml
+                docker run --rm \
+                -v "$PWD/vuln-api:/app" \
+                -w /app \
+                python:3.12-slim \
+                sh -c "pip install -r requirements.txt && pytest --cov=. --cov-report=xml"
                 '''
             }
         }
+
 
         stage('SonarQube Analysis') {
             steps {
