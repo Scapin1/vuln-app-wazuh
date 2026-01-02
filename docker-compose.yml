@@ -1,7 +1,6 @@
 services:
   db:
     image: postgres:15
-    container_name: wazuh_db
     environment:
       POSTGRES_DB: wazuh_vulns
       POSTGRES_USER: wazuh
@@ -10,43 +9,74 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    networks:
+      - app-network
 
   api:
-    build: ./api
-    container_name: wazuh_api
+    build: ./vuln-api
     environment:
       DATABASE_URL: postgresql://wazuh:wazuhpass@db:5432/wazuh_vulns
+
+      # Wazuh Manager API (si lo usas para login/consultas)
       WAZUH_API_URL: https://WAZUH_MANAGER:55000
       WAZUH_USER: wazuh-user
       WAZUH_PASSWORD: wazuh-pass
+
+      # ⚠️ IMPORTANTE: tu app lo usa en wazuh_client.py (antes fallaba por None)
+      # Ajusta al endpoint real del Indexer (o deja temporal mientras pruebas ZAP)
+      WAZUH_INDEXER_URL: https://wazuh-indexer:9200
+
       SECRET_KEY: supersecret
     depends_on:
       - db
     ports:
       - "8000:8000"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   jenkins:
     build: ./jenkins
-    container_name: jenkins
+    user: root
     ports:
       - "8080:8080"
+      - "50000:50000"
     volumes:
       - jenkins_data:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./reports:/reports
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
     depends_on:
       - api
+    networks:
+      - app-network
 
   zap:
-    image: zaproxy/zap-stable
-    container_name: zap
-    command: >
-      zap-baseline.py
-      -t http://api:8000
-      -r zap_report.html
+    image: zaproxy/zap-weekly
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    volumes:
+      - ./reports:/zap/wrk
+    command: >
+      sh -c "echo 'Waiting for API...'; sleep 20;
+      zap-baseline.py -t http://api:8000
+      -r zap_report.html
+      -J zap_report.json
+      -m 2"
+    networks:
+      - app-network
+    restart: "no"
 
 volumes:
   postgres_data:
   jenkins_data:
 
+networks:
+  app-network:
+    driver: bridge
