@@ -14,15 +14,14 @@ pipeline {
             }
         }
 
-        stage('Deploy app (Docker Compose)') {
+        stage('Deploy app') {
             steps {
                 sh '''
-                docker compose down
-                docker compose up -d --build
+                docker compose up -d --build api zap sonarqube
                 '''
             }
         }
-
+        
         stage('Tests & Coverage') {
             steps {
                 sh '''
