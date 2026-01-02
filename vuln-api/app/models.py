@@ -1,5 +1,6 @@
 # app/models.py
-from sqlalchemy import Column, Integer, BigInteger, String, Text, DateTime, Numeric, UniqueConstraint
+from sqlalchemy import Column, Integer, BigInteger, String, Text, DateTime, Numeric, UniqueConstraint, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .db import Base
 
@@ -9,6 +10,20 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    interactions = relationship("UserInteraction", back_populates="user")
+
+class UserInteraction(Base):
+    __tablename__ = "user_interactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    endpoint = Column(String, index=True) # La URL o recurso accedido
+    method = Column(String)               # GET, POST, DELETE, etc.
+    details = Column(Text, nullable=True) # Información adicional opcional
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="interactions")
 
 class WazuhVulnerability(Base):
     __tablename__ = "wazuh_vulnerabilities"
