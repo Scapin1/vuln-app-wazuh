@@ -8,12 +8,6 @@ pipeline {
     }
 
     stages {
-        stage('Build Docker image') {
-            steps {
-                sh 'docker build -t vuln-api:${BUILD_NUMBER} -f vuln-api/Dockerfile vuln-api'
-            }
-        }
-
         stage('Deploy app') {
             steps {
                 sh '''
@@ -21,7 +15,7 @@ pipeline {
                 '''
             }
         }
-        
+
         stage('Tests & Coverage') {
             steps {
                 sh '''

@@ -2,19 +2,16 @@ services:
   db:
     image: postgres:15
     environment:
-      POSTGRES_DB: postgres
       POSTGRES_USER: wazuh
       POSTGRES_PASSWORD: wazuhpass
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     networks:
       - app-network
 
   sonarqube:
     image: sonarqube:9.9-community
-    container_name: sonarqube
     depends_on:
       - db
     environment:
