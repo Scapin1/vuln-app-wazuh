@@ -11,9 +11,6 @@ pipeline {
         stage('Deploy app') {
             steps {
                 sh '''
-                docker compose rm -sf api
-                docker compose build --no-cache api
-                docker compose up -d api
                 docker compose up -d --build api zap sonarqube
                 '''
             }
