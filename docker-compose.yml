@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: wazuhpass
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - ./db-init:/docker-entrypoint-initdb.d
     networks:
       - app-network
 
