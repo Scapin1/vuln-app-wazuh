@@ -35,7 +35,11 @@ pipeline {
                 -e SONAR_HOST_URL=$SONAR_HOST_URL \
                 -e SONAR_TOKEN=$SONAR_AUTH_TOKEN \
                 -v "$(pwd):/usr/src" \
-                sonarsource/sonar-scanner-cli
+                sonarsource/sonar-scanner-cli \
+                -Dsonar.projectKey=vuln-app-api \
+                -Dsonar.projectName="Vuln App Wazuh" \
+                -Dsonar.sources=. \
+                -Dsonar.sourceEncoding=UTF-8
                 '''
             }
         }
