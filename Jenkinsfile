@@ -31,8 +31,6 @@ pipeline {
                 -w /workspace/vuln-api \
                 python:3.12-slim \
                 bash -c "
-                    python -m venv .venv &&
-                    source .venv/bin/activate &&
                     pip install --upgrade pip &&
                     pip install -r requirements.txt &&
                     pytest --cov=app --cov-report=xml
@@ -40,6 +38,7 @@ pipeline {
                 '''
             }
         }
+
 
 
        stage('SonarQube Analysis') {
