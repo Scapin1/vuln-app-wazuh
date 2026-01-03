@@ -25,43 +25,20 @@ pipeline {
 
         stage('Tests & Coverage API') {
             steps {
+                echo "Ejecutando pruebas y generando reporte de cobertura..."
+                // Levantamos la DB de la API por si los tests la necesitan
+                sh 'docker compose up -d db-api'
+                
+                // Ejecutamos pytest con reporte XML para SonarQube
+                // Se monta el volumen actual para que el reporte persista en el host
                 sh '''
-                echo "== Ejecutando tests y coverage de la API =="
-
-                docker run --rm \
-                --network=vuln-app-wazuh_app-network \
-                -e DATABASE_URL=postgresql://admin:adminpassword@db-api:5432/vulnerabilidades_db \
-                -v "$(pwd)/vuln-api:/app" \
-                -w /app \
-                python:3.11-slim \
-                sh -c "
-                    pip install --no-cache-dir -r requirements.txt &&
-                    pytest \
-                    --cov=app \
-                    --cov-report=xml:coverage.xml \
-                    --cov-report=html:htmlcov \
-                    --cov-report=term
+                docker compose run --rm -v "$(pwd)/vuln-api:/app" api sh -c "
+                    pip install pytest pytest-cov && \
+                    pytest --cov=. --cov-report=xml:/app/coverage.xml --cov-report=term
                 "
                 '''
             }
-
-            post {
-                always {
-                    // Coverage HTML para Jenkins
-                    publishHTML(target: [
-                        reportDir: 'vuln-api/htmlcov',
-                        reportFiles: 'index.html',
-                        reportName: 'API Coverage Report',
-                        keepAll: true,
-                        alwaysLinkToLastBuild: true
-                    ])
-
-                    // Coverage XML para SonarQube
-                    archiveArtifacts artifacts: 'vuln-api/coverage.xml', onlyIfSuccessful: false
-                }
-            }
         }
-
 
 
        stage('SonarQube Analysis') {
