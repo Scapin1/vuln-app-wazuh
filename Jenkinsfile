@@ -23,6 +23,18 @@ pipeline {
             }
         }
 
+        stage('Debug Filesystem') {
+            steps {
+                sh '''
+                echo "--- ARCHIVOS EN JENKINS ---"
+                ls -R ${WORKSPACE}/vuln-api
+                
+                echo "--- INTENTANDO VER ARCHIVOS DESDE EL CONTENEDOR API ---"
+                docker compose run --rm api ls -R /app
+                '''
+            }
+        }
+
         stage('Unit Tests & Coverage') {
             steps {
                 echo "Ejecutando pruebas unitarias..."
