@@ -27,12 +27,13 @@ pipeline {
             steps {
                 sh '''
                 cd vuln-api
+                python3 -m venv .venv
+                source .venv/bin/activate
                 pip install -r requirements.txt
                 pytest --cov=app --cov-report=xml
                 '''
             }
         }
-
 
        stage('SonarQube Analysis') {
             environment {
