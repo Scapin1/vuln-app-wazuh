@@ -23,22 +23,45 @@ pipeline {
             }
         }
 
-        stage('Tests & Coverage') {
+        stage('Tests & Coverage API') {
             steps {
                 sh '''
+                echo "== Ejecutando tests y coverage de la API =="
+
                 docker run --rm \
-                -v "$PWD:/workspace" \
-                -w /workspace/vuln-api \
-                python:3.12-slim \
-                bash -c "
-                    ls -la &&
-                    pip install --upgrade pip &&
-                    pip install -r requirements.txt &&
-                    pytest --cov=app --cov-report=xml
+                --network=vuln-app-wazuh_app-network \
+                -e DATABASE_URL=postgresql://admin:adminpassword@db-api:5432/vulnerabilidades_db \
+                -v "$(pwd)/vuln-api:/app" \
+                -w /app \
+                python:3.11-slim \
+                sh -c "
+                    pip install --no-cache-dir -r requirements.txt &&
+                    pytest \
+                    --cov=app \
+                    --cov-report=xml:coverage.xml \
+                    --cov-report=html:htmlcov \
+                    --cov-report=term
                 "
                 '''
             }
+
+            post {
+                always {
+                    // Coverage HTML para Jenkins
+                    publishHTML(target: [
+                        reportDir: 'vuln-api/htmlcov',
+                        reportFiles: 'index.html',
+                        reportName: 'API Coverage Report',
+                        keepAll: true,
+                        alwaysLinkToLastBuild: true
+                    ])
+
+                    // Coverage XML para SonarQube
+                    archiveArtifacts artifacts: 'vuln-api/coverage.xml', onlyIfSuccessful: false
+                }
+            }
         }
+
 
 
        stage('SonarQube Analysis') {
