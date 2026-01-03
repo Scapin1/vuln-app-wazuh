@@ -27,6 +27,7 @@ pipeline {
             steps {
                 sh '''
                 cd vuln-api
+                sonar.python.coverage.reportPaths=coverage.xml
                 python3 -m venv .venv
                 source .venv/bin/activate
                 pip install -r requirements.txt
