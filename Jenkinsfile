@@ -41,7 +41,6 @@ pipeline {
         }
 
 
-
        stage('SonarQube Analysis') {
             environment {
                 SONAR_HOST_URL = "http://sonarqube:9000"
