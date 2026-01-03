@@ -16,6 +16,13 @@ pipeline {
             }
         }
 
+        stage('Esperar SonarQube') {
+            steps {
+                echo "Esperando a que el API de SonarQube responda..."
+                sh 'timeout 180s bash -c "until curl -s http://localhost:9000/api/system/status | grep -q UP; do sleep 5; done"'
+            }
+        }
+
         stage('SonarQube Analysis') {
             steps {
                 withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
