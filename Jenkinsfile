@@ -26,14 +26,16 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                    sh '''
+                    sh """
                     docker run --rm \
                     --network=vuln-app-wazuh_app-network \
                     -e SONAR_HOST_URL=http://sonarqube:9000 \
-                    -e SONAR_LOGIN=$SONAR_TOKEN \
+                    -e SONAR_LOGIN=${SONAR_TOKEN} \
+                    -e SONAR_PROJECT_KEY=vuln-app-api \
+                    -e SONAR_PROJECT_NAME="Vuln App Wazuh" \
                     -v "$PWD:/usr/src" \
                     sonarsource/sonar-scanner-cli
-                    '''
+                    """
                 }
             }
         }
