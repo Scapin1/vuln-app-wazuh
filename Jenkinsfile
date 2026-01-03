@@ -32,13 +32,10 @@ pipeline {
                 sh '''
                 docker run --rm \
                 --network=vuln-app-wazuh_app-network \
+                -e SONAR_HOST_URL=$SONAR_HOST_URL \
+                -e SONAR_TOKEN=$SONAR_AUTH_TOKEN \
                 -v "$(pwd):/usr/src" \
-                sonarsource/sonar-scanner-cli \
-                -Dsonar.host.url=$SONAR_HOST_URL \
-                -Dsonar.token=$SONAR_AUTH_TOKEN \
-                -Dsonar.projectKey=vuln-app-api \
-                -Dsonar.projectName="Vuln App Wazuh" \
-                -Dsonar.sources=.
+                sonarsource/sonar-scanner-cli
                 '''
             }
         }
