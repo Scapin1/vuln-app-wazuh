@@ -29,7 +29,7 @@ pipeline {
                     sh '''
                     docker run --rm \
                     --network=vuln-app-wazuh_app-network \
-                    -e SONAR_HOST_URL=http://sonarqube:9000 \
+                    -e SONAR_HOST_URL=http://localhost:9000 \
                     -e SONAR_LOGIN=$SONAR_TOKEN \
                     -v "$PWD:/usr/src" \
                     sonarsource/sonar-scanner-cli
