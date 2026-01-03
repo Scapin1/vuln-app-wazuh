@@ -19,7 +19,7 @@ pipeline {
         stage('Esperar SonarQube') {
             steps {
                 echo "Esperando a que el API de SonarQube responda..."
-                sh 'timeout 300s bash -c "until curl -s http://localhost:9000/api/system/status | grep -q UP; do sleep 5; done"'
+                sh 'timeout 300s bash -c "until curl -s http://sonarqube:9000/api/system/status | grep -q UP; do sleep 5; done"'
             }
         }
 
@@ -29,7 +29,7 @@ pipeline {
                     sh '''
                     docker run --rm \
                     --network=vuln-app-wazuh_app-network \
-                    -e SONAR_HOST_URL=http://localhost:9000 \
+                    -e SONAR_HOST_URL=http://sonarqube:9000 \
                     -e SONAR_LOGIN=$SONAR_TOKEN \
                     -v "$PWD:/usr/src" \
                     sonarsource/sonar-scanner-cli
