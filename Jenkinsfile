@@ -26,12 +26,17 @@ pipeline {
         stage('Tests & Coverage') {
             steps {
                 sh '''
-                cd vuln-api
-                apt install python3.12-venv
-                python3 -m venv .venv
-                source .venv/bin/activate
-                pip install -r requirements.txt
-                pytest --cov=app --cov-report=xml
+                docker run --rm \
+                -v "$PWD/vuln-api:/app" \
+                -w /app \
+                python:3.12-slim \
+                bash -c "
+                    python -m venv .venv &&
+                    source .venv/bin/activate &&
+                    pip install --upgrade pip &&
+                    pip install -r requirements.txt &&
+                    pytest --cov=app --cov-report=xml
+                "
                 '''
             }
         }
