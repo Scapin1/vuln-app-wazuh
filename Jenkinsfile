@@ -28,9 +28,10 @@ pipeline {
                 sh '''
                 docker run --rm \
                 -v "$PWD:/workspace" \
-                -w /workspace/vuln-api \
+                -w /workspace \
                 python:3.12-slim \
                 bash -c "
+                    ls -la &&
                     pip install --upgrade pip &&
                     pip install -r requirements.txt &&
                     pytest --cov=app --cov-report=xml
@@ -38,7 +39,6 @@ pipeline {
                 '''
             }
         }
-
 
 
        stage('SonarQube Analysis') {
