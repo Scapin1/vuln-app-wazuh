@@ -31,7 +31,6 @@ pipeline {
                 -w /workspace \
                 python:3.12-slim \
                 bash -c "
-                    cd vuln-api &&
                     ls -la &&
                     pip install --upgrade pip &&
                     pip install -r requirements.txt &&
@@ -40,6 +39,7 @@ pipeline {
                 '''
             }
         }
+
 
 
        stage('SonarQube Analysis') {
