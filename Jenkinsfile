@@ -24,21 +24,24 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
+            environment {
+                SONAR_HOST_URL = "http://sonarqube:9000"
+                SONAR_AUTH_TOKEN = credentials('sonar-token')
+            }
             steps {
-                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                    sh """
-                    docker run --rm \
-                    --network=vuln-app-wazuh_app-network \
-                    -e SONAR_HOST_URL=http://sonarqube:9000 \
-                    -e SONAR_LOGIN=${SONAR_TOKEN} \
-                    -e SONAR_PROJECT_KEY=vuln-app-api \
-                    -e SONAR_PROJECT_NAME="Vuln App Wazuh" \
-                    -v "$PWD:/usr/src" \
-                    sonarsource/sonar-scanner-cli
-                    """
-                }
+                sh '''
+                docker run --rm \
+                --network=vuln-app-wazuh_app-network \
+                -e SONAR_HOST_URL=$SONAR_HOST_URL \
+                -e SONAR_LOGIN=$SONAR_AUTH_TOKEN \
+                -e SONAR_PROJECT_KEY=vuln-app-api \
+                -e SONAR_PROJECT_NAME="Vuln App Wazuh" \
+                -v "$(pwd):/usr/src" \
+                sonarsource/sonar-scanner-cli
+                '''
             }
         }
+
 
         stage('Deploy app') {
             steps {
