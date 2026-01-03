@@ -23,18 +23,15 @@ pipeline {
             }
         }
 
-        stage('Tests & Coverage API') {
+        stage('Unit Tests & Coverage') {
             steps {
-                echo "Ejecutando pruebas y generando reporte de cobertura..."
-                // Levantamos la DB de la API por si los tests la necesitan
-                sh 'docker compose up -d db-api'
-                
-                // Ejecutamos pytest con reporte XML para SonarQube
-                // Se monta el volumen actual para que el reporte persista en el host
+                echo "Ejecutando pruebas unitarias..."
                 sh '''
-                docker compose run --rm -v "$(pwd)/vuln-api:/app" api sh -c "
-                    pip install pytest pytest-cov && \
-                    pytest --cov=. --cov-report=xml:/app/coverage.xml --cov-report=term
+                # Usamos el contenedor de la API para correr los tests
+                docker compose run --rm api sh -c "
+                    pip install pytest pytest-cov httpx && \
+                    echo 'Contenido en /app:' && ls -R /app && \
+                    pytest /app/tests --cov=/app/app --cov-report=xml:/app/coverage.xml --cov-report=term
                 "
                 '''
             }
