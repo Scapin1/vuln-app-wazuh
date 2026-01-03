@@ -1,24 +1,36 @@
 services:
-  db:
+  db-api:
     image: postgres:15
+    container_name: db-api
     environment:
-      POSTGRES_DB: postgres
-      POSTGRES_USER: wazuh
-      POSTGRES_PASSWORD: wazuhpass
+      POSTGRES_DB: vulnerabilidades_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: adminpassword
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./db-init:/docker-entrypoint-initdb.d
+      - postgres_api_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  db-sonar:
+    image: postgres:15
+    container_name: db-sonar
+    environment:
+      - POSTGRES_USER=sonar
+      - POSTGRES_PASSWORD=sonarpassword
+      - POSTGRES_DB=sonarqube
+    volumes:
+      - postgres_sonar_data:/var/lib/postgresql/data
     networks:
       - app-network
 
   sonarqube:
     image: sonarqube:9.9-community
     depends_on:
-      - db
+      - db-sonar
     environment:
-      SONAR_JDBC_URL: jdbc:postgresql://db:5432/sonarqube
-      SONAR_JDBC_USERNAME: wazuh
-      SONAR_JDBC_PASSWORD: wazuhpass
+      SONAR_JDBC_URL: jdbc:postgresql://db-sonar:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: sonarpassword
     ports:
       - "9000:9000"
     volumes:
@@ -31,7 +43,7 @@ services:
   api:
     build: ./vuln-api
     environment:
-      DATABASE_URL: postgresql://wazuh:wazuhpass@db:5432/postgres
+      DATABASE_URL: postgresql://admin:adminpassword@db-api:5432/vulnerabilidades_db
 
       # Wazuh Manager API (si lo usas para login/consultas)
       WAZUH_USER: wazuh-user
@@ -43,7 +55,7 @@ services:
 
       SECRET_KEY: supersecret
     depends_on:
-      - db
+      - db-api
     ports:
       - "8000:8000"
     networks:
@@ -89,7 +101,8 @@ services:
     restart: "no"
 
 volumes:
-  postgres_data:
+  postgres_sonar_data:
+  postgres_api_data:
   jenkins_data:
   sonarqube_data:
   sonarqube_extensions:
