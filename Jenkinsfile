@@ -23,6 +23,17 @@ pipeline {
             }
         }
 
+        stage('Tests & Coverage') {
+            steps {
+                sh '''
+                cd vuln-api
+                pip install -r requirements.txt
+                pytest --cov=app --cov-report=xml
+                '''
+            }
+        }
+
+
        stage('SonarQube Analysis') {
             environment {
                 SONAR_HOST_URL = "http://sonarqube:9000"
