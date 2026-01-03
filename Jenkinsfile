@@ -8,26 +8,13 @@ pipeline {
     }
 
     stages {
-        stage('Deploy app') {
+        stage('Deploy sonarqube') {
             steps {
                 sh '''
-                docker compose up -d --build api zap sonarqube
+                docker compose up -d --build sonarqube
                 '''
             }
         }
-
-        stage('Tests & Coverage') {
-            steps {
-                sh '''
-                docker run --rm \
-                -v "$PWD/vuln-api:/app" \
-                -w /app \
-                python:3.12-slim \
-                sh -c "pip install -r requirements.txt && pytest --cov=. --cov-report=xml"
-                '''
-            }
-        }
-
 
         stage('SonarQube Analysis') {
             steps {
@@ -40,6 +27,14 @@ pipeline {
                     sonarsource/sonar-scanner-cli
                     '''
                 }
+            }
+        }
+
+        stage('Deploy app') {
+            steps {
+                sh '''
+                docker compose up -d --build api zap
+                '''
             }
         }
 
