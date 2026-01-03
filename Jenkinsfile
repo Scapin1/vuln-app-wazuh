@@ -27,8 +27,8 @@ pipeline {
             steps {
                 sh '''
                 docker run --rm \
-                -v "$PWD/vuln-api:/app" \
-                -w /app \
+                -v "$PWD:/workspace" \
+                -w /workspace/vuln-api \
                 python:3.12-slim \
                 bash -c "
                     python -m venv .venv &&
@@ -40,6 +40,7 @@ pipeline {
                 '''
             }
         }
+
 
        stage('SonarQube Analysis') {
             environment {
