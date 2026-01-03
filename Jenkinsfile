@@ -37,14 +37,17 @@ pipeline {
 
         stage('Unit Tests & Coverage') {
             steps {
-                echo "Ejecutando pruebas unitarias..."
+                echo "Ejecutando pruebas unitarias desde el contenedor..."
                 sh '''
-                # Usamos el contenedor de la API para correr los tests
+                docker compose build api
+                
                 docker compose run --rm api sh -c "
                     pip install pytest pytest-cov httpx && \
-                    echo 'Contenido en /app:' && ls -R /app && \
-                    pytest /app/tests --cov=/app/app --cov-report=xml:/app/coverage.xml --cov-report=term
+                    pytest tests/ --cov=app --cov-report=xml:coverage.xml --cov-report=term
                 "
+                CONTAINER_ID=$(docker create vuln-app-api)
+                docker cp $CONTAINER_ID:/app/coverage.xml ./vuln-api/coverage.xml
+                docker rm $CONTAINER_ID
                 '''
             }
         }
