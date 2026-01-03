@@ -28,7 +28,7 @@ pipeline {
                 sh '''
                 docker run --rm \
                 -v "$PWD:/workspace" \
-                -w /workspace \
+                -w /workspace/vuln-api \
                 python:3.12-slim \
                 bash -c "
                     ls -la &&
