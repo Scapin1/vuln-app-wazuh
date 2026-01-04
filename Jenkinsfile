@@ -20,6 +20,13 @@ pipeline {
                 SONAR_AUTH_TOKEN = credentials('sonar-token')
             }
             steps {
+                sh """
+                    docker run --rm \
+                        --user root \
+                        -v "\$(pwd):/usr/src" \
+                        -w /usr/src \
+                        alpine ls -la /usr/src
+                    """
                 sh '''
                 docker run --rm \
                 --user root \
