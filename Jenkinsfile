@@ -8,6 +8,12 @@ pipeline {
     }
 
     stages {
+       stage('Debug Paths') {
+           steps {
+               // Esto nos mostrará el árbol de carpetas real en el log de Jenkins
+               sh "ls -R" 
+           }
+       }
        stage('SonarQube Analysis') {
             environment {
                 SONAR_HOST_URL = "http://sonarqube:9000"
