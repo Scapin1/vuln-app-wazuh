@@ -22,12 +22,14 @@ pipeline {
             steps {
                 sh '''
                 docker run --rm \
+                --user root \
                 --network=vuln-app-wazuh_app-network \
                 -e SONAR_HOST_URL=$SONAR_HOST_URL \
                 -e SONAR_TOKEN=$SONAR_AUTH_TOKEN \
                 -v "$(pwd):/usr/src" \
                 -w /usr/src \
-                sonarsource/sonar-scanner-cli
+                sonarsource/sonar-scanner-cli \
+                -Dproject.settings=/usr/src/sonar-project.properties
                 '''
             }
         }
