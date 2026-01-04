@@ -8,12 +8,6 @@ pipeline {
     }
 
     stages {
-       stage('Debug Paths') {
-           steps {
-               // Esto nos mostrará el árbol de carpetas real en el log de Jenkins
-               sh "ls -R" 
-           }
-       }
        // ETAPA DE TESTS: Comentada hasta que los tests estén listos
         /*
         stage('Unit Tests & Coverage') {
