@@ -21,17 +21,27 @@ pipeline {
             }
             steps {
                 script {
-                    // Jenkins se encarga de:
-                    // 1. Montar el volumen correctamente (incluso en Docker-in-Docker)
-                    // 2. Correr el contenedor
-                    // 3. Borrar el contenedor al finalizar (pase lo que pase)
+                    // 1. Generamos el reporte de cobertura (Pytest + Coverage)
+                    // Usamos una imagen de python para correr los tests antes del análisis
+                    docker.image('python:3.12-slim').inside("--network=vuln-app-wazuh_app-network") {
+                        sh """
+                        pip install -r vuln-api/requirements.txt pytest pytest-cov
+                        pytest --cov=vuln-api/app --cov-report=xml:coverage.xml vuln-api/tests/
+                        """
+                    }
+
+                    // 2. Corremos el Scanner usando el reporte generado
                     docker.image('sonarsource/sonar-scanner-cli').inside("--network=vuln-app-wazuh_app-network --user=root") {
                         sh """
                         sonar-scanner \
                             -Dsonar.projectKey=vuln-app-api \
-                            -Dsonar.host.url=http://sonarqube:9000 \
+                            -Dsonar.host.url=${SONAR_HOST_URL} \
                             -Dsonar.login=${SONAR_AUTH_TOKEN} \
-                            -Dsonar.sources=vuln-api/app
+                            -Dsonar.sources=vuln-api/app \
+                            -Dsonar.tests=vuln-api/tests \
+                            -Dsonar.python.coverage.reportPaths=coverage.xml \
+                            -Dsonar.qualitygate.wait=true \
+                            -Dsonar.qualitygate.timeout=300
                         """
                     }
                 }
