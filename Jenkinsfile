@@ -8,32 +8,6 @@ pipeline {
     }
 
     stages {
-        stage('Deploy sonarqube') {
-            steps {
-                sh '''
-                docker compose up -d --build sonarqube
-                '''
-            }
-        }
-
-        stage('Esperar SonarQube') {
-            steps {
-                echo "Esperando a que el API de SonarQube responda..."
-                sh 'timeout 300s bash -c "until curl -s http://sonarqube:9000/api/system/status | grep -q UP; do sleep 5; done"'
-            }
-        }
-
-        stage('Debug Filesystem') {
-            steps {
-                sh '''
-                echo "--- ARCHIVOS EN JENKINS ---"
-                ls -R ${WORKSPACE}/vuln-api
-                
-                echo "--- INTENTANDO VER ARCHIVOS DESDE EL CONTENEDOR API ---"
-                docker compose run --rm api ls -R /app
-                '''
-            }
-        }
 
         stage('Unit Tests & Coverage') {
             steps {

@@ -76,12 +76,12 @@ services:
       - jenkins_data:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
       - ./reports:/reports
-      - .:/home/proyecto_local
     environment:
       - DOCKER_HOST=unix:///var/run/docker.sock
-      - JAVA_OPTS=-Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true
     networks:
       - app-network
+    depends_on:
+      - sonarqube
 
   zap:
     image: zaproxy/zap-weekly
