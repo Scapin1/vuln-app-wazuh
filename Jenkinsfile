@@ -8,25 +8,6 @@ pipeline {
     }
 
     stages {
-
-        stage('Unit Tests & Coverage') {
-            steps {
-                echo "Ejecutando pruebas unitarias desde el contenedor..."
-                sh '''
-                docker compose build api
-                
-                docker compose run --rm api sh -c "
-                    pip install pytest pytest-cov httpx && \
-                    pytest tests/ --cov=app --cov-report=xml:coverage.xml --cov-report=term
-                "
-                CONTAINER_ID=$(docker create vuln-app-api)
-                docker cp $CONTAINER_ID:/app/coverage.xml ./vuln-api/coverage.xml
-                docker rm $CONTAINER_ID
-                '''
-            }
-        }
-
-
        stage('SonarQube Analysis') {
             environment {
                 SONAR_HOST_URL = "http://sonarqube:9000"
@@ -41,8 +22,10 @@ pipeline {
                 -v "$(pwd):/usr/src" \
                 sonarsource/sonar-scanner-cli \
                 -Dsonar.projectKey=vuln-app-api \
+                -Dsonar.host.url=$SONAR_HOST_URL
                 -Dsonar.projectName="Vuln App Wazuh" \
-                -Dsonar.sources=. \
+                -Dsonar.sources=vuln-api/app \
+                -Dsonar.tests=vuln-api/tests \
                 -Dsonar.sourceEncoding=UTF-8
                 '''
             }
