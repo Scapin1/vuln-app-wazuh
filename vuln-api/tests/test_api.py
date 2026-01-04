@@ -41,7 +41,11 @@ def test_sync_vulnerabilities_success(mock_post, client, db_session):
                 {
                     "_source": {
                         "agent": {"id": "001", "name": "test-agent"},
-                        "vulnerability": {"id": "CVE-2023-1234", "severity": "High", "score": {"base": 7.5}},
+                        "vulnerability": {
+                            "id": "CVE-2023-1234", 
+                            "severity": "High", 
+                            "score": {"base": 7.5, "version": "3.1"}
+                        },
                         "package": {"name": "openssl", "version": "1.1.1"},
                         "host": {"os": {"full": "Ubuntu 22.04"}}
                     }

@@ -28,7 +28,7 @@ class UserInteraction(Base):
 class WazuhVulnerability(Base):
     __tablename__ = "wazuh_vulnerabilities"
 
-    id = Column(BigInteger, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     agent_id = Column(String, nullable=False, index=True)
     agent_name = Column(String)
     os_full = Column(Text)

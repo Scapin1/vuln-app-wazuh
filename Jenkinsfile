@@ -9,20 +9,21 @@ pipeline {
 
     stages {
        // ETAPA DE TESTS: Comentada hasta que los tests estén listos
-        /*
+        
         stage('Unit Tests & Coverage') {
             steps {
-                script {
-                    docker.image('python:3.12-slim').inside("--network=vuln-app-wazuh_app-network") {
-                        sh """
-                        pip install -r vuln-api/requirements.txt pytest pytest-cov
-                        pytest --cov=vuln-api/app --cov-report=xml:coverage.xml vuln-api/tests/
-                        """
-                    }
-                }
+                sh '''
+                    docker compose build api
+                    docker compose run --rm \
+                        -v "$WORKSPACE/vuln-api:/coverage" \
+                        api sh -c "PYTHONPATH=/app pytest tests \
+                        --cov=app \
+                        --cov-report=xml:/coverage/coverage.xml \
+                        --cov-report=term"
+                '''
             }
         }
-        */
+        
 
         stage('SonarQube Analysis') {
             environment {
