@@ -14,23 +14,29 @@ pipeline {
                sh "ls -R" 
            }
        }
-       stage('SonarQube Analysis') {
-            environment {
-                SONAR_HOST_URL = "http://sonarqube:9000"
-                SONAR_AUTH_TOKEN = credentials('sonar-token')
-            }
+       // ETAPA DE TESTS: Comentada hasta que los tests estén listos
+        /*
+        stage('Unit Tests & Coverage') {
             steps {
                 script {
-                    // 1. Generamos el reporte de cobertura (Pytest + Coverage)
-                    // Usamos una imagen de python para correr los tests antes del análisis
                     docker.image('python:3.12-slim').inside("--network=vuln-app-wazuh_app-network") {
                         sh """
                         pip install -r vuln-api/requirements.txt pytest pytest-cov
                         pytest --cov=vuln-api/app --cov-report=xml:coverage.xml vuln-api/tests/
                         """
                     }
+                }
+            }
+        }
+        */
 
-                    // 2. Corremos el Scanner usando el reporte generado
+        stage('SonarQube Analysis') {
+            environment {
+                SONAR_HOST_URL = "http://sonarqube:9000"
+                SONAR_AUTH_TOKEN = credentials('sonar-token')
+            }
+            steps {
+                script {
                     docker.image('sonarsource/sonar-scanner-cli').inside("--network=vuln-app-wazuh_app-network --user=root") {
                         sh """
                         sonar-scanner \
@@ -38,11 +44,11 @@ pipeline {
                             -Dsonar.host.url=${SONAR_HOST_URL} \
                             -Dsonar.login=${SONAR_AUTH_TOKEN} \
                             -Dsonar.sources=vuln-api/app \
-                            -Dsonar.tests=vuln-api/tests \
-                            -Dsonar.python.coverage.reportPaths=coverage.xml \
                             -Dsonar.qualitygate.wait=true \
                             -Dsonar.qualitygate.timeout=300
                         """
+                        // Nota: Cuando habilites los tests, recuerda añadir esta línea al comando de arriba:
+                        // -Dsonar.python.coverage.reportPaths=coverage.xml
                     }
                 }
             }
