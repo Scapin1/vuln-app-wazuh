@@ -22,7 +22,7 @@ pipeline {
                 -v "$(pwd):/usr/src" \
                 sonarsource/sonar-scanner-cli \
                 -Dsonar.projectKey=vuln-api \
-                -Dsonar.host.url=$SONAR_HOST_URL
+                -Dsonar.host.url=$SONAR_HOST_URL \
                 -Dsonar.projectName="Vuln Api" \
                 -Dsonar.sources=vuln-api/app \
                 -Dsonar.tests=vuln-api/tests \
