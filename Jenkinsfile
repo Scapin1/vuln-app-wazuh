@@ -26,13 +26,7 @@ pipeline {
                 -e SONAR_HOST_URL=$SONAR_HOST_URL \
                 -e SONAR_TOKEN=$SONAR_AUTH_TOKEN \
                 -v "$(pwd):/usr/src" \
-                sonarsource/sonar-scanner-cli \
-                -Dsonar.projectKey=vuln-api \
-                -Dsonar.host.url=$SONAR_HOST_URL \
-                -Dsonar.projectName="Vuln Api" \
-                -Dsonar.sources=vuln-api/app \
-                -Dsonar.tests=vuln-api/tests \
-                -Dsonar.sourceEncoding=UTF-8
+                sonarsource/sonar-scanner-cli
                 '''
             }
         }
