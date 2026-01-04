@@ -29,6 +29,7 @@ pipeline {
                 -v "$(pwd):/usr/src" \
                 -w /usr/src \
                 sonarsource/sonar-scanner-cli \
+                alpine ls -la /usr/src \
                 -Dproject.settings=/usr/src/sonar-project.properties
                 '''
             }
