@@ -21,20 +21,19 @@ pipeline {
             }
             steps {
                 script {
-                    // 1. Crear el contenedor (sin iniciarlo aún)
-                    sh "docker create --name sonar_scanner --network=vuln-app-wazuh_app-network -e SONAR_HOST_URL=http://sonarqube:9000 -e SONAR_TOKEN=${SONAR_TOKEN} -w /usr/src sonarsource/sonar-scanner-cli"
-
-                    // 2. Copiar TODO tu código actual de Jenkins al contenedor
-                    sh "docker cp . sonar_scanner:/usr/src"
-
-                    // 3. Iniciar el contenedor y ver los logs
-                    sh "docker start -a sonar_scanner"
-                }
-            }
-            post {
-                always {
-                    // 4. Limpiar el contenedor creado
-                    sh "docker rm -f sonar_scanner || true"
+                    // Jenkins se encarga de:
+                    // 1. Montar el volumen correctamente (incluso en Docker-in-Docker)
+                    // 2. Correr el contenedor
+                    // 3. Borrar el contenedor al finalizar (pase lo que pase)
+                    docker.image('sonarsource/sonar-scanner-cli').inside("--network=vuln-app-wazuh_app-network --user=root") {
+                        sh """
+                        sonar-scanner \
+                            -Dsonar.projectKey=vuln-app-api \
+                            -Dsonar.host.url=http://sonarqube:9000 \
+                            -Dsonar.login=${SONAR_AUTH_TOKEN} \
+                            -Dsonar.sources=vuln-api/app
+                        """
+                    }
                 }
             }
         }
