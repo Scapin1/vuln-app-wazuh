@@ -40,7 +40,8 @@ pipeline {
                             -Dsonar.login=${SONAR_AUTH_TOKEN} \
                             -Dsonar.sources=vuln-api/app \
                             -Dsonar.qualitygate.wait=true \
-                            -Dsonar.qualitygate.timeout=300
+                            -Dsonar.qualitygate.timeout=300 \
+                            -Dsonar.python.coverage.reportPaths=coverage.xml
                         """
                         // Nota: Cuando habilites los tests, recuerda añadir esta línea al comando de arriba:
                         // -Dsonar.python.coverage.reportPaths=coverage.xml
