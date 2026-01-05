@@ -46,8 +46,8 @@ services:
       DATABASE_URL: postgresql://admin:adminpassword@db-api:5432/vulnerabilidades_db
 
       # Wazuh Manager API (si lo usas para login/consultas)
-      WAZUH_USER: wazuh-user
-      WAZUH_PASSWORD: wazuh-pass
+      WAZUH_USER: admin
+      WAZUH_PASSWORD: cb57aN*kLyEp+Kj1r7I2kwwIoXQng7Ty
       WAZUH_API_URL: https://165.227.59.98:55000
 
       # Ajusta al endpoint real del Indexer (o deja temporal mientras pruebas ZAP)
