@@ -60,10 +60,10 @@ pipeline {
 
         stage('OWASP ZAP baseline') {
             steps {
-                sh 'chmod +x scripts/run_zap.sh'
                 script {
-                    def scanId = env.BUILD_NUMBER
-                    sh "scripts/run_zap.sh ${TARGET_URL} ${scanId}"
+                    sh 'mkdir -p reports && chmod 777 reports'
+                    sh 'chmod +x jenkins/scripts/run_zap.sh'
+                    sh "./jenkins/scripts/run_zap.sh ${OWASP_URL} ${env.BUILD_NUMBER}"
                 }
             }
         }
