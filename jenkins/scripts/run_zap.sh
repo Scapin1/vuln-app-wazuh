@@ -38,7 +38,10 @@ docker run --rm \
     --network=$NETWORK \
     -v "$(pwd)/reports:/zap/wrk:rw" \
     ghcr.io/zaproxy/zaproxy:stable \
-    zap-api-scan.py -t "$TARGET" -f openapi \
+    zap-api-scan.py \
+    -t "$TARGET" \
+    -f openapi \
+    -s \
     -r "zap_report.html" \
     -J "zap_report.json" \
     -z "Authorization: Bearer $TOKEN" || echo "ZAP finalizó"
