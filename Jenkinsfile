@@ -9,8 +9,6 @@ pipeline {
     }
 
     stages {
-       // ETAPA DE TESTS: Comentada hasta que los tests estén listos
-        
         stage('Unit Tests & Coverage') {
             steps {
                 sh '''
@@ -24,7 +22,6 @@ pipeline {
                 '''
             }
         }
-        
 
         stage('SonarQube Analysis') {
             environment {
@@ -41,11 +38,6 @@ pipeline {
                             -Dsonar.login=${SONAR_AUTH_TOKEN} \
                             -Dsonar.sources=vuln-api/app
                         """
-                        // Nota: Cuando habilites los tests, recuerda añadir esta línea al comando de arriba:
-                        // -Dsonar.qualitygate.wait=true \
-                        // -Dsonar.qualitygate.timeout=300 \
-                        // -Dsonar.python.coverage.reportPaths=vuln-api/coverage.xml
-                        // -Dsonar.python.coverage.reportPaths=coverage.xml
                     }
                 }
             }
@@ -53,9 +45,7 @@ pipeline {
 
         stage('Deploy app') {
             steps {
-                sh '''
-                docker compose up -d --build api zap
-                '''
+                sh 'docker compose up -d --build api zap'
             }
         }
 
@@ -68,12 +58,12 @@ pipeline {
                 }
             }
         }
+    } // Cierre de STAGES
 
     post {
         always {
             script {
                 def scanId = env.BUILD_NUMBER
-                // Publicar reporte HTML de ZAP (si tienes HTML Publisher)
                 publishHTML(target: [
                     reportDir: '.',
                     reportFiles: "zap_report_${scanId}.html",
@@ -83,9 +73,7 @@ pipeline {
                 ])
                 archiveArtifacts artifacts: "zap_report_${scanId}.html,zap_report_${scanId}.json", onlyIfSuccessful: false
             }
-
-            // Limpieza opcional
             sh 'docker ps -a'
         }
-    }
-}
+    } // Cierre de POST
+} // <--- ESTA ES LA LLAVE QUE FALTABA PARA CERRAR EL PIPELINE
