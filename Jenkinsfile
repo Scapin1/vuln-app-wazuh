@@ -4,7 +4,8 @@ pipeline {
     environment {
         APP_IMAGE = "vuln-api:${env.BUILD_NUMBER}"
         APP_PORT  = "8000"
-        TARGET_URL = "https://165.227.59.98:9200"  // ajusta según tu entorno
+        TARGET_URL = "https://165.227.59.98:9200"
+        OWASP_URL = "http://api:8000/openapi.json"
     }
 
     stages {
