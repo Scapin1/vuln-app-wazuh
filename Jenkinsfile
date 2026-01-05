@@ -65,15 +65,20 @@ pipeline {
             script {
                 def scanId = env.BUILD_NUMBER
                 publishHTML(target: [
-                    reportDir: '.',
+                    reportDir: 'reports', // <--- CAMBIO AQUÍ: apunta a la carpeta reports
                     reportFiles: "zap_report_${scanId}.html",
                     reportName: "OWASP ZAP Report",
                     keepAll: true,
                     alwaysLinkToLastBuild: true
                 ])
-                archiveArtifacts artifacts: "zap_report_${scanId}.html,zap_report_${scanId}.json", onlyIfSuccessful: false
+                
+                // Añadimos allowEmptyArchive: true para que no falle la build si el archivo falta
+                // y corregimos la ruta a reports/
+                archiveArtifacts artifacts: "reports/zap_report_${scanId}.html, reports/zap_report_${scanId}.json", 
+                                 onlyIfSuccessful: false, 
+                                 allowEmptyArchive: true 
             }
             sh 'docker ps -a'
         }
-    } // Cierre de POST
-} // <--- ESTA ES LA LLAVE QUE FALTABA PARA CERRAR EL PIPELINE
+    }
+}
