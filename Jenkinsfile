@@ -69,25 +69,6 @@ pipeline {
             }
         }
 
-        stage('Sincronizar vulnerabilidades desde Wazuh') {
-            steps {
-                script {
-                    // Llamas al endpoint /auth/login y /vulns/sync con curl
-                    // (aquí asumo usuario admin:admin creado previamente)
-                    sh """
-                    TOKEN=\$(curl -s -X POST ${TARGET_URL}/auth/login \
-                        -H "Content-Type: application/x-www-form-urlencoded" \
-                        -d "username=admin&password=admin" | python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
-
-                    curl -s -X POST ${TARGET_URL}/vulns/sync \
-                        -H "Authorization: Bearer \$TOKEN" \
-                        -H "Content-Type: application/json"
-                    """
-                }
-            }
-        }
-    }
-
     post {
         always {
             script {
