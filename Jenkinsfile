@@ -59,7 +59,7 @@ pipeline {
             }
         }
 
-        stage('OWASP ZAP baseline') {
+        stage('OWASP ZAP Scan') {
             steps {
                 script {
                     sh 'mkdir -p reports && chmod 777 reports'
