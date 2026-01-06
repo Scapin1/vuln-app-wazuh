@@ -2,7 +2,7 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Annotated
 from pydantic import BaseModel
 
 from .db import Base, engine, get_db, SessionLocal
@@ -47,19 +47,19 @@ class ChangePasswordRequest(BaseModel):
 def change_password(
     request: ChangePasswordRequest, 
     db: Session = Depends(get_db), 
-    current_user: User = Depends(get_current_user)
+    current_user: Annotated[User, Depends(get_current_user)]
 ):
     # 1. Verificar que la contraseña antigua sea correcta
     if not verify_password(request.old_password, current_user.password_hash):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
+            status_code=400, 
             detail="La contraseña antigua es incorrecta"
         )
     
     # 2. Validar que la nueva contraseña no sea igual a la antigua (opcional pero recomendado)
     if request.old_password == request.new_password:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
+            status_code=400, 
             detail="La nueva contraseña debe ser diferente a la anterior"
         )
 
