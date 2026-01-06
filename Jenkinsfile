@@ -19,6 +19,7 @@ pipeline {
                         --cov=app \
                         --cov-report=xml:/coverage/coverage.xml \
                         --cov-report=term"
+                        sed -i 's|<source>/app/app</source>|<source>vuln-api/app</source>|g' vuln-api/coverage.xml
                 '''
             }
         }
