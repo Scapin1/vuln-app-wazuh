@@ -46,8 +46,8 @@ class ChangePasswordRequest(BaseModel):
 @app.post("/auth/change-password")
 def change_password(
     request: ChangePasswordRequest, 
-    db: Session = Depends(get_db), 
-    current_user: Annotated[User, Depends(get_current_user)]
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Session = Depends(get_db)
 ):
     # 1. Verificar que la contraseña antigua sea correcta
     if not verify_password(request.old_password, current_user.password_hash):
