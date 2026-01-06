@@ -13,13 +13,7 @@ pipeline {
             steps {
                 sh '''
                     docker compose build api
-                    docker compose run --rm \
-                        -v "$WORKSPACE/vuln-api:/coverage" \
-                        api sh -c "echo '--- Ruta actual: ---' && pwd && \
-                                   echo '--- Contenido de /app (Código): ---' && ls -R /app && \
-                                   echo '--- Contenido de /coverage (Volumen): ---' && ls -la /coverage && \
-                                   PYTHONPATH=/app pytest tests --cov=app --cov-report=xml:/coverage/coverage.xml"
-                    ls -R
+                    docker compose run --rm -v .:/app api sh -c "PYTHONPATH=/app pytest tests --cov=app --cov-report=xml:vuln-api/coverage.xml"
                     sed -i 's|<source>/app/app</source>|<source>vuln-api/app</source>|g' vuln-api/coverage.xml
                 '''
             }
