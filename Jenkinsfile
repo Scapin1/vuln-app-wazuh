@@ -31,12 +31,14 @@ pipeline {
             }
             steps {
                 script {
-                    docker.image('sonarsource/sonar-scanner-cli').inside("--network=vuln-app-wazuh_app-network --user=root") {
-                        sh """
-                        sonar-scanner \
-                            -Dsonar.host.url=${SONAR_HOST_URL} \
-                            -Dsonar.login=${SONAR_AUTH_TOKEN} \
-                        """
+                    withSonarQubeEnv('SonarQube-Server') {
+                        docker.image('sonarsource/sonar-scanner-cli').inside("--network=vuln-app-wazuh_app-network --user=root") {
+                            sh """
+                            sonar-scanner \
+                                -Dsonar.host.url=${SONAR_HOST_URL} \
+                                -Dsonar.login=${SONAR_AUTH_TOKEN} \
+                            """
+                        }     
                     }
                 }
             }
