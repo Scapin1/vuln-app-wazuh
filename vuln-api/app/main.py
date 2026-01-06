@@ -3,10 +3,11 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from typing import List
+from pydantic import BaseModel
 
 from .db import Base, engine, get_db, SessionLocal
 from .models import User, WazuhVulnerability
-from .auth import authenticate_user, create_access_token, get_current_user, hash_password
+from .auth import authenticate_user, create_access_token, get_current_user, hash_password, verify_password
 from .wazuh_client import fetch_all_vulns
 
 Base.metadata.create_all(bind=engine)
@@ -16,7 +17,7 @@ def create_default_admin():
     try:
         admin_exists = db.query(User).filter(User.username == "admin").first()
         if not admin_exists:
-            print("Creating admin user by default...")
+            print("Creando usuario admin default...")
             default_admin = User(
                     username="admin",
                     password_hash=hash_password("admin")
@@ -37,6 +38,39 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         raise HTTPException(status_code=400, detail="Usuario o contraseña incorrectos")
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+@app.post("/auth/change-password")
+def change_password(
+    request: ChangePasswordRequest, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    # 1. Verificar que la contraseña antigua sea correcta
+    if not verify_password(request.old_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="La contraseña antigua es incorrecta"
+        )
+    
+    # 2. Validar que la nueva contraseña no sea igual a la antigua (opcional pero recomendado)
+    if request.old_password == request.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="La nueva contraseña debe ser diferente a la anterior"
+        )
+
+    # 3. Hashear la nueva contraseña y actualizar el modelo
+    current_user.password_hash = hash_password(request.new_password)
+    
+    # 4. Guardar los cambios en la base de datos
+    db.add(current_user)
+    db.commit()
+    
+    return {"message": "Contraseña actualizada exitosamente"}
 
 @app.post("/vulns/sync")
 def sync_vulnerabilities(
@@ -107,4 +141,5 @@ def list_vulns(
 ):
     vulns = db.query(WazuhVulnerability).limit(limit).all()
     return vulns
+
 
