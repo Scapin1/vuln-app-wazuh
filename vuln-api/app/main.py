@@ -4,12 +4,29 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from typing import List
 
-from .db import Base, engine, get_db
+from .db import Base, engine, get_db, SessionLocal
 from .models import User, WazuhVulnerability
-from .auth import authenticate_user, create_access_token, get_current_user
+from .auth import authenticate_user, create_access_token, get_current_user, hash_password
 from .wazuh_client import fetch_all_vulns
 
 Base.metadata.create_all(bind=engine)
+
+def create_default_admin():
+    db = SessionLocal()
+    try:
+        admin_exists = db.query(User).filter(User.username == "admin").first()
+        if not admin_exists:
+            print("Creating admin user by default...")
+            default_admin = User(
+                    username="admin",
+                    password_hash=hash_password("admin")
+                    )
+            db.add(default_admin)
+            db.commit()
+    finally:
+        db.close()
+
+create_default_admin()
 
 app = FastAPI(title="Vulnerability Aggregator API")
 
