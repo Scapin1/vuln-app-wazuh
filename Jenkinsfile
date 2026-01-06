@@ -14,11 +14,11 @@ pipeline {
                 sh '''
                     docker compose build api
                     docker compose run \
-                        -v "$WORKSPACE/vuln-api:/app/coverage" \
+                        -v "$WORKSPACE/vuln-api:/coverage" \
                         api sh -c "PYTHONPATH=/app pytest tests \
                         --cov=app \
                         --cov-report=xml:/coverage/coverage.xml \
-                        --cov-report=term"
+                        --cov-report=term" && ls -R
                     ls -R    
                     sed -i 's|<source>/app/app</source>|<source>vuln-api/app</source>|g' vuln-api/coverage.xml
                 '''
