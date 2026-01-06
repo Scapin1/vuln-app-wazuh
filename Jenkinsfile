@@ -31,7 +31,7 @@ pipeline {
             }
             steps {
                 script {
-                    withSonarQubeEnv('SonarQube-Server') {
+                    withSonarQubeEnv('sonarqube') {
                         docker.image('sonarsource/sonar-scanner-cli').inside("--network=vuln-app-wazuh_app-network --user=root") {
                             sh """
                             sonar-scanner \
