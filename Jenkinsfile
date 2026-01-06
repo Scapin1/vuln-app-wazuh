@@ -11,19 +11,22 @@ pipeline {
     stages {
         stage('Unit Tests & Coverage') {
             steps {
-                sh '''
-                    docker compose build api
-                    docker compose run --rm \
-                        -v "$(pwd)/vuln-api:/app" \
-                        api sh -c "PYTHONPATH=/app pytest tests \
-                        --cov=app \
-                        --cov-report=xml:coverage.xml \
-                        --cov-report=term"
-                    ls -la vuln-api
-                    sed -i 's|<source>/app/app</source>|<source>vuln-api/app</source>|g' vuln-api/coverage.xml
-                '''
+                script {
+                    sh '''
+                        # Ejecutamos sin --rm para que el contenedor quede "Exited" pero con los archivos dentro
+                        docker compose run --name temp-tests api sh -c "PYTHONPATH=/app pytest tests --cov=app --cov-report=xml:coverage.xml"
+                        
+                        # Copiamos el archivo al workspace de Jenkins
+                        docker cp temp-tests:/app/coverage.xml vuln-api/coverage.xml
+                        
+                        # Limpiamos el contenedor
+                        docker rm temp-tests
+                        
+                        # Corregimos las rutas para SonarQube
+                        sed -i 's|<source>/app/app</source>|<source>vuln-api/app</source>|g' vuln-api/coverage.xml
+                    '''
+                }
             }
-        }
 
         stage('SonarQube Analysis') {
             environment {
