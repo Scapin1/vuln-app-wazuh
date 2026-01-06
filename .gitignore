@@ -1,3 +1,7 @@
 __pycache__/
 .env
 .venv
+
+reports/
+
+vuln-api/coverage.xml
