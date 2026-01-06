@@ -19,6 +19,7 @@ pipeline {
                                    echo '--- Contenido de /app (Código): ---' && ls -R /app && \
                                    echo '--- Contenido de /coverage (Volumen): ---' && ls -la /coverage && \
                                    PYTHONPATH=/app pytest tests --cov=app --cov-report=xml:/coverage/coverage.xml"
+                    ls -R
                     sed -i 's|<source>/app/app</source>|<source>vuln-api/app</source>|g' vuln-api/coverage.xml
                 '''
             }
