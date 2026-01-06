@@ -37,7 +37,7 @@ pipeline {
                             -Dsonar.host.url=${SONAR_HOST_URL} \
                             -Dsonar.login=${SONAR_AUTH_TOKEN} \
                             -Dsonar.sources=vuln-api/app \
-                            -Dsonar.python.coverage.reportPaths=vuñn-api/coverage.xml
+                            -Dsonar.python.coverage.reportPaths=vuln-api/coverage.xml
                         """
                     }
                 }
