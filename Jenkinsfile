@@ -33,11 +33,8 @@ pipeline {
                     docker.image('sonarsource/sonar-scanner-cli').inside("--network=vuln-app-wazuh_app-network --user=root") {
                         sh """
                         sonar-scanner \
-                            -Dsonar.projectKey=vuln-app-api \
                             -Dsonar.host.url=${SONAR_HOST_URL} \
                             -Dsonar.login=${SONAR_AUTH_TOKEN} \
-                            -Dsonar.sources=vuln-api/app \
-                            -Dsonar.python.coverage.reportPaths=vuln-api/coverage.xml
                         """
                     }
                 }
