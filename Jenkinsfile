@@ -14,7 +14,7 @@ pipeline {
                 sh '''
                     docker compose build api
                     docker compose run \
-                        -v "$WORKSPACE/vuln-api:/coverage" \
+                        -v "$WORKSPACE/vuln-api:/app/coverage" \
                         api sh -c "PYTHONPATH=/app pytest tests \
                         --cov=app \
                         --cov-report=xml:/coverage/coverage.xml \
