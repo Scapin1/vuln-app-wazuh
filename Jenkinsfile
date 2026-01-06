@@ -13,7 +13,7 @@ pipeline {
             steps {
                 sh '''
                     docker compose build api
-                    docker compose run --rm \
+                    docker compose run \
                         -v "$WORKSPACE/vuln-api:/coverage" \
                         api sh -c "PYTHONPATH=/app pytest tests \
                         --cov=app \
