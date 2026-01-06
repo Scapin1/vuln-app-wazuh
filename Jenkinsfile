@@ -36,9 +36,19 @@ pipeline {
                             -Dsonar.projectKey=vuln-app-api \
                             -Dsonar.host.url=${SONAR_HOST_URL} \
                             -Dsonar.login=${SONAR_AUTH_TOKEN} \
-                            -Dsonar.sources=vuln-api/app
+                            -Dsonar.sources=vuln-api/app \
+                            -Dsonar.python.coverage.reportPaths=vuñn-api/coverage.xml
                         """
                     }
+                }
+            }
+        }
+
+        stage("Quality Gate") {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    // Jenkins se detiene aquí hasta que SonarQube termine el análisis
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
