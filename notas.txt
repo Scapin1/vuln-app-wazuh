@@ -1,0 +1,3 @@
+- al ser un único usuario iniciar con credenciales default y obligar a cambiar las credenciales en el primer inicio de sesión
+- solo un usuario autenticado puede crear otro usuario
+- 
