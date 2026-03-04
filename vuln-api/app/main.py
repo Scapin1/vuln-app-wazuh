@@ -1,6 +1,9 @@
 # app/main.py
+import os
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import set_key, find_dotenv
 from sqlalchemy.orm import Session
 from typing import List, Annotated
 from pydantic import BaseModel
@@ -30,6 +33,14 @@ def create_default_admin():
 create_default_admin()
 
 app = FastAPI(title="Vulnerability Aggregator API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/auth/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
@@ -142,4 +153,68 @@ def list_vulns(
     vulns = db.query(WazuhVulnerability).limit(limit).all()
     return vulns
 
+@app.get("/users/me")
+def get_user_me(current_user: User = Depends(get_current_user)):
+    # Check if this is admin and has default password
+    is_default = (current_user.username == "admin" and verify_password("admin", current_user.password_hash))
+    return {"id": current_user.id, "username": current_user.username, "is_default_password": is_default}
 
+class NewUserRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/users")
+def create_user(
+    request: NewUserRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    existing = db.query(User).filter(User.username == request.username).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Usuario ya existe")
+    
+    new_user = User(
+        username=request.username,
+        password_hash=hash_password(request.password)
+    )
+    db.add(new_user)
+    db.commit()
+    return {"message": "Usuario creado"}
+
+class WazuhConfigRequest(BaseModel):
+    indexer_url: str
+    user: str
+    password: str
+
+@app.get("/wazuh-config")
+def get_wazuh_config(current_user: User = Depends(get_current_user)):
+    return {
+        "indexer_url": os.getenv("WAZUH_INDEXER_URL", ""),
+        "user": os.getenv("WAZUH_USER", ""),
+        "password": "" # Don't return password directly for security, or return masked
+    }
+
+@app.put("/wazuh-config")
+def update_wazuh_config(
+    request: WazuhConfigRequest,
+    current_user: User = Depends(get_current_user)
+):
+    env_file = find_dotenv()
+    if not env_file:
+        env_file = ".env"
+        # Create if not exists
+        with open(env_file, "a") as f:
+            pass
+    
+    set_key(env_file, "WAZUH_INDEXER_URL", request.indexer_url)
+    set_key(env_file, "WAZUH_USER", request.user)
+    if request.password:
+        set_key(env_file, "WAZUH_PASSWORD", request.password)
+        
+    # Reload environment variables to update current process
+    os.environ["WAZUH_INDEXER_URL"] = request.indexer_url
+    os.environ["WAZUH_USER"] = request.user
+    if request.password:
+         os.environ["WAZUH_PASSWORD"] = request.password
+        
+    return {"message": "Configuración actualizada. Puede requerir reiniciar el backend si wazuh_client.py la carga estáticamente al importar."}

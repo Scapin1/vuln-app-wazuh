@@ -1,0 +1,164 @@
+<template>
+  <div class="card max-w-lg fade-in">
+    <div class="card-header">
+      <div class="icon-box">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      </div>
+      <div>
+        <h1 class="title">Seguridad de la Cuenta</h1>
+        <p class="subtitle" style="margin-bottom:0">Actualiza tu contraseña para mantener la cuenta segura.</p>
+      </div>
+    </div>
+
+    <form @submit.prevent="handleChange" class="mt-4">
+      <div class="form-group">
+        <label class="form-label">Contraseña Actual</label>
+        <div class="input-icon">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          <input type="password" v-model="oldPassword" class="form-input" required placeholder="••••••••">
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">Nueva Contraseña</label>
+        <div class="input-icon">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
+          <input type="password" v-model="newPassword" class="form-input" required placeholder="••••••••">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Confirmar Nueva Contraseña</label>
+        <div class="input-icon">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          <input type="password" v-model="confirmPassword" class="form-input" required placeholder="••••••••">
+        </div>
+      </div>
+
+      <div v-if="error" class="alert alert-danger fade-in">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        {{ error }}
+      </div>
+      <div v-if="success" class="alert alert-success fade-in">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        {{ success }}
+      </div>
+
+      <button type="submit" class="btn btn-primary" :disabled="loading" style="margin-top: 1rem;">
+        <svg v-if="loading" class="spin" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+        <span v-else>Guardar Cambios</span>
+      </button>
+    </form>
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import api from '../api'
+
+const router = useRouter()
+const oldPassword = ref('')
+const newPassword = ref('')
+const confirmPassword = ref('')
+const error = ref('')
+const success = ref('')
+const loading = ref(false)
+
+const handleChange = async () => {
+  error.value = ''
+  success.value = ''
+  
+  if (newPassword.value !== confirmPassword.value) {
+    error.value = 'Las contraseñas no coinciden.'
+    return
+  }
+
+  loading.value = true
+  
+  try {
+    await api.post('/auth/change-password', {
+      old_password: oldPassword.value,
+      new_password: newPassword.value
+    })
+    success.value = 'Contraseña actualizada correctamente.'
+    setTimeout(() => {
+      router.push('/')
+    }, 1500)
+  } catch (err) {
+    if (err.response && err.response.data.detail) {
+      error.value = err.response.data.detail
+    } else {
+      error.value = 'Error al cambiar la contraseña.'
+    }
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
+<style scoped>
+.max-w-lg {
+  max-width: 600px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.icon-box {
+  width: 48px;
+  height: 48px;
+  background-color: var(--primary-glow);
+  color: var(--primary);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.input-icon {
+  position: relative;
+}
+
+.input-icon .icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}
+
+.input-icon .form-input {
+  padding-left: 3rem;
+}
+
+.alert {
+  padding: 1rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
+.alert-danger {
+  color: var(--danger);
+  background-color: var(--danger-bg);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.alert-success {
+  color: var(--success);
+  background-color: var(--success-bg);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+</style>
