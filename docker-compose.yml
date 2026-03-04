@@ -66,44 +66,57 @@ services:
       timeout: 5s
       retries: 5
 
-  jenkins:
-    build: ./jenkins
-    user: root
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
     ports:
-      - "8080:8080"
-      - "50000:50000"
-    volumes:
-      - jenkins_data:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./reports:/reports
-    environment:
-      - DOCKER_HOST=unix:///var/run/docker.sock
-    networks:
-      - app-network
-    depends_on:
-      - sonarqube
-
-  zap:
-    image: zaproxy/zap-weekly
+      - "3000:80"
     depends_on:
       api:
         condition: service_healthy
-    volumes:
-      - ./reports:/zap/wrk
-    command: >
-      sh -c "echo 'Waiting for API...'; sleep 20;
-      zap-baseline.py -t http://api:8000
-      -r zap_report.html
-      -J zap_report.json
-      -m 2"
     networks:
       - app-network
-    restart: "no"
+
+  # jenkins:
+  #   build: ./jenkins
+  #   user: root
+  #   ports:
+  #     - "8080:8080"
+  #     - "50000:50000"
+  #   volumes:
+  #     - jenkins_data:/var/jenkins_home
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - ./reports:/reports
+  #   environment:
+  #     - DOCKER_HOST=unix:///var/run/docker.sock
+  #   networks:
+  #     - app-network
+  #   depends_on:
+  #     - sonarqube
+
+  # zap:
+  #   image: zaproxy/zap-weekly
+  #   depends_on:
+  #     api:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./reports:/zap/wrk
+  #   command: >
+  #     sh -c "echo 'Waiting for API...'; sleep 20;
+  #     zap-baseline.py -t http://api:8000
+  #     -r zap_report.html
+  #     -J zap_report.json
+  #     -m 2"
+  #   networks:
+  #     - app-network
+  #   restart: "no"
 
 volumes:
   postgres_sonar_data:
   postgres_api_data:
-  jenkins_data:
+  # jenkins_data:
   sonarqube_data:
   sonarqube_extensions:
   sonarqube_logs:
