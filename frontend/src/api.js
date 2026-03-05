@@ -4,7 +4,7 @@ const mockData = {
     vulns: [
         {
             id: 1,
-            cve_id: 'CVE-2023-1234',
+            cve_id: 'CVE-2023-1234 FALSO',
             severity: 'critical',
             agent_name: 'server-01',
             package_name: 'bash',
@@ -14,7 +14,7 @@ const mockData = {
         },
         {
             id: 2,
-            cve_id: 'CVE-2022-9876',
+            cve_id: 'CVE-2022-9876 FALSO',
             severity: 'high',
             agent_name: 'desktop-mx',
             package_name: 'openssl',
@@ -24,7 +24,7 @@ const mockData = {
         },
         {
             id: 3,
-            cve_id: 'CVE-2021-3452',
+            cve_id: 'CVE-2021-3452 FALSO',
             severity: 'medium',
             agent_name: 'web-server-02',
             package_name: 'nginx',
@@ -34,7 +34,7 @@ const mockData = {
         },
         {
             id: 4,
-            cve_id: 'CVE-2020-0001',
+            cve_id: 'CVE-2020-0001 FALSO',
             severity: 'low',
             agent_name: 'vpn-node',
             package_name: 'curl',
@@ -45,7 +45,7 @@ const mockData = {
     ],
     user: {
         id: 1,
-        username: 'admin',
+        username: 'admin FALSO',
         is_default_password: false // Falso para que puedas explorar el panel sin que te obligue a cambiar la password
     }
 }

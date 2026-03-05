@@ -8,7 +8,7 @@
     <aside class="sidebar">
       <div class="sidebar-brand">
         <div class="logo-box">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
         </div>
         <span>VulnSync</span>
       </div>
@@ -149,7 +149,7 @@ router.afterEach((to) => {
   gap: 1rem;
   font-size: 1.25rem;
   font-weight: 700;
-  color: #fff;
+  color: var(--text-main);
   border-bottom: 1px solid var(--border);
 }
 
@@ -200,13 +200,13 @@ router.afterEach((to) => {
 }
 
 .nav-item:hover {
-  color: #fff;
-  background-color: var(--bg-hover);
+  color: var(--primary);
+  background-color: rgba(31, 138, 59, 0.10);
   text-decoration: none;
 }
 
 .nav-item.router-link-active {
-  color: #fff;
+  color: var(--primary);
   background-color: rgba(135, 197, 62, 0.1);
   border-left-color: var(--primary);
 }

@@ -1,33 +1,39 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  /* Linux Mint Inspired Theme */
-  --primary: #87c53e;
-  --primary-hover: #72a933;
-  --primary-glow: rgba(135, 197, 62, 0.25);
+  /* Linux Mint Inspired Light Theme */
+  --primary: #6ea42a;
+  /* Ligeramente más oscuro para contrastar en fondo claro */
+  --primary-hover: #5c8e22;
+  --primary-glow: rgba(110, 164, 42, 0.25);
 
-  --bg-dark: #0f1115;
-  --bg-panel: #16181d;
-  --bg-card: #1f2228;
-  --bg-hover: #2a2e35;
+  --bg-dark: #f3f4f6;
+  /* Fondo gris muy claro para el body */
+  --bg-panel: #ffffff;
+  --bg-card: #ffffff;
+  /* Tarjetas blancas */
+  --bg-hover: #f9fafb;
+  /* Hover state sutil */
 
-  --text-main: #f3f4f6;
-  --text-muted: #9ca3af;
-  --border: #2d313a;
+  --text-main: #111827;
+  /* Texto oscuro para máxima visibilidad */
+  --text-muted: #4b5563;
+  /* Texto secundario gris oscuro */
+  --border: #e5e7eb;
 
-  --danger: #ef4444;
-  --danger-bg: rgba(239, 68, 68, 0.15);
-  --warning: #f59e0b;
-  --warning-bg: rgba(245, 158, 11, 0.15);
-  --success: #10b981;
-  --success-bg: rgba(16, 185, 129, 0.15);
+  --danger: #dc2626;
+  --danger-bg: rgba(220, 38, 38, 0.15);
+  --warning: #d97706;
+  --warning-bg: rgba(217, 119, 6, 0.15);
+  --success: #059669;
+  --success-bg: rgba(5, 150, 105, 0.15);
 
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
 
-  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -127,7 +133,7 @@ a:hover {
 
 .btn-primary {
   background-color: var(--primary);
-  color: #000;
+  color: #ffffff;
   box-shadow: 0 4px 12px var(--primary-glow);
 }
 
@@ -165,7 +171,7 @@ td {
 }
 
 th {
-  background-color: rgba(255, 255, 255, 0.02);
+  background-color: rgba(0, 0, 0, 0.03);
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -205,9 +211,9 @@ tr:hover td {
 }
 
 .badge-medium {
-  background-color: rgba(96, 165, 250, 0.15);
-  color: #60a5fa;
-  border: 1px solid rgba(96, 165, 250, 0.3);
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #1d4ed8;
+  border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
 .badge-low {
@@ -280,6 +286,8 @@ tr:hover td {
 .spin {
   animation: spin 1s linear infinite;
 }
+
+
 
 @keyframes spin {
   from {
