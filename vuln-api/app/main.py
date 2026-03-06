@@ -112,16 +112,6 @@ def change_password(
     return {"message": "Contraseña actualizada exitosamente"}
 
 
-@app.get("/vulns")
-def list_vulns(
-    limit: int = 100,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    vulns = db.query(WazuhVulnerability).limit(limit).all()
-    return vulns
-
-
 @app.get("/users/me")
 def get_user_me(current_user: User = Depends(get_current_user)):
     # Check if this is admin and has default password
