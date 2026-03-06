@@ -57,6 +57,9 @@ class WazuhVulnerability(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     connection_id = Column(Integer, ForeignKey("wazuh_connections.id"), nullable=False)
     connection = relationship("WazuhConnection", back_populates="vulnerabilities")
+
+    status = Column(String, default="ACTIVE")  # "ACTIVE" o "RESOLVED"
+
     agent_id = Column(String, nullable=False, index=True)
     agent_name = Column(String)
     os_full = Column(Text)
@@ -85,6 +88,12 @@ class WazuhVulnerability(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    history = relationship(
+        "VulnerabilityHistory",
+        back_populates="vulnerability",
+        cascade="all, delete-orphan",
+    )
+
     __table_args__ = (
         UniqueConstraint(
             "connection_id",
@@ -95,3 +104,21 @@ class WazuhVulnerability(Base):
             name="uniq_wazuh_vuln",
         ),
     )
+
+
+class VulnerabilityHistory(Base):
+    __tablename__ = "vulnerability_history"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    vulnerability_id = Column(
+        Integer, ForeignKey("wazuh_vulnerabilities.id"), nullable=False
+    )
+
+    action = Column(
+        String, nullable=False
+    )  # Ej: "DETECTED", "SEVERITY_CHANGED", "RESOLVED", "REOPENED"
+    details = Column(Text, nullable=True)  # Explicación humana de lo que pasó
+
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+
+    vulnerability = relationship("WazuhVulnerability", back_populates="history")

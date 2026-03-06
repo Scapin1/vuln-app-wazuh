@@ -17,11 +17,12 @@ from .auth import (
     hash_password,
     verify_password,
 )
-
+from .models import User, WazuhVulnerability, WazuhConnection, VulnerabilityHistory
 from .wazuh_client import fetch_all_vulns, test_connection
 from .crypto import encrypt, decrypt
 
 Base.metadata.create_all(bind=engine)
+
 
 class WazuhConnectionRequest(BaseModel):
     name: str
@@ -30,6 +31,7 @@ class WazuhConnectionRequest(BaseModel):
     wazuh_password: str
     version: str = None
 
+
 class WazuhConnectionResponse(BaseModel):
     id: int
     name: str
@@ -37,6 +39,7 @@ class WazuhConnectionResponse(BaseModel):
     wazuh_user: str
     version: str | None
     is_active: bool
+
 
 def create_default_admin():
     db = SessionLocal()
@@ -107,6 +110,7 @@ def change_password(
     db.commit()
 
     return {"message": "Contraseña actualizada exitosamente"}
+
 
 @app.get("/users/me")
 def get_user_me(current_user: User = Depends(get_current_user)):
@@ -320,7 +324,25 @@ def sync_connection(
     raw_vulns = fetch_all_vulns(
         conn.indexer_url, conn.wazuh_user, decrypt(conn.wazuh_password), conn.version
     )
+
+    count = process_wazuh_vulnerabilities(db, conn.id, raw_vulns)
+    db.commit()
+
+    return {"synced": count, "connection": conn.name}
+
+
+def process_wazuh_vulnerabilities(db: Session, conn_id: int, raw_vulns: list) -> int:
+    """Procesa el payload de Wazuh, actualiza estados y genera historial de auditoría."""
     count = 0
+    seen_vuln_ids = set()
+
+    # 1. Traemos todas las vulnerabilidades que actualmente consideramos "ACTIVAS" para esta conexión
+    active_vulns_in_db = (
+        db.query(WazuhVulnerability)
+        .filter_by(connection_id=conn_id, status="ACTIVE")
+        .all()
+    )
+    active_vuln_dict = {v.id: v for v in active_vulns_in_db}
 
     for v in raw_vulns:
         agent = v.get("agent", {})
@@ -332,10 +354,11 @@ def sync_connection(
         if not vuln.get("id"):
             continue
 
+        # Buscamos si ya existe en la base de datos
         existing = (
             db.query(WazuhVulnerability)
             .filter_by(
-                connection_id=conn.id,
+                connection_id=conn_id,
                 agent_id=agent.get("id"),
                 package_name=pkg.get("name"),
                 package_version=pkg.get("version"),
@@ -345,127 +368,114 @@ def sync_connection(
         )
 
         if existing:
-            existing.severity = vuln.get("severity")
+            seen_vuln_ids.add(existing.id)
+
+            # A. ¿Estaba resuelta y volvió a aparecer?
+            if existing.status == "RESOLVED":
+                existing.status = "ACTIVE"
+                db.add(
+                    VulnerabilityHistory(
+                        vulnerability_id=existing.id,
+                        action="REOPENED",
+                        details="La vulnerabilidad fue detectada nuevamente por Wazuh",
+                    )
+                )
+
+            # B. ¿Cambió la severidad?
+            if existing.severity != vuln.get("severity"):
+                db.add(
+                    VulnerabilityHistory(
+                        vulnerability_id=existing.id,
+                        action="SEVERITY_CHANGED",
+                        details=f"Severidad cambió de {existing.severity} a {vuln.get('severity')}",
+                    )
+                )
+                existing.severity = vuln.get("severity")
+
+            # Actualizamos datos menores sin generar historial
             existing.score_base = (vuln.get("score") or {}).get("base")
-            existing.detected_at = vuln.get("detected_at")
             existing.last_seen = func.now()
+
         else:
+            # C. Es una vulnerabilidad completamente NUEVA
+            new_vuln = WazuhVulnerability(
+                connection_id=conn_id,
+                status="ACTIVE",
+                agent_id=agent.get("id"),
+                agent_name=agent.get("name"),
+                os_full=osinfo.get("full"),
+                os_platform=osinfo.get("platform"),
+                os_version=osinfo.get("version"),
+                package_name=pkg.get("name"),
+                package_version=pkg.get("version"),
+                package_type=pkg.get("type"),
+                package_arch=pkg.get("architecture"),
+                cve_id=vuln.get("id"),
+                severity=vuln.get("severity"),
+                score_base=(vuln.get("score") or {}).get("base"),
+                score_version=(vuln.get("score") or {}).get("version"),
+                detected_at=vuln.get("detected_at"),
+                published_at=vuln.get("published_at"),
+                description=vuln.get("description"),
+                reference=vuln.get("reference"),
+                scanner_vendor=(vuln.get("scanner") or {}).get("vendor"),
+            )
+            db.add(new_vuln)
+            db.flush()  # CRÍTICO: flush() le pide a Postgres el ID generado antes del commit final
+
+            seen_vuln_ids.add(new_vuln.id)
             db.add(
-                WazuhVulnerability(
-                    connection_id=conn.id,
-                    agent_id=agent.get("id"),
-                    agent_name=agent.get("name"),
-                    os_full=osinfo.get("full"),
-                    os_platform=osinfo.get("platform"),
-                    os_version=osinfo.get("version"),
-                    package_name=pkg.get("name"),
-                    package_version=pkg.get("version"),
-                    package_type=pkg.get("type"),
-                    package_arch=pkg.get("architecture"),
-                    cve_id=vuln.get("id"),
-                    severity=vuln.get("severity"),
-                    score_base=(vuln.get("score") or {}).get("base"),
-                    score_version=(vuln.get("score") or {}).get("version"),
-                    detected_at=vuln.get("detected_at"),
-                    published_at=vuln.get("published_at"),
-                    description=vuln.get("description"),
-                    reference=vuln.get("reference"),
-                    scanner_vendor=(vuln.get("scanner") or {}).get("vendor"),
+                VulnerabilityHistory(
+                    vulnerability_id=new_vuln.id,
+                    action="DETECTED",
+                    details="Vulnerabilidad identificada por primera vez",
                 )
             )
+
         count += 1
 
-    db.commit()
-    return {"synced": count, "connection": conn.name}
+    # 2. RESOLUCIÓN AUTOMÁTICA: Si teníamos vulnerabilidades activas que NO vinieron en este reporte,
+    # significa que el servidor fue parcheado. Las marcamos como resueltas.
+    for vuln_id, db_vuln in active_vuln_dict.items():
+        if vuln_id not in seen_vuln_ids:
+            db_vuln.status = "RESOLVED"
+            db.add(
+                VulnerabilityHistory(
+                    vulnerability_id=vuln_id,
+                    action="RESOLVED",
+                    details="Ya no es reportada por el agente (Probablemente parcheada)",
+                )
+            )
+
+    return count
 
 
 @app.post("/vulns/sync-all")
 def sync_all_connections(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
-    # Buscamos todas las conexiones activas
     conns = db.query(WazuhConnection).filter(WazuhConnection.is_active == True).all()
     results = []
 
     for conn in conns:
         try:
-            # 1. Obtenemos las vulnerabilidades usando la contraseña desencriptada
             raw_vulns = fetch_all_vulns(
                 conn.indexer_url,
                 conn.wazuh_user,
                 decrypt(conn.wazuh_password),
                 conn.version,
             )
-            count = 0
 
-            # 2. Iteramos sobre cada vulnerabilidad
-            for v in raw_vulns:
-                agent = v.get("agent", {})
-                host = v.get("host", {})
-                osinfo = host.get("os") or {}
-                pkg = v.get("package", {})
-                vuln = v.get("vulnerability", {})
-
-                if not vuln.get("id"):
-                    continue
-
-                # 3. Verificamos si ya existe para ESTA conexión específica
-                existing = (
-                    db.query(WazuhVulnerability)
-                    .filter_by(
-                        connection_id=conn.id,
-                        agent_id=agent.get("id"),
-                        package_name=pkg.get("name"),
-                        package_version=pkg.get("version"),
-                        cve_id=vuln.get("id"),
-                    )
-                    .first()
-                )
-
-                if existing:
-                    # Actualizamos si ya existe
-                    existing.severity = vuln.get("severity")
-                    existing.score_base = (vuln.get("score") or {}).get("base")
-                    existing.detected_at = vuln.get("detected_at")
-                    existing.last_seen = func.now()
-                else:
-                    # Insertamos si es nueva
-                    db.add(
-                        WazuhVulnerability(
-                            connection_id=conn.id,
-                            agent_id=agent.get("id"),
-                            agent_name=agent.get("name"),
-                            os_full=osinfo.get("full"),
-                            os_platform=osinfo.get("platform"),
-                            os_version=osinfo.get("version"),
-                            package_name=pkg.get("name"),
-                            package_version=pkg.get("version"),
-                            package_type=pkg.get("type"),
-                            package_arch=pkg.get("architecture"),
-                            cve_id=vuln.get("id"),
-                            severity=vuln.get("severity"),
-                            score_base=(vuln.get("score") or {}).get("base"),
-                            score_version=(vuln.get("score") or {}).get("version"),
-                            detected_at=vuln.get("detected_at"),
-                            published_at=vuln.get("published_at"),
-                            description=vuln.get("description"),
-                            reference=vuln.get("reference"),
-                            scanner_vendor=(vuln.get("scanner") or {}).get("vendor"),
-                        )
-                    )
-                count += 1
-
-            # 4. Guardamos los cambios de esta conexión específica en la BD
+            # Usamos nuestra nueva función profesional
+            count = process_wazuh_vulnerabilities(db, conn.id, raw_vulns)
             db.commit()
-            results.append({"connection": conn.name, "synced": count, "ok": True})
 
+            results.append({"connection": conn.name, "synced": count, "ok": True})
         except Exception as e:
-            # Si algo falla con esta conexión (ej. credenciales malas), revertimos sus cambios
             db.rollback()
             results.append({"connection": conn.name, "ok": False, "error": str(e)})
 
     return results
-
 
 
 @app.get("/vulns")
@@ -555,4 +565,3 @@ def update_wazuh_config(
     return {
         "message": "Configuración actualizada. Puede requerir reiniciar el backend si wazuh_client.py la carga estáticamente al importar."
     }
-
