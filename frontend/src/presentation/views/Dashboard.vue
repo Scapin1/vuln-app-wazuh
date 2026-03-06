@@ -7,11 +7,50 @@
         <p class="subtitle">Visualiza y gestiona el inventario de vulnerabilidades reportado por Wazuh.</p>
       </div>
       <div>
+        <button class="btn btn-secondary" @click="showFilters = !showFilters">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+          </svg>
+          {{ showFilters ? 'Ocultar' : 'Filtros' }}
+        </button>
         <button class="btn btn-primary" @click="syncVulns" :disabled="syncing">
           <svg v-if="syncing" class="spin" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
           <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.5l1.75 1.93"></path></svg>
           {{ syncing ? 'Sincronizando con Wazuh...' : 'Forzar Sincronización' }}
         </button>
+      </div>
+    </div>
+
+    <!-- Filter Tray -->
+    <div v-show="showFilters" class="filter-tray fade-in">
+      <div class="filter-grid">
+        <div class="filter-item">
+          <label>Estado</label>
+          <input v-model="filters.estado" type="text" placeholder="NUEVO, ACTIVO..." class="filter-input">
+        </div>
+        <div class="filter-item">
+          <label>Severidad</label>
+          <input v-model="filters.severidad" type="text" placeholder="CRITICAL, HIGH..." class="filter-input">
+        </div>
+        <div class="filter-item">
+          <label>CVE ID</label>
+          <input v-model="filters.cveId" type="text" placeholder="CVE-2023-..." class="filter-input">
+        </div>
+        <div class="filter-item">
+          <label>Agente</label>
+          <input v-model="filters.agente" type="text" placeholder="Nombre del agente..." class="filter-input">
+        </div>
+        <div class="filter-item">
+          <label>Software Afectado</label>
+          <input v-model="filters.software" type="text" placeholder="Nombre del paquete..." class="filter-input">
+        </div>
+        <div class="filter-item">
+          <label>Línea de Vida</label>
+          <input v-model="filters.lineaVida" type="text" placeholder="Fecha detectada..." class="filter-input">
+        </div>
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-outline" @click="clearFilters">Limpiar Filtros</button>
       </div>
     </div>
 
@@ -34,16 +73,58 @@
         <table v-if="vulns.length > 0">
           <thead>
             <tr>
-              <th width="10%">Estado</th>
-              <th width="12%">Severidad</th>
-              <th width="15%">CVE ID</th>
-              <th width="15%">Agente</th>
-              <th width="28%">Software Afectado</th>
-              <th width="20%">Línea de Vida</th>
+              <th width="10%" @click="sortBy('first_seen')">
+                Estado
+                <span v-if="sortKey === 'first_seen'" class="sort-indicator">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
+                    <path d="M7 14l5-5 5 5z"/>
+                  </svg>
+                </span>
+              </th>
+              <th width="12%" @click="sortBy('severity')">
+                Severidad
+                <span v-if="sortKey === 'severity'" class="sort-indicator">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
+                    <path d="M7 14l5-5 5 5z"/>
+                  </svg>
+                </span>
+              </th>
+              <th width="15%" @click="sortBy('cve_id')">
+                CVE ID
+                <span v-if="sortKey === 'cve_id'" class="sort-indicator">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
+                    <path d="M7 14l5-5 5 5z"/>
+                  </svg>
+                </span>
+              </th>
+              <th width="15%" @click="sortBy('agent_name')">
+                Agente
+                <span v-if="sortKey === 'agent_name'" class="sort-indicator">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
+                    <path d="M7 14l5-5 5 5z"/>
+                  </svg>
+                </span>
+              </th>
+              <th width="28%" @click="sortBy('package_name')">
+                Software Afectado
+                <span v-if="sortKey === 'package_name'" class="sort-indicator">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
+                    <path d="M7 14l5-5 5 5z"/>
+                  </svg>
+                </span>
+              </th>
+              <th width="20%" @click="sortBy('last_seen')">
+                Línea de Vida
+                <span v-if="sortKey === 'last_seen'" class="sort-indicator">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
+                    <path d="M7 14l5-5 5 5z"/>
+                  </svg>
+                </span>
+              </th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="vuln in vulns" :key="vuln.id">
+            <tr v-for="vuln in sortedVulns" :key="vuln.id">
               <td>
                 <span v-if="isNew(vuln.first_seen)" class="badge badge-new">
                   <span class="pulse-dot"></span> NUEVO
@@ -98,20 +179,136 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import vulnService from '../../application/services/vulnService'
 
 const vulns = ref([])
 const loading = ref(true)
 const syncing = ref(false)
 const error = ref('')
+const sortKey = ref('last_seen')
+const sortOrder = ref('desc')
+const showFilters = ref(false)
+const filters = ref({
+  estado: '',
+  severidad: '',
+  cveId: '',
+  agente: '',
+  software: '',
+  lineaVida: ''
+})
+
+const getSeverityLevel = (s) => {
+  if (!s) return 0
+  const severity = s.toLowerCase()
+  if (severity === 'critical' || severity === 'critica') return 4
+  if (severity === 'high' || severity === 'alta') return 3
+  if (severity === 'medium' || severity === 'media') return 2
+  return 1 // low or unknown
+}
+
+const compareValues = (a, b, key) => {
+  let aVal = a[key]
+  let bVal = b[key]
+
+  if (key === 'first_seen' || key === 'last_seen') {
+    aVal = aVal ? new Date(aVal).getTime() : 0
+    bVal = bVal ? new Date(bVal).getTime() : 0
+    return aVal - bVal
+  } else if (key === 'severity') {
+    aVal = getSeverityLevel(aVal)
+    bVal = getSeverityLevel(bVal)
+    return aVal - bVal
+  } else {
+    aVal = aVal || ''
+    bVal = bVal || ''
+    if (typeof aVal === 'string') {
+      return aVal.toLowerCase().localeCompare(bVal.toLowerCase())
+    }
+    return aVal - bVal
+  }
+}
+
+const estadoOptions = computed(() => {
+  const estados = new Set()
+  vulns.value.forEach(vuln => {
+    const estado = isNew(vuln.first_seen) ? 'NUEVO' : 'ACTIVO'
+    estados.add(estado)
+  })
+  return Array.from(estados).sort()
+})
+
+const severidadOptions = computed(() => {
+  const severidades = new Set()
+  vulns.value.forEach(vuln => {
+    const severidad = (vuln.severity || 'UNKNOWN').toUpperCase()
+    severidades.add(severidad)
+  })
+  return Array.from(severidades).sort((a, b) => {
+    // Sort by severity level for better UX
+    const levelA = getSeverityLevel(a.toLowerCase())
+    const levelB = getSeverityLevel(b.toLowerCase())
+    return levelB - levelA // Higher severity first
+  })
+})
+
+const filteredVulns = computed(() => {
+  return vulns.value.filter(vuln => {
+    const estadoText = isNew(vuln.first_seen) ? 'NUEVO' : 'ACTIVO'
+    const severidadText = (vuln.severity || 'UNKNOWN').toUpperCase()
+    const cveText = vuln.cve_id || 'N/A'
+    const agenteText = vuln.agent_name || vuln.agent_id || 'N/A'
+    const softwareText = vuln.package_name || ''
+    const lineaVidaText = formatDate(vuln.first_seen) + ' ' + formatDate(vuln.last_seen)
+
+    return (
+      (!filters.value.estado || estadoText.toLowerCase().includes(filters.value.estado.toLowerCase())) &&
+      (!filters.value.severidad || severidadText.toLowerCase().includes(filters.value.severidad.toLowerCase())) &&
+      (!filters.value.cveId || cveText.toLowerCase().includes(filters.value.cveId.toLowerCase())) &&
+      (!filters.value.agente || agenteText.toLowerCase().includes(filters.value.agente.toLowerCase())) &&
+      (!filters.value.software || softwareText.toLowerCase().includes(filters.value.software.toLowerCase())) &&
+      (!filters.value.lineaVida || lineaVidaText.toLowerCase().includes(filters.value.lineaVida.toLowerCase()))
+    )
+  })
+})
+
+const sortedVulns = computed(() => {
+  if (!sortKey.value) return filteredVulns.value
+  return [...filteredVulns.value].sort((a, b) => {
+    const cmp = compareValues(a, b, sortKey.value)
+    return sortOrder.value === 'asc' ? cmp : -cmp
+  })
+})
+
+const sortBy = (key) => {
+  if (sortKey.value !== key) {
+    sortKey.value = key
+    sortOrder.value = 'asc'
+  } else if (sortOrder.value === 'asc') {
+    sortOrder.value = 'desc'
+  } else {
+    sortKey.value = ''
+    sortOrder.value = ''
+  }
+}
+
+const clearFilters = () => {
+  filters.value = {
+    estado: '',
+    severidad: '',
+    cveId: '',
+    agente: '',
+    software: '',
+    lineaVida: ''
+  }
+}
 
 const fetchVulns = async () => {
   loading.value = true
   error.value = ''
   try {
     const res = await vulnService.getVulns()
-    vulns.value = res.data.sort((a, b) => new Date(b.last_seen) - new Date(a.last_seen))
+    vulns.value = res.data
   } catch (err) {
     error.value = 'Error al cargar los datos de vulnerabilidades.'
   } finally {
@@ -169,6 +366,83 @@ onMounted(() => {
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 1.5rem;
+}
+
+th {
+  cursor: pointer;
+}
+
+.sort-indicator {
+  margin-left: 0.5rem;
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.rotate-180 {
+  transform: rotate(180deg);
+}
+
+.filter-tray {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.filter-item label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-main);
+}
+
+.filter-input {
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-input);
+  color: var(--text-main);
+  font-size: 0.9rem;
+}
+
+.filter-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.filter-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-outline {
+  background-color: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.btn-outline:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--text-muted);
 }
 
 .empty-state {
