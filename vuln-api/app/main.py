@@ -29,7 +29,6 @@ class WazuhConnectionRequest(BaseModel):
     indexer_url: str
     wazuh_user: str
     wazuh_password: str
-    version: str = None
 
 
 class WazuhConnectionResponse(BaseModel):
@@ -37,7 +36,6 @@ class WazuhConnectionResponse(BaseModel):
     name: str
     indexer_url: str
     wazuh_user: str
-    version: str | None
     is_active: bool
 
 
@@ -89,23 +87,19 @@ def change_password(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Session = Depends(get_db),
 ):
-    # 1. Verificar que la contraseña antigua sea correcta
     if not verify_password(request.old_password, current_user.password_hash):
         raise HTTPException(
             status_code=400, detail="La contraseña antigua es incorrecta"
         )
 
-    # 2. Validar que la nueva contraseña no sea igual a la antigua (opcional pero recomendado)
     if request.old_password == request.new_password:
         raise HTTPException(
             status_code=400,
             detail="La nueva contraseña debe ser diferente a la anterior",
         )
 
-    # 3. Hashear la nueva contraseña y actualizar el modelo
     current_user.password_hash = hash_password(request.new_password)
 
-    # 4. Guardar los cambios en la base de datos
     db.add(current_user)
     db.commit()
 
@@ -114,7 +108,6 @@ def change_password(
 
 @app.get("/users/me")
 def get_user_me(current_user: User = Depends(get_current_user)):
-    # Check if this is admin and has default password
     is_default = current_user.username == "admin" and verify_password(
         "admin", current_user.password_hash
     )
@@ -174,48 +167,6 @@ def delete_user(
     return {"message": "Usuario eliminado"}
 
 
-class WazuhConfigRequest(BaseModel):
-    indexer_url: str
-    user: str
-    password: str
-
-
-@app.get("/wazuh-config")
-def get_wazuh_config(current_user: User = Depends(get_current_user)):
-    return {
-        "indexer_url": os.getenv("WAZUH_INDEXER_URL", ""),
-        "user": os.getenv("WAZUH_USER", ""),
-        "password": "",  # Don't return password directly for security, or return masked
-    }
-
-
-@app.put("/wazuh-config")
-def update_wazuh_config(
-    request: WazuhConfigRequest, current_user: User = Depends(get_current_user)
-):
-    env_file = find_dotenv()
-    if not env_file:
-        env_file = ".env"
-        # Create if not exists
-        with open(env_file, "a") as f:
-            pass
-
-    set_key(env_file, "WAZUH_INDEXER_URL", request.indexer_url)
-    set_key(env_file, "WAZUH_USER", request.user)
-    if request.password:
-        set_key(env_file, "WAZUH_PASSWORD", request.password)
-
-    # Reload environment variables to update current process
-    os.environ["WAZUH_INDEXER_URL"] = request.indexer_url
-    os.environ["WAZUH_USER"] = request.user
-    if request.password:
-        os.environ["WAZUH_PASSWORD"] = request.password
-
-    return {
-        "message": "Configuración actualizada. Puede requerir reiniciar el backend si wazuh_client.py la carga estáticamente al importar."
-    }
-
-
 @app.get("/wazuh-connections")
 def list_connections(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
@@ -227,7 +178,6 @@ def list_connections(
             "name": c.name,
             "indexer_url": c.indexer_url,
             "wazuh_user": c.wazuh_user,
-            "version": c.version,
             "is_active": c.is_active,
         }
         for c in conns
@@ -250,7 +200,6 @@ def create_connection(
         indexer_url=request.indexer_url,
         wazuh_user=request.wazuh_user,
         wazuh_password=encrypt(request.wazuh_password),
-        version=request.version,
     )
     db.add(conn)
     db.commit()
@@ -274,7 +223,6 @@ def update_connection(
     conn.wazuh_user = request.wazuh_user
     if request.wazuh_password:
         conn.wazuh_password = encrypt(request.wazuh_password)
-    conn.version = request.version
     db.commit()
     return {"message": "Conexión actualizada"}
 
@@ -322,7 +270,7 @@ def sync_connection(
         raise HTTPException(status_code=400, detail="La conexión está inactiva")
 
     raw_vulns = fetch_all_vulns(
-        conn.indexer_url, conn.wazuh_user, decrypt(conn.wazuh_password), conn.version
+        conn.indexer_url, conn.wazuh_user, decrypt(conn.wazuh_password)
     )
 
     count = process_wazuh_vulnerabilities(db, conn.id, raw_vulns)
@@ -336,7 +284,6 @@ def process_wazuh_vulnerabilities(db: Session, conn_id: int, raw_vulns: list) ->
     count = 0
     seen_vuln_ids = set()
 
-    # 1. Traemos todas las vulnerabilidades que actualmente consideramos "ACTIVAS" para esta conexión
     active_vulns_in_db = (
         db.query(WazuhVulnerability)
         .filter_by(connection_id=conn_id, status="ACTIVE")
@@ -354,7 +301,6 @@ def process_wazuh_vulnerabilities(db: Session, conn_id: int, raw_vulns: list) ->
         if not vuln.get("id"):
             continue
 
-        # Buscamos si ya existe en la base de datos
         existing = (
             db.query(WazuhVulnerability)
             .filter_by(
@@ -370,7 +316,6 @@ def process_wazuh_vulnerabilities(db: Session, conn_id: int, raw_vulns: list) ->
         if existing:
             seen_vuln_ids.add(existing.id)
 
-            # A. ¿Estaba resuelta y volvió a aparecer?
             if existing.status == "RESOLVED":
                 existing.status = "ACTIVE"
                 db.add(
@@ -381,7 +326,6 @@ def process_wazuh_vulnerabilities(db: Session, conn_id: int, raw_vulns: list) ->
                     )
                 )
 
-            # B. ¿Cambió la severidad?
             if existing.severity != vuln.get("severity"):
                 db.add(
                     VulnerabilityHistory(
@@ -392,12 +336,10 @@ def process_wazuh_vulnerabilities(db: Session, conn_id: int, raw_vulns: list) ->
                 )
                 existing.severity = vuln.get("severity")
 
-            # Actualizamos datos menores sin generar historial
             existing.score_base = (vuln.get("score") or {}).get("base")
             existing.last_seen = func.now()
 
         else:
-            # C. Es una vulnerabilidad completamente NUEVA
             new_vuln = WazuhVulnerability(
                 connection_id=conn_id,
                 status="ACTIVE",
@@ -421,7 +363,7 @@ def process_wazuh_vulnerabilities(db: Session, conn_id: int, raw_vulns: list) ->
                 scanner_vendor=(vuln.get("scanner") or {}).get("vendor"),
             )
             db.add(new_vuln)
-            db.flush()  # CRÍTICO: flush() le pide a Postgres el ID generado antes del commit final
+            db.flush()
 
             seen_vuln_ids.add(new_vuln.id)
             db.add(
@@ -434,8 +376,6 @@ def process_wazuh_vulnerabilities(db: Session, conn_id: int, raw_vulns: list) ->
 
         count += 1
 
-    # 2. RESOLUCIÓN AUTOMÁTICA: Si teníamos vulnerabilidades activas que NO vinieron en este reporte,
-    # significa que el servidor fue parcheado. Las marcamos como resueltas.
     for vuln_id, db_vuln in active_vuln_dict.items():
         if vuln_id not in seen_vuln_ids:
             db_vuln.status = "RESOLVED"
@@ -463,10 +403,8 @@ def sync_all_connections(
                 conn.indexer_url,
                 conn.wazuh_user,
                 decrypt(conn.wazuh_password),
-                conn.version,
             )
 
-            # Usamos nuestra nueva función profesional
             count = process_wazuh_vulnerabilities(db, conn.id, raw_vulns)
             db.commit()
 
@@ -487,81 +425,3 @@ def list_vulns(
 ):
     vulns = db.query(WazuhVulnerability).limit(limit).all()
     return vulns
-
-
-@app.get("/users/me")
-def get_user_me(current_user: User = Depends(get_current_user)):
-    # Check if this is admin and has default password
-    is_default = current_user.username == "admin" and verify_password(
-        "admin", current_user.password_hash
-    )
-    return {
-        "id": current_user.id,
-        "username": current_user.username,
-        "is_default_password": is_default,
-    }
-
-
-class NewUserRequest(BaseModel):
-    username: str
-    password: str
-
-
-@app.post("/users")
-def create_user(
-    request: NewUserRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    existing = db.query(User).filter(User.username == request.username).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Usuario ya existe")
-
-    new_user = User(
-        username=request.username, password_hash=hash_password(request.password)
-    )
-    db.add(new_user)
-    db.commit()
-    return {"message": "Usuario creado"}
-
-
-class WazuhConfigRequest(BaseModel):
-    indexer_url: str
-    user: str
-    password: str
-
-
-@app.get("/wazuh-config")
-def get_wazuh_config(current_user: User = Depends(get_current_user)):
-    return {
-        "indexer_url": os.getenv("WAZUH_INDEXER_URL", ""),
-        "user": os.getenv("WAZUH_USER", ""),
-        "password": "",  # Don't return password directly for security, or return masked
-    }
-
-
-@app.put("/wazuh-config")
-def update_wazuh_config(
-    request: WazuhConfigRequest, current_user: User = Depends(get_current_user)
-):
-    env_file = find_dotenv()
-    if not env_file:
-        env_file = ".env"
-        # Create if not exists
-        with open(env_file, "a") as f:
-            pass
-
-    set_key(env_file, "WAZUH_INDEXER_URL", request.indexer_url)
-    set_key(env_file, "WAZUH_USER", request.user)
-    if request.password:
-        set_key(env_file, "WAZUH_PASSWORD", request.password)
-
-    # Reload environment variables to update current process
-    os.environ["WAZUH_INDEXER_URL"] = request.indexer_url
-    os.environ["WAZUH_USER"] = request.user
-    if request.password:
-        os.environ["WAZUH_PASSWORD"] = request.password
-
-    return {
-        "message": "Configuración actualizada. Puede requerir reiniciar el backend si wazuh_client.py la carga estáticamente al importar."
-    }
