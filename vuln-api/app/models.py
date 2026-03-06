@@ -1,5 +1,5 @@
 # app/models.py
-from sqlalchemy import Column, Integer, BigInteger, String, Text, DateTime, Numeric, UniqueConstraint, ForeignKey
+from sqlalchemy import Column, Integer, Boolean, String, Text, DateTime, Numeric, UniqueConstraint, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .db import Base
@@ -12,6 +12,19 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     interactions = relationship("UserInteraction", back_populates="user")
+
+class WazuhConnection(Base):
+    __tablename__ = "wazuh_connections"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String, nullable=False, unique=True)      # ej: "Cliente A", "Prod"
+    indexer_url = Column(String, nullable=False)
+    wazuh_user = Column(String, nullable=False)
+    wazuh_password = Column(String, nullable=False)         # idealmente encriptado
+    version = Column(String, nullable=True)                 # ej: "4.7", "4.8"
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    vulnerabilities = relationship("WazuhVulnerability", back_populates="connection")
+
 
 class UserInteraction(Base):
     __tablename__ = "user_interactions"
