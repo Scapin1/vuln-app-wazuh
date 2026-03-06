@@ -70,7 +70,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import api from './api'
+import userService from './application/services/userService'
 
 const router = useRouter()
 const route = useRoute()
@@ -92,7 +92,7 @@ const currentRouteName = computed(() => {
 const checkFirstLogin = async () => {
   if (route.name === 'Login') return
   try {
-    const res = await api.get('/users/me')
+    const res = await userService.getMe()
     if (res.data.is_default_password && route.name !== 'ChangePassword') {
       router.push('/change-password')
     }

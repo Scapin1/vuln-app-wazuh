@@ -43,7 +43,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import api from '../api'
+import authService from '../../application/services/authService'
 
 const router = useRouter()
 const username = ref('')
@@ -61,9 +61,7 @@ const handleLogin = async () => {
     formData.append('password', password.value)
     
     // Login req is form URL encoded for OAuth2
-    const res = await api.post('/auth/login', formData, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    })
+    const res = await authService.login(formData)
     
     // Save token
     localStorage.setItem('token', res.data.access_token)

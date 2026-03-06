@@ -1,3 +1,4 @@
+// apiClient.js
 const MOCK_DELAY = 500;
 
 const mockData = {
@@ -9,7 +10,7 @@ const mockData = {
             agent_name: 'server-01',
             package_name: 'bash',
             package_version: '5.0-1',
-            first_seen: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // hace 30 min (NUEVO)
+            first_seen: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
             last_seen: new Date().toISOString()
         },
         {
@@ -19,7 +20,7 @@ const mockData = {
             agent_name: 'desktop-mx',
             package_name: 'openssl',
             package_version: '1.1.1',
-            first_seen: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(), // hace 48 horas
+            first_seen: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
             last_seen: new Date().toISOString()
         },
         {

@@ -99,7 +99,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import api from '../api'
+import vulnService from '../../application/services/vulnService'
 
 const vulns = ref([])
 const loading = ref(true)
@@ -110,7 +110,7 @@ const fetchVulns = async () => {
   loading.value = true
   error.value = ''
   try {
-    const res = await api.get('/vulns')
+    const res = await vulnService.getVulns()
     vulns.value = res.data.sort((a, b) => new Date(b.last_seen) - new Date(a.last_seen))
   } catch (err) {
     error.value = 'Error al cargar los datos de vulnerabilidades.'
@@ -123,7 +123,7 @@ const syncVulns = async () => {
   syncing.value = true
   error.value = ''
   try {
-    await api.post('/vulns/sync')
+    await vulnService.syncVulns()
     await fetchVulns()
   } catch (err) {
     error.value = 'Error durante la sincronización con Wazuh. Verifica tu configuración en Admin Wazuh.'

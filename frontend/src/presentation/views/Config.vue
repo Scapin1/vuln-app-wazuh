@@ -54,7 +54,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import api from '../api'
+import configService from '../../application/services/configService'
 
 const config = ref({
   indexer_url: '',
@@ -68,7 +68,7 @@ const success = ref('')
 
 const fetchConfig = async () => {
   try {
-    const res = await api.get('/wazuh-config')
+    const res = await configService.getConfig()
     config.value.indexer_url = res.data.indexer_url || ''
     config.value.user = res.data.user || ''
   } catch (err) {
@@ -82,7 +82,7 @@ const updateConfig = async () => {
   success.value = ''
   try {
     const payload = { ...config.value }
-    const res = await api.put('/wazuh-config', payload)
+    const res = await configService.updateConfig(payload)
     success.value = res.data.message || 'Configuración guardada correctamente.'
     config.value.password = ''
     setTimeout(() => success.value = '', 4000)
