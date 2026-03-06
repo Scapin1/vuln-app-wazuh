@@ -1,8 +1,19 @@
 # app/models.py
-from sqlalchemy import Column, Integer, BigInteger, String, Text, DateTime, Numeric, UniqueConstraint, ForeignKey
+from sqlalchemy import (
+    Column,
+    Integer,
+    Boolean,
+    String,
+    Text,
+    DateTime,
+    Numeric,
+    UniqueConstraint,
+    ForeignKey,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .db import Base
+
 
 class User(Base):
     __tablename__ = "users"
@@ -13,22 +24,39 @@ class User(Base):
 
     interactions = relationship("UserInteraction", back_populates="user")
 
+
+class WazuhConnection(Base):
+    __tablename__ = "wazuh_connections"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String, nullable=False, unique=True)  # ej: "Cliente A", "Prod"
+    indexer_url = Column(String, nullable=False)
+    wazuh_user = Column(String, nullable=False)
+    wazuh_password = Column(String, nullable=False)  # idealmente encriptado
+    version = Column(String, nullable=True)  # ej: "4.7", "4.8"
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    vulnerabilities = relationship("WazuhVulnerability", back_populates="connection")
+
+
 class UserInteraction(Base):
     __tablename__ = "user_interactions"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    endpoint = Column(String, index=True) # La URL o recurso accedido
-    method = Column(String)               # GET, POST, DELETE, etc.
-    details = Column(Text, nullable=True) # Información adicional opcional
+    endpoint = Column(String, index=True)  # La URL o recurso accedido
+    method = Column(String)  # GET, POST, DELETE, etc.
+    details = Column(Text, nullable=True)  # Información adicional opcional
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="interactions")
+
 
 class WazuhVulnerability(Base):
     __tablename__ = "wazuh_vulnerabilities"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    connection_id = Column(Integer, ForeignKey("wazuh_connections.id"), nullable=False)
+    connection = relationship("WazuhConnection", back_populates="vulnerabilities")
     agent_id = Column(String, nullable=False, index=True)
     agent_name = Column(String)
     os_full = Column(Text)
@@ -53,9 +81,17 @@ class WazuhVulnerability(Base):
     scanner_vendor = Column(Text)
 
     first_seen = Column(DateTime(timezone=True), server_default=func.now())
-    last_seen = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-    __table_args__ = (
-        UniqueConstraint("agent_id", "package_name", "package_version", "cve_id", name="uniq_wazuh_vuln"),
+    last_seen = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    __table_args__ = (
+        UniqueConstraint(
+            "connection_id",
+            "agent_id",
+            "package_name",
+            "package_version",
+            "cve_id",
+            name="uniq_wazuh_vuln",
+        ),
+    )

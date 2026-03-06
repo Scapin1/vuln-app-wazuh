@@ -8,6 +8,8 @@ services:
       POSTGRES_PASSWORD: adminpassword
     volumes:
       - postgres_api_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
     networks:
       - app-network
 
@@ -44,6 +46,7 @@ services:
     build: ./vuln-api
     environment:
       DATABASE_URL: postgresql://admin:adminpassword@db-api:5432/vulnerabilidades_db
+      ENCRYPTION_KEY: "_PDHhMGJ7ej8t4jZVgwX4xht5A8RBGwN4mwmUD15NkM="
 
       # Wazuh Manager API (si lo usas para login/consultas)
       WAZUH_USER: admin
