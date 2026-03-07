@@ -7,6 +7,10 @@ const userService = {
 
   createUser: async (userData) => {
     return apiClient.post('/users', userData)
+  },
+
+  deleteUser: async (userId) => {
+    return apiClient.delete(`/users/${userId}`)
   }
 }
 

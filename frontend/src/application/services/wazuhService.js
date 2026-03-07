@@ -11,6 +11,10 @@ const wazuhService = {
 
   editConnection: async (connId, connectionData) => {
     return apiClient.put(`/wazuh-connections/${connId}`, connectionData)
+  },
+
+  deleteConnection: async (connId) => {
+    return apiClient.delete(`/wazuh-connections/${connId}`)
   }
 }
 
