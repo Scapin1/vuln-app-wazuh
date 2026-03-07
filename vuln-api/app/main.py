@@ -1,4 +1,5 @@
 # app/main.py
+import re
 import os
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
@@ -79,7 +80,26 @@ def login(
 class ChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str
+    confirm_password: str 
 
+def validate_strong_password(password: str) -> None:
+    """Valida que la contraseña sea robusta. Lanza HTTPException si no cumple."""
+    errors = []
+    if len(password) < 8:
+        errors.append("mínimo 8 caracteres")
+    if not re.search(r"[A-Z]", password):
+        errors.append("al menos una letra mayúscula")
+    if not re.search(r"[a-z]", password):
+        errors.append("al menos una letra minúscula")
+    if not re.search(r"\d", password):
+        errors.append("al menos un número")
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>_\-]", password):
+        errors.append("al menos un carácter especial (!@#$%^&*...)")
+    if errors:
+        raise HTTPException(
+            status_code=400,
+            detail=f"La contraseña no es suficientemente robusta: {', '.join(errors)}",
+        )
 
 @app.post("/auth/change-password")
 def change_password(
@@ -88,9 +108,7 @@ def change_password(
     db: Session = Depends(get_db),
 ):
     if not verify_password(request.old_password, current_user.password_hash):
-        raise HTTPException(
-            status_code=400, detail="La contraseña antigua es incorrecta"
-        )
+        raise HTTPException(status_code=400, detail="La contraseña antigua es incorrecta")
 
     if request.old_password == request.new_password:
         raise HTTPException(
@@ -98,7 +116,16 @@ def change_password(
             detail="La nueva contraseña debe ser diferente a la anterior",
         )
 
+    if request.new_password != request.confirm_password:
+        raise HTTPException(
+            status_code=400,
+            detail="Las contraseñas nuevas no coinciden",
+        )
+
+    validate_strong_password(request.new_password)
+
     current_user.password_hash = hash_password(request.new_password)
+    current_user.is_active = True 
 
     db.add(current_user)
     db.commit()
