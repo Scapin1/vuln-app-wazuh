@@ -2,6 +2,9 @@ services:
   db-api:
     image: postgres:15
     container_name: db-api
+    restart: unless-stopped
+    env_file:
+      - ./vuln-api/.env
     environment:
       POSTGRES_DB: vulnerabilidades_db
       POSTGRES_USER: admin
@@ -13,50 +16,12 @@ services:
     networks:
       - app-network
 
-  db-sonar:
-    image: postgres:15
-    container_name: db-sonar
-    environment:
-      - POSTGRES_USER=sonar
-      - POSTGRES_PASSWORD=sonarpassword
-      - POSTGRES_DB=sonarqube
-    volumes:
-      - postgres_sonar_data:/var/lib/postgresql/data
-    networks:
-      - app-network
-
-  sonarqube:
-    image: sonarqube:9.9-community
-    depends_on:
-      - db-sonar
-    environment:
-      SONAR_JDBC_URL: jdbc:postgresql://db-sonar:5432/sonarqube
-      SONAR_JDBC_USERNAME: sonar
-      SONAR_JDBC_PASSWORD: sonarpassword
-    ports:
-      - "9000:9000"
-    volumes:
-      - sonarqube_data:/opt/sonarqube/data
-      - sonarqube_extensions:/opt/sonarqube/extensions
-      - sonarqube_logs:/opt/sonarqube/logs
-    networks:
-      - app-network
-
   api:
     build: ./vuln-api
+    env_file:
+      - ./vuln-api/.env
     environment:
-      DATABASE_URL: postgresql://admin:adminpassword@db-api:5432/vulnerabilidades_db
-      ENCRYPTION_KEY: "_PDHhMGJ7ej8t4jZVgwX4xht5A8RBGwN4mwmUD15NkM="
-
-      # Wazuh Manager API (si lo usas para login/consultas)
-      WAZUH_USER: admin
-      WAZUH_PASSWORD: cb57aN*kLyEp+Kj1r7I2kwwIoXQng7Ty
-      WAZUH_API_URL: https://165.227.59.98:55000
-
-      # Ajusta al endpoint real del Indexer (o deja temporal mientras pruebas ZAP)
-      WAZUH_INDEXER_URL: https://165.227.59.98:9200
-
-      SECRET_KEY: supersecret
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db-api:5432/${POSTGRES_DB}
     depends_on:
       - db-api
     ports:
@@ -71,59 +36,21 @@ services:
       retries: 5
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    build: ./frontend
     container_name: frontend
+    env_file:
+      - ./frontend/.env
     ports:
       - "3000:80"
     depends_on:
       api:
         condition: service_healthy
+    restart: unless-stopped
     networks:
       - app-network
-
-  jenkins:
-    build: ./jenkins
-    user: root
-    ports:
-      - "8080:8080"
-      - "50000:50000"
-    volumes:
-      - jenkins_data:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./reports:/reports
-    environment:
-      - DOCKER_HOST=unix:///var/run/docker.sock
-    networks:
-      - app-network
-    depends_on:
-      - sonarqube
-
-  zap:
-    image: zaproxy/zap-weekly
-    depends_on:
-      api:
-        condition: service_healthy
-    volumes:
-      - ./reports:/zap/wrk
-    command: >
-      sh -c "echo 'Waiting for API...'; sleep 20;
-      zap-baseline.py -t http://api:8000
-      -r zap_report.html
-      -J zap_report.json
-      -m 2"
-    networks:
-      - app-network
-    restart: "no"
 
 volumes:
-  postgres_sonar_data:
   postgres_api_data:
-  jenkins_data:
-  sonarqube_data:
-  sonarqube_extensions:
-  sonarqube_logs:
 
 networks:
   app-network:

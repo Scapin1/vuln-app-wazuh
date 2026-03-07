@@ -1,0 +1,23 @@
+services:
+  jenkins:
+    build: /home/fabian/vuln-app-wazuh/dev-tools/jenkins
+    container_name: jenkins
+    user: root
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /home/fabian/vuln-app-wazuh/dev-tools/reports:/reports 
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    networks:
+      - jenkins-network
+
+volumes:
+  jenkins_data:
+
+networks:
+  jenkins-network:
+    driver: bridge
