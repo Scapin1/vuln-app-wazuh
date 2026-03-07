@@ -66,8 +66,22 @@ const handleLogin = async () => {
     // Save token
     localStorage.setItem('token', res.data.access_token)
     
-    // Auth success -> Go to dashboard layout (App.vue router hook will intercept if default password)
-    router.push('/')
+    // save user 
+    localStorage.setItem('username', username.value)
+
+    // Revisar flag por usuario -> ya q es unico
+    const passwordChanged = localStorage.getItem(`pwd_changed_${username.value}`)
+    
+    if (passwordChanged !== 'true') {
+      sessionStorage.setItem(
+        'force_password_message',
+        'Por seguridad, debe cambiar tu contraseña inmediatamente antes de continuar. Todas las demás rutas se están bloqueadas hasta que cambies tu contraseña.'
+      )
+      router.push('/change-password') // aqui tendrá bloqueado lo de+
+    } else {
+      router.push('/dashboard')
+    }
+
   } catch (err) {
     if (err.response && err.response.data.detail) {
       error.value = err.response.data.detail
@@ -78,6 +92,10 @@ const handleLogin = async () => {
     loading.value = false
   }
 }
+
+
+
+
 </script>
 
 <style scoped>

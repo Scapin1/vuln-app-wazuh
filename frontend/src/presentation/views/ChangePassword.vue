@@ -10,7 +10,16 @@
       </div>
     </div>
 
-    <form @submit.prevent="handleChange" class="mt-4">
+    <div v-if="securityMessage" class="alert alert-warning fade-in">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+        <line x1="12" y1="9" x2="12" y2="13"></line>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+      </svg>
+      {{ securityMessage }}
+    </div>
+
+    <form @submit.prevent="handleChangePassword" class="mt-4">
       <div class="form-group">
         <label class="form-label">Contraseña Actual</label>
         <div class="input-icon">
@@ -53,7 +62,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted} from 'vue'
 import { useRouter } from 'vue-router'
 import authService from '../../application/services/authService'
 
@@ -64,8 +73,17 @@ const confirmPassword = ref('')
 const error = ref('')
 const success = ref('')
 const loading = ref(false)
+const securityMessage = ref('')
 
-const handleChange = async () => {
+onMounted(() => {
+  const msg = sessionStorage.getItem('force_password_message')
+  if (msg) {
+    securityMessage.value = msg
+    sessionStorage.removeItem('force_password_message')
+  }
+})
+
+const handleChangePassword = async () => {
   error.value = ''
   success.value = ''
   
@@ -81,10 +99,16 @@ const handleChange = async () => {
       old_password: oldPassword.value,
       new_password: newPassword.value
     })
+
+    const username = localStorage.getItem('username')
+
+    if (username) {
+      localStorage.setItem(`pwd_changed_${username}`, 'true')
+    }
+
     success.value = 'Contraseña actualizada correctamente.'
-    setTimeout(() => {
-      router.push('/')
-    }, 1500)
+    router.push('/dashboard')
+
   } catch (err) {
     if (err.response && err.response.data.detail) {
       error.value = err.response.data.detail
@@ -100,6 +124,12 @@ const handleChange = async () => {
 <style scoped>
 .max-w-lg {
   max-width: 600px;
+}
+
+.alert-warning {
+  color: #f59e0b;
+  background-color: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
 }
 
 .card-header {

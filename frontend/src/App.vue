@@ -89,30 +89,12 @@ const currentRouteName = computed(() => {
   }
 })
 
-const checkFirstLogin = async () => {
-  if (route.name === 'Login') return
-  try {
-    const res = await userService.getMe()
-    if (res.data.is_default_password && route.name !== 'ChangePassword') {
-      router.push('/change-password')
-    }
-  } catch (err) {
-    if (err.response && err.response.status === 401) {
-      router.push('/login')
-    }
-  }
-}
-
 const logout = () => {
   localStorage.removeItem('token')
+  localStorage.removeItem('username')
   router.push('/login')
 }
 
-router.afterEach((to) => {
-  if (to.name !== 'Login' && to.name !== 'ChangePassword') {
-    checkFirstLogin()
-  }
-})
 </script>
 
 <style scoped>
