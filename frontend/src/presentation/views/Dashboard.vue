@@ -44,9 +44,16 @@
           <label>Software Afectado</label>
           <input v-model="filters.software" type="text" placeholder="Nombre del paquete..." class="filter-input">
         </div>
-        <div class="filter-item">
-          <label>Línea de Vida</label>
-          <input v-model="filters.lineaVida" type="text" placeholder="Fecha detectada..." class="filter-input">
+        <div class="filter-item" style="grid-column: span 2;">
+          <label>Rango de Fechas</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <div style="flex: 1;">
+              <input v-model="filters.startDate" type="date" class="filter-input" style="width: 100%;">
+            </div>
+            <div style="flex: 1;">
+              <input v-model="filters.endDate" type="date" class="filter-input" style="width: 100%;">
+            </div>
+          </div>
         </div>
       </div>
       <div class="filter-actions">
@@ -195,7 +202,8 @@ const filters = ref({
   cveId: '',
   agente: '',
   software: '',
-  lineaVida: ''
+  startDate: '',
+  endDate: ''
 })
 
 const getSeverityLevel = (s) => {
@@ -259,7 +267,23 @@ const filteredVulns = computed(() => {
     const cveText = vuln.cve_id || 'N/A'
     const agenteText = vuln.agent_name || vuln.agent_id || 'N/A'
     const softwareText = vuln.package_name || ''
-    const lineaVidaText = formatDate(vuln.first_seen) + ' ' + formatDate(vuln.last_seen)
+
+    // Date filtering
+    let dateMatch = true
+    if (filters.value.startDate || filters.value.endDate) {
+      const firstSeen = vuln.first_seen ? new Date(vuln.first_seen) : null
+      const lastSeen = vuln.last_seen ? new Date(vuln.last_seen) : null
+      const start = filters.value.startDate ? new Date(filters.value.startDate) : null
+      const end = filters.value.endDate ? new Date(filters.value.endDate) : null
+
+      if (start && end) {
+        dateMatch = (firstSeen && firstSeen >= start && firstSeen <= end) || (lastSeen && lastSeen >= start && lastSeen <= end)
+      } else if (start) {
+        dateMatch = (firstSeen && firstSeen >= start) || (lastSeen && lastSeen >= start)
+      } else if (end) {
+        dateMatch = (firstSeen && firstSeen <= end) || (lastSeen && lastSeen <= end)
+      }
+    }
 
     return (
       (!filters.value.estado || estadoText.toLowerCase().includes(filters.value.estado.toLowerCase())) &&
@@ -267,7 +291,7 @@ const filteredVulns = computed(() => {
       (!filters.value.cveId || cveText.toLowerCase().includes(filters.value.cveId.toLowerCase())) &&
       (!filters.value.agente || agenteText.toLowerCase().includes(filters.value.agente.toLowerCase())) &&
       (!filters.value.software || softwareText.toLowerCase().includes(filters.value.software.toLowerCase())) &&
-      (!filters.value.lineaVida || lineaVidaText.toLowerCase().includes(filters.value.lineaVida.toLowerCase()))
+      dateMatch
     )
   })
 })
@@ -299,7 +323,8 @@ const clearFilters = () => {
     cveId: '',
     agente: '',
     software: '',
-    lineaVida: ''
+    startDate: '',
+    endDate: ''
   }
 }
 
