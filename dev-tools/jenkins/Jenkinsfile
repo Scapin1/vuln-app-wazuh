@@ -27,15 +27,21 @@ pipeline {
             }
         }
 
-        stage('SAST: SonarQube Code Analysis') {
+        stage('SAST: SonarQube Code Analysis'){
+            when {
+                expression { params.RUN_SONARQUBE == true }
+            }
             environment {
-                SONAR_HOST_URL = "http://34.176.3.106:9000"
+                // Volvemos a usar la comunicación interna súper rápida y segura
+                SONAR_HOST_URL = "http://sonarqube:9000"
                 SONAR_AUTH_TOKEN = credentials('sonar-token')
             }
             steps {
                 script {
                     withSonarQubeEnv('sonarqube') {
-                        docker.image('sonarsource/sonar-scanner-cli').inside("--network=vuln-app-wazuh_app-network --user=root") {
+                        // Cambiamos la red a la que usa tu stack de SonarQube. 
+                        // Docker Compose suele nombrar las redes como: nombrecarpeta_nombrered
+                        docker.image('sonarsource/sonar-scanner-cli').inside("--network=sonarqube_sonar-network --user=root") {
                             sh '''
                             sonar-scanner \
                                 -Dproject.settings=dev-tools/sonarqube/sonar-project.properties \
@@ -46,7 +52,7 @@ pipeline {
                     }
                 }
             }
-        }
+        } 
 
         stage('GATE: SonarQube Quality Gate') {
             steps {
