@@ -7,6 +7,10 @@ const wazuhService = {
 
   createConnection: async (connectionData) => {
     return apiClient.post('/wazuh-connections', connectionData)
+  },
+
+  editConnection: async (connId, connectionData) => {
+    return apiClient.put(`/wazuh-connections/${connId}`, connectionData)
   }
 }
 
