@@ -146,7 +146,7 @@ def list_users(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     users = db.query(User).all()
-    return [{"id": u.id, "username": u.username, "role": u.role} for u in users]
+    return [{"id": u.id, "username": u.username} for u in users]
 
 
 @app.delete("/users/{user_id}")
