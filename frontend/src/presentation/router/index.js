@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../views/Login.vue'
 import Dashboard from '../views/Dashboard.vue'
-import AddUser from '../views/AddUser.vue'
+import ConfigUser from '../views/ConfigUser.vue'
 import ConfigWazuh from '../views/ConfigWazuh.vue'
 import ChangePassword from '../views/ChangePassword.vue'
 
@@ -9,7 +9,7 @@ const routes = [
   { path: '/', redirect: '/dashboard' },
   { path: '/login', name: 'Login', component: Login },
   { path: '/dashboard', name: 'Dashboard', component: Dashboard, meta: { requiresAuth: true } },
-  { path: '/add-user', name: 'AddUser', component: AddUser, meta: { requiresAuth: true } },
+  { path: '/config-user', name: 'ConfigUser', component: ConfigUser, meta: { requiresAuth: true } },
   { path: '/config-wazuh', name: 'ConfigWazuh', component: ConfigWazuh, meta: { requiresAuth: true } },
   { path: '/change-password', name: 'ChangePassword', component: ChangePassword, meta: { requiresAuth: true } },
 ]

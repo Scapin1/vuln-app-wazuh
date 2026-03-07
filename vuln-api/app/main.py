@@ -131,7 +131,7 @@ def create_user(
 ):
     existing = db.query(User).filter(User.username == request.username).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Usuario ya existe")
+        raise HTTPException(status_code=400, detail="El nombre de usuario ya esta ocupado. Elige otro.")
 
     new_user = User(
         username=request.username, password_hash=hash_password(request.password)
@@ -146,7 +146,7 @@ def list_users(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     users = db.query(User).all()
-    return [{"id": u.id, "username": u.username, "role": u.role} for u in users]
+    return [{"id": u.id, "username": u.username} for u in users]
 
 
 @app.delete("/users/{user_id}")
