@@ -23,7 +23,7 @@
 
         <a href="#" @click.prevent="handleNavClick('/timeline')" class="nav-item" :class="{ 'router-link-active': route.path === '/timeline' }">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-          LÃ­nea de Tiempo
+          Línea de Tiempo
         </a>
         
         <a href="#" @click.prevent="handleNavClick('/config-user')" class="nav-item" :class="{ 'router-link-active': route.path === '/config-user' }">
@@ -40,11 +40,11 @@
       <div class="sidebar-footer">
         <router-link to="/change-password" class="nav-item">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-          Cambiar ContraseÃ±a
+          Cambiar Contraseña
         </router-link>
         <button @click="logout" class="nav-item logout-btn">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-          Cerrar SesiÃ³n
+          Cerrar Sesión
         </button>
       </div>
     </aside>
@@ -96,10 +96,10 @@ const currentRouteName = computed(() => {
   switch(route.name) {
     case 'Dashboard': return 'Vulnerabilidades Wazuh'
     case 'Timeline': return 'Linea de tiempo'
-    case 'ConfigUser': return 'GestiÃ³n de Usuarios'
-    case 'ConfigWazuh': return 'ConfiguraciÃ³n de Wazuh'
+    case 'ConfigUser': return 'Gestión de Usuarios'
+    case 'ConfigWazuh': return 'Configuración de Wazuh'
     case 'ChangePassword': return 'Seguridad de Cuenta'
-    case 'NotFound': return 'PÃ¡gina no encontrada'
+    case 'NotFound': return 'Página no encontrada'
     default: return ''
   }
 })
@@ -109,7 +109,7 @@ const handleNavClick = (path) => {
   if (mustChange) {
     Swal.fire({
       title: 'Acceso bloqueado',
-      text: 'Debes cambiar tu contraseÃ±a para continuar navegando.',
+      text: 'Debes cambiar tu contraseña para continuar navegando.',
       icon: 'warning',
       confirmButtonText: 'Entendido',
       background: 'var(--bg-panel)',

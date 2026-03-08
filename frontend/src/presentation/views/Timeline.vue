@@ -2,15 +2,15 @@
   <div class="fade-in timeline-view">
     <div class="header-actions">
       <div>
-        <h1 class="title">Linea de Tiempo</h1>
-        <p class="subtitle">Dias continuos, solo se pintan los dias con cambios.</p>
+        <h1 class="title">Línea de Tiempo</h1>
+        <p class="subtitle">Días continuos, solo se pintan los días con cambios.</p>
       </div>
     </div>
 
     <div class="card filter-panel">
       <div class="filter-row">
         <div class="f-group">
-          <label>Conexion Wazuh</label>
+          <label>Conexión Wazuh</label>
           <select v-model="selectedConnection" @change="onConnectionChange" class="filter-input">
             <option value="" disabled>Selecciona servidor...</option>
             <option v-for="conn in connections" :key="conn.id" :value="conn.id">{{ conn.name }}</option>
@@ -21,7 +21,7 @@
           <label>Equipos / Agentes</label>
           <button class="filter-input dd-btn" @click="dd.agents = !dd.agents">
             <span>{{ selectedAgents.length ? selectedAgents.length + ' sel.' : 'Todos' }}</span>
-            <span>â–¼</span>
+            <span>▼</span>
           </button>
           <div v-if="dd.agents" class="dd-panel fade-in">
             <input type="text" v-model="search.agent" placeholder="Buscar agente..." class="dd-search">
@@ -41,7 +41,7 @@
           <label>Vulnerabilidad</label>
           <button class="filter-input dd-btn" @click="dd.vulns = !dd.vulns">
             <span>{{ selectedVulns.length ? selectedVulns.length + ' sel.' : 'Todas' }}</span>
-            <span>â–¼</span>
+            <span>▼</span>
           </button>
           <div v-if="dd.vulns" class="dd-panel fade-in">
             <input type="text" v-model="search.vuln" placeholder="Buscar CVE..." class="dd-search">
@@ -65,7 +65,7 @@
         </div>
 
         <div class="f-group" v-if="period === 'day'">
-          <label>Dia</label>
+          <label>Día</label>
           <input type="date" v-model="customDate" class="filter-input">
         </div>
 
@@ -80,7 +80,7 @@
     <div class="kpi-strip" v-if="hasBuilt">
       <div class="kpi-card">
         <span class="kpi-val">{{ paintedCount }}</span>
-        <span class="kpi-label">Dias/Horas pintados</span>
+        <span class="kpi-label">Días/Horas pintados</span>
       </div>
       <div class="kpi-card kpi-danger">
         <span class="kpi-val">{{ latestSnap.pending }}</span>
@@ -103,11 +103,11 @@
           <span class="tl-info">{{ paintedCount }} con cambios / {{ allSlots.length }} slots</span>
         </div>
         <div class="tl-toolbar-right">
-          <button class="btn btn-outline btn-icon" @click="moveLeft" :disabled="!canMoveLeft">â—€</button>
+          <button class="btn btn-outline btn-icon" @click="moveLeft" :disabled="!canMoveLeft">◀</button>
           <button class="btn btn-outline btn-icon" @click="zoomOut" :disabled="!canZoomOut">-</button>
           <span class="zoom-badge">{{ activeZoom.label }}</span>
           <button class="btn btn-outline btn-icon" @click="zoomIn" :disabled="!canZoomIn">+</button>
-          <button class="btn btn-outline btn-icon" @click="moveRight" :disabled="!canMoveRight">â–¶</button>
+          <button class="btn btn-outline btn-icon" @click="moveRight" :disabled="!canMoveRight">▶</button>
         </div>
       </div>
 
@@ -173,13 +173,13 @@
           <table class="modal-table">
             <thead>
               <tr>
-                <th @click="msort('connection_name')">Conexion</th>
+                <th @click="msort('connection_name')">Conexión</th>
                 <th @click="msort('agent_name')">Equipo</th>
                 <th @click="msort('cve_id')">CVE</th>
                 <th @click="msort('severity')">Severidad</th>
                 <th @click="msort('first_seen')">Detectado</th>
                 <th @click="msort('status')">Estado</th>
-                <th @click="msort('resolved_at')">Resolucion</th>
+                <th @click="msort('resolved_at')">Resolución</th>
               </tr>
             </thead>
             <tbody>

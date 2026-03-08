@@ -47,18 +47,18 @@ router.beforeEach(async (to, from) => {
       const userMeRes = await userService.getUserMe()
       const user = userMeRes.data
 
-      // Si sigue con contraseÃ±a por defecto, solo puede entrar a change-password
+      // Si sigue con contraseña por defecto, solo puede entrar a change-password
       if (user.is_default_password && to.path !== '/change-password') {
         sessionStorage.setItem(
           'force_password_message',
-          'Para continuar, debes cambiar tu contraseÃ±a obligatoriamente.'
+          'Para continuar, debes cambiar tu contraseña obligatoriamente.'
         )
         return '/change-password'
       }
 
       return true
     } catch (error) {
-      // Si falla getUserMe, token invÃ¡lido/expirado o backend no responde
+      // Si falla getUserMe, token inválido/expirado o backend no responde
       localStorage.removeItem('token')
       localStorage.removeItem('username')
       return '/login'
