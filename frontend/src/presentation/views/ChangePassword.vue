@@ -97,14 +97,9 @@ const handleChangePassword = async () => {
   try {
     await authService.changePassword({
       old_password: oldPassword.value,
-      new_password: newPassword.value
+      new_password: newPassword.value,
+      confirm_password: confirmPassword.value
     })
-
-    const username = localStorage.getItem('username')
-
-    if (username) {
-      localStorage.setItem(`pwd_changed_${username}`, 'true')
-    }
 
     success.value = 'Contraseña actualizada correctamente.'
     router.push('/dashboard')
