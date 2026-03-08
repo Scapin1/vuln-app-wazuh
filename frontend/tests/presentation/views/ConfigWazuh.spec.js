@@ -9,7 +9,8 @@ vi.mock('@/application/services/wazuhService', () => ({
         getConnections: vi.fn(),
         createConnection: vi.fn(),
         editConnection: vi.fn(),
-        deleteConnection: vi.fn()
+        deleteConnection: vi.fn(),
+        testConnection: vi.fn()
     }
 }))
 

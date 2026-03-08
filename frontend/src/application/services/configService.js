@@ -1,4 +1,3 @@
-import apiClient from '../../infrastructure/http/apiClient';
 /*
 export default {
     getConfig: async () => {
