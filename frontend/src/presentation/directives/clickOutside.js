@@ -1,7 +1,7 @@
 const clickOutside = {
   mounted(el, binding) {
     el.__clickOutsideHandler__ = event => {
-      if (!el.contains(event.target)) {
+      if (!el.contains(event.target) && typeof binding.value === 'function') {
         binding.value(event)
       }
     }
