@@ -29,9 +29,6 @@ pipeline {
         }
 
         stage('SAST: SonarQube Code Analysis'){
-            when {
-                expression { params.RUN_SONARQUBE == true }
-            }
             environment {
                 SONAR_HOST_URL = "http://sonarqube:9000"
                 SONAR_AUTH_TOKEN = credentials('sonar-token')
