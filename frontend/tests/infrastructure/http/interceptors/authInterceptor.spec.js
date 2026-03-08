@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import setupAuthInterceptor from '../../../../infrastructure/http/interceptors/authInterceptor'
+import setupAuthInterceptor from '@/infrastructure/http/interceptors/authInterceptor'
 
 describe('authInterceptor.js', () => {
     let mockApiClient

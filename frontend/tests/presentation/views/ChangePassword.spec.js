@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import ChangePassword from '../../../presentation/views/ChangePassword.vue'
-import authService from '../../../application/services/authService'
+import ChangePassword from '@/presentation/views/ChangePassword.vue'
+import authService from '@/application/services/authService'
 
-vi.mock('../../../application/services/authService', () => ({
+vi.mock('@/application/services/authService', () => ({
     default: {
         changePassword: vi.fn()
     }

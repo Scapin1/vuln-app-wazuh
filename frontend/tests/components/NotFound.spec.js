@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
-import NotFound from '../../presentation/views/NotFound.vue'
+import NotFound from '@/presentation/views/NotFound.vue'
 
 describe('NotFound.vue', () => {
     it('renders correctly', () => {

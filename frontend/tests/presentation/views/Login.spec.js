@@ -1,17 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-import Login from '../../../presentation/views/Login.vue'
-import authService from '../../../application/services/authService'
-import userService from '../../../application/services/userService'
+import Login from '@/presentation/views/Login.vue'
+import authService from '@/application/services/authService'
+import userService from '@/application/services/userService'
 
 // Mock services
-vi.mock('../../../application/services/authService', () => ({
+vi.mock('@/application/services/authService', () => ({
     default: {
         login: vi.fn()
     }
 }))
 
-vi.mock('../../../application/services/userService', () => ({
+vi.mock('@/application/services/userService', () => ({
     default: {
         getUserMe: vi.fn()
     }

@@ -22,7 +22,7 @@ describe('apiClient.js', () => {
 
     it('debe crear la instancia de axios con baseURL del entorno', async () => {
         const axios = (await import('axios')).default
-        const apiClient = (await import('../../../infrastructure/http/apiClient')).default
+        const apiClient = (await import('src/src/src/infrastructure/http/apiClient')).default
 
         expect(axios.create).toHaveBeenCalledWith({
             baseURL: 'http://api-test:8000'

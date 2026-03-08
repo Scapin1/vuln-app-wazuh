@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import ConfigWazuh from '../../../presentation/views/ConfigWazuh.vue'
-import wazuhService from '../../../application/services/wazuhService'
+import ConfigWazuh from '@/presentation/views/ConfigWazuh.vue'
+import wazuhService from '@/application/services/wazuhService'
 import Swal from 'sweetalert2'
 
-vi.mock('../../../application/services/wazuhService', () => ({
+vi.mock('@/application/services/wazuhService', () => ({
     default: {
         getConnections: vi.fn(),
         createConnection: vi.fn(),

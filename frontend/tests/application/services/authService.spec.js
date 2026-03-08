@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
-import authService from '../../../application/services/authService'
-import apiClient from '../../../infrastructure/http/apiClient'
+import authService from '@/application/services/authService'
+import apiClient from '@/infrastructure/http/apiClient'
 
 // Mock the apiClient module
-vi.mock('../../../infrastructure/http/apiClient', () => {
+vi.mock('@/infrastructure/http/apiClient', () => {
     return {
         default: {
             post: vi.fn(),

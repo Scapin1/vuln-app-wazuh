@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import router from '../../../presentation/router/index'
+import router from '@/presentation/router/index'
 
 describe('router/index.js global guard', () => {
     beforeEach(() => {

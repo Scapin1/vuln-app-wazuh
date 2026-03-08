@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
-import wazuhService from '../../../application/services/wazuhService'
-import apiClient from '../../../infrastructure/http/apiClient'
+import wazuhService from '@/application/services/wazuhService'
+import apiClient from '@/infrastructure/http/apiClient'
 
 // Mock the apiClient module
-vi.mock('../../../infrastructure/http/apiClient', () => {
+vi.mock('@/infrastructure/http/apiClient', () => {
     return {
         default: {
             get: vi.fn(),

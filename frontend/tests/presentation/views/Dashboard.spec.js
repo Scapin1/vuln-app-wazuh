@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import Dashboard from '../../../presentation/views/Dashboard.vue'
-import vulnService from '../../../application/services/vulnService'
+import Dashboard from '@/presentation/views/Dashboard.vue'
+import vulnService from '@/application/services/vulnService'
 
-vi.mock('../../../application/services/vulnService', () => ({
+vi.mock('@/application/services/vulnService', () => ({
     default: {
         getVulns: vi.fn(),
         syncVulns: vi.fn()

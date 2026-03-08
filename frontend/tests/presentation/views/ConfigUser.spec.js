@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import ConfigUser from '../../../presentation/views/ConfigUser.vue'
-import userService from '../../../application/services/userService'
+import ConfigUser from '@/presentation/views/ConfigUser.vue'
+import userService from '@/application/services/userService'
 import Swal from 'sweetalert2'
 
-vi.mock('../../../application/services/userService', () => ({
+vi.mock('@/application/services/userService', () => ({
     default: {
         getUsers: vi.fn(),
         createUser: vi.fn(),
