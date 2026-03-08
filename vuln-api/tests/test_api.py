@@ -6,8 +6,8 @@ from app.crypto import encrypt
 
 #helpers
 
-def _create_user(db, username="admin", password="admin"):
-    user = User(username=username, password_hash=hash_password(password))
+def _create_user(db, username="admin", password="admin", is_active=True):
+    user = User(username=username, password_hash=hash_password(password), is_active=is_active)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -71,6 +71,10 @@ def test_login_fail(client):
     assert response.status_code == 400
     assert response.json()["detail"] == "Usuario o contraseña incorrectos"
 
+def test_login_inactive_user(client, db_session):
+    _create_user(db_session, is_active=False) 
+    res = client.post("/auth/login", data={"username": "admin", "password": "admin"})
+    assert res.status_code == 400
 
 def test_login_success(client, db_session):
     _create_user(db_session)
@@ -102,7 +106,7 @@ def test_sync_vulnerabilities_unauthorized(client, db_session):
 @patch("app.main.fetch_all_vulns")
 def test_sync_vulnerabilities_success(mock_fetch, client, db_session):
     from app.auth import pwd_context
-    test_user = User(username="admin", password_hash=pwd_context.hash("admin"))
+    test_user = User(username="admin", password_hash=pwd_context.hash("admin"), is_active=True)
     db_session.add(test_user)
     conn = WazuhConnection(
         name="test", indexer_url="https://x:9200",
@@ -174,16 +178,20 @@ def test_get_me(client, db_session):
     res = client.get("/users/me", headers=_get_headers(client))
     assert res.status_code == 200
     assert res.json()["username"] == "admin"
-    assert res.json()["is_default_password"] is True
+    assert res.json()["is_active"] is True
 
 
-def test_get_me_is_default_false_after_change(client, db_session):
+def test_get_me_is_active_false_after_deactivation(client, db_session):
     _create_user(db_session)
-    client.post("/auth/change-password",
-                json={"old_password": "admin", "new_password": "safe123"},
-                headers=_get_headers(client))
-    res = client.get("/users/me", headers=_get_headers(client, password="safe123"))
-    assert res.json()["is_default_password"] is False
+    headers = _get_headers(client) 
+    me = client.get("/users/me", headers=headers).json()
+
+    user = db_session.query(User).filter_by(id=me["id"]).first()
+    user.is_active = False
+    db_session.commit()
+
+    res = client.get("/users/me", headers=headers) 
+    assert res.json()["is_active"] is False 
 
 
 #users crud

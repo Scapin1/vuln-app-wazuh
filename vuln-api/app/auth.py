@@ -38,6 +38,8 @@ def authenticate_user(db: Session, username: str, password: str):
         return None
     if not verify_password(password, user.password_hash):
         return None
+    if not user.is_active:
+        return None
     return user
 
 def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
