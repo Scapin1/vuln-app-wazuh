@@ -48,11 +48,12 @@ pipeline {
                 script {
                     withSonarQubeEnv('sonarqube') {
                         docker.image('sonarsource/sonar-scanner-cli').inside("--network=sonarqube_sonar-network --user=root") {
+                            // Quitamos $SONAR_HOST_URL y forzamos la comunicación por red interna
                             sh '''
                             sonar-scanner \
                                 -Dproject.settings=dev-tools/sonarqube/sonar-project.properties \
                                 -Dsonar.projectBaseDir=. \
-                                -Dsonar.host.url=$SONAR_HOST_URL \
+                                -Dsonar.host.url=http://sonarqube:9000 \
                                 -Dsonar.login=$SONAR_AUTH_TOKEN
                             '''
                         }     
