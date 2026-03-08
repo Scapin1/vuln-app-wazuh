@@ -1,6 +1,14 @@
 pipeline {
     agent any
 
+    parameters {
+        booleanParam(
+            name: 'RUN_SONARQUBE',
+            defaultValue: true, 
+            description: 'Ejecutar análisis SonarQube'
+        )
+    }
+
     environment {
         OWASP_URL = "http://api:8000/openapi.json"
     }
