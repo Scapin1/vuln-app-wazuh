@@ -15,6 +15,8 @@ services:
       - JAVA_OPTS=-Xmx4096m -Xms1024m -XX:+UseG1GC -XX:+ExplicitGCInvokesConcurrent -XX:+ParallelRefProcEnabled -XX:+UseStringDeduplication
     networks:
       - jenkins-network
+      - sonar-network
+      - app-network
 
 volumes:
   jenkins_data:
