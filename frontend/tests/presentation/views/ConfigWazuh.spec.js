@@ -48,7 +48,7 @@ describe('ConfigWazuh.vue', () => {
         await flushPromises()
 
         // Mockeamos el fallo con un mensaje específico
-        const errorMsg = 'Error de validación'
+        const errorMsg = 'Error al guardar la conexión. Verifica que los datos sean correctos.'
         wazuhService.editConnection.mockRejectedValueOnce({ 
             response: { data: { message: errorMsg } } 
         })
