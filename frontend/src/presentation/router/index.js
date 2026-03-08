@@ -8,6 +8,8 @@ import ChangePassword from '../views/ChangePassword.vue'
 import NotFound from '../views/NotFound.vue'
 import userService from '../../application/services/userService'
 
+import Timeline from '../views/Timeline.vue'
+
 const routes = [
   { path: '/login', name: 'Login', component: Login },
   { path: '/', redirect: '/login' },
