@@ -34,7 +34,6 @@ describe('ConfigWazuh.vue', () => {
         const wrapper = mount(ConfigWazuh)
         await flushPromises()
 
-        // Buscamos el botón por su atributo title, que es infalible
         const editBtn = wrapper.find('button[title="Editar"]')
         await editBtn.trigger('click')
         await flushPromises()
@@ -51,6 +50,9 @@ describe('ConfigWazuh.vue', () => {
 
         await wrapper.find('button[title="Editar"]').trigger('click')
         await flushPromises()
+
+        // IMPORTANTE: Debemos asignar una contraseña para pasar la validación
+        wrapper.vm.newConn.wazuh_password = 'dummy-password'
 
         await wrapper.find('form').trigger('submit.prevent')
         await flushPromises()
