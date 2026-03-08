@@ -227,9 +227,19 @@ def create_connection(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # verify unique name
     if db.query(WazuhConnection).filter(WazuhConnection.name == request.name).first():
         raise HTTPException(
             status_code=400, detail="Ya existe una conexión con ese nombre"
+        )
+
+    # try to connect before persisting
+    ok = test_connection(request.indexer_url, request.wazuh_user, request.wazuh_password)
+    if not ok:
+        # do not store invalid configuration
+        raise HTTPException(
+            status_code=400,
+            detail="No se pudo establecer conexión con el indexador Wazuh",
         )
 
     conn = WazuhConnection(
@@ -237,6 +247,9 @@ def create_connection(
         indexer_url=request.indexer_url,
         wazuh_user=request.wazuh_user,
         wazuh_password=encrypt(request.wazuh_password),
+        tested=True,
+        last_tested_at=func.now(),
+        last_test_ok=True,
     )
     db.add(conn)
     db.commit()

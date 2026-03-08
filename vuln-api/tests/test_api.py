@@ -258,13 +258,16 @@ def test_list_connections_empty(client, db_session):
     assert res.json() == []
 
 
-def test_create_connection(client, db_session):
+@patch("app.main.test_connection", return_value=True)
+def test_create_connection(mock_test, client, db_session):
+    # the endpoint should automatically verify the Wazuh connection
     _create_user(db_session)
-    res = client.post("/wazuh-connections",
-                      json={"name": "prod", "indexer_url": "https://wazuh:9200",
-                            "wazuh_user": "admin", "wazuh_password": "secret"},
-                      headers=_get_headers(client))
+    payload = {"name": "prod", "indexer_url": "https://wazuh:9200",
+               "wazuh_user": "admin", "wazuh_password": "secret"}
+    res = client.post("/wazuh-connections", json=payload, headers=_get_headers(client))
     assert res.status_code == 201
+    # verify that test_connection was called with provided credentials
+    mock_test.assert_called_once_with(payload["indexer_url"], payload["wazuh_user"], payload["wazuh_password"])
 
 
 def test_create_connection_duplicate_name(client, db_session):
@@ -273,6 +276,15 @@ def test_create_connection_duplicate_name(client, db_session):
     payload = {"name": "dup", "indexer_url": "x", "wazuh_user": "u", "wazuh_password": "p"}
     client.post("/wazuh-connections", json=payload, headers=headers)
     assert client.post("/wazuh-connections", json=payload, headers=headers).status_code == 400
+
+@patch("app.main.test_connection", return_value=False)
+def test_create_connection_fails_when_unreachable(mock_test, client, db_session):
+    _create_user(db_session)
+    payload = {"name": "bad", "indexer_url": "https://bad", "wazuh_user": "u", "wazuh_password": "p"}
+    res = client.post("/wazuh-connections", json=payload, headers=_get_headers(client))
+    assert res.status_code == 400
+    assert "No se pudo establecer conexión" in res.json()["detail"]
+    mock_test.assert_called_once()
 
 
 def test_update_connection(client, db_session):
