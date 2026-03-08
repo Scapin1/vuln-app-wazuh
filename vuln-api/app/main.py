@@ -48,7 +48,12 @@ def create_default_admin():
         admin_exists = db.query(User).filter(User.username == "admin").first()
         if not admin_exists:
             print("Creando usuario admin default...")
-            default_admin = User(username="admin", password_hash=hash_password("admin"), is_active=True)
+            default_admin = User(
+                username="admin", 
+                password_hash=hash_password("admin"), 
+                is_active=True,
+                is_default_password=True,
+            )
             db.add(default_admin)
             db.commit()
     finally:
@@ -128,6 +133,7 @@ def change_password(
 
     current_user.password_hash = hash_password(request.new_password)
     current_user.is_active = True 
+    current_user.is_default_password = False
 
     db.add(current_user)
     db.commit()
@@ -141,6 +147,7 @@ def get_user_me(current_user: User = Depends(get_current_user)):
         "id": current_user.id,
         "username": current_user.username,
         "is_active": current_user.is_active,
+        "is_default_password": current_user.is_default_password,
     }
 
 class NewUserRequest(BaseModel):
@@ -159,7 +166,9 @@ def create_user(
         raise HTTPException(status_code=400, detail="El nombre de usuario ya esta ocupado. Elige otro.")
 
     new_user = User(
-        username=request.username, password_hash=hash_password(request.password)
+        username=request.username, 
+        password_hash=hash_password(request.password),
+        is_default_password=True,
     )
     db.add(new_user)
     db.commit()

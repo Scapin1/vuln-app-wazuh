@@ -16,7 +16,7 @@
       <nav class="sidebar-nav">
         <div class="nav-section">MENU PRINCIPAL</div>
         
-        <a href="#" @click.prevent="handleNavClick('/')" class="nav-item" :class="{ 'router-link-active': route.path === '/' }">
+        <a href="#" @click.prevent="handleNavClick('/dashboard')" class="nav-item" :class="{ 'router-link-active': route.path === '/dashboard' }">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
           Dashboard
         </a>
@@ -70,7 +70,6 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import userService from './application/services/userService'
 import Swal from 'sweetalert2'
 
 const router = useRouter()

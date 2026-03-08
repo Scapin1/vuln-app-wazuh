@@ -6,8 +6,8 @@ import ConfigWazuh from '../views/ConfigWazuh.vue'
 import ChangePassword from '../views/ChangePassword.vue'
 
 const routes = [
-  { path: '/', redirect: '/dashboard' },
   { path: '/login', name: 'Login', component: Login },
+  { path: '/', redirect: '/login' },
   { path: '/dashboard', name: 'Dashboard', component: Dashboard, meta: { requiresAuth: true } },
   { path: '/config-user', name: 'ConfigUser', component: ConfigUser, meta: { requiresAuth: true } },
   { path: '/config-wazuh', name: 'ConfigWazuh', component: ConfigWazuh, meta: { requiresAuth: true } },
@@ -29,13 +29,13 @@ router.beforeEach((to, from ) => {
 
   // si la ruta requiere auten- pero no tiene token
   if (requiresAuth && !token) { 
-    next('/login')
+    '/login'
     return
   } 
 
   // Si ya está logeado pero no ha cambiado contraseña,
   // solo puede entrar a /change-password
-  if (token && passwordChanged !== 'true' && to.path !== '/change-password') {
+  if (passwordChanged !== 'true' && to.path !== '/change-password') {
     sessionStorage.setItem(
       'force_password_message',
       'Para seguir navegando, debes cambiar tu contraseña.'
@@ -45,7 +45,7 @@ router.beforeEach((to, from ) => {
 
   // Si ya cambió contraseña y trata de ir al login, lo mandas al dashboard
   if (token && passwordChanged === 'true' && to.path === '/login') {
-    return '/'
+    return '/dashboard'
   }
   
   return true
