@@ -10,7 +10,7 @@ vi.mock('@/application/services/wazuhService', () => ({
         createConnection: vi.fn(),
         editConnection: vi.fn(),
         deleteConnection: vi.fn(),
-        testConnection: vi.fn()
+        testConnection: vi.fn(() => Promise.resolve({ data: { success: true } }))
     }
 }))
 
@@ -156,7 +156,7 @@ describe('ConfigWazuh.vue', () => {
         Swal.fire.mockResolvedValueOnce({ isConfirmed: true })
         wazuhService.deleteConnection.mockResolvedValueOnce({})
 
-        const deleteBtn = wrapper.findAll('tbody tr')[0].findAll('.btn-icon')[1]
+        const deleteBtn = wrapper.findAll('tbody tr')[0].findAll('.btn-icon')[2]
         await deleteBtn.trigger('click')
 
         await flushPromises()
@@ -180,3 +180,4 @@ describe('ConfigWazuh.vue', () => {
         expect(wazuhService.deleteConnection).not.toHaveBeenCalled()
     })
 })
+
