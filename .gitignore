@@ -4,3 +4,5 @@ __pycache__/
 reports/
 
 vuln-api/coverage.xml
+frontend/coverage/
+frontend/node_modules/
