@@ -44,21 +44,26 @@ describe('ConfigWazuh.vue', () => {
     })
 
     it('handles edit connection fail gracefully', async () => {
-        wazuhService.editConnection.mockRejectedValueOnce({ response: { data: { message: 'Error' } } })
         const wrapper = mount(ConfigWazuh)
         await flushPromises()
+
+        // Mockeamos el fallo con un mensaje específico
+        const errorMsg = 'Error de validación'
+        wazuhService.editConnection.mockRejectedValueOnce({ 
+            response: { data: { message: errorMsg } } 
+        })
 
         await wrapper.find('button[title="Editar"]').trigger('click')
         await flushPromises()
 
-        // IMPORTANTE: Debemos asignar una contraseña para pasar la validación
+        // IMPORTANTE: Asignamos una contraseña para pasar la validación del frontend
         wrapper.vm.newConn.wazuh_password = 'dummy-password'
 
         await wrapper.find('form').trigger('submit.prevent')
         await flushPromises()
 
         expect(wazuhService.editConnection).toHaveBeenCalled()
-        expect(wrapper.vm.newConnError).toBe('Error')
+        expect(wrapper.vm.newConnError).toBe(errorMsg)
     })
 
     it('deletes connection successfully confirmed', async () => {
