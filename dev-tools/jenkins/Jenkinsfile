@@ -1,14 +1,6 @@
 pipeline {
     agent any
 
-    parameters {
-        booleanParam(
-            name: 'RUN_SONARQUBE',
-            defaultValue: true, 
-            description: 'Ejecutar análisis SonarQube'
-        )
-    }
-
     environment {
         OWASP_URL = "http://api:8000/openapi.json"
     }
@@ -63,9 +55,6 @@ pipeline {
         } 
 
         stage('GATE: SonarQube Quality Gate') {
-            when {
-                expression { params.RUN_SONARQUBE == true } 
-            }
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
@@ -80,14 +69,10 @@ pipeline {
         }
 
         stage('DAST: OWASP ZAP Dynamic Scan'){
-            when {
-                expression { params.RUN_ZAP == true }
-            }
             steps {
                 script {
                     sh 'mkdir -p reports && chmod 777 reports'
                     sh 'chmod +x dev-tools/jenkins/scripts/run_zap.sh'
-                    // Ya no le pasamos la URL por parámetro porque el script ahora maneja ambas
                     sh "./dev-tools/jenkins/scripts/run_zap.sh ${env.BUILD_NUMBER}"
                 }
             }
