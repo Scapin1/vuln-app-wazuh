@@ -25,10 +25,6 @@
     <div v-show="showFilters" class="filter-tray fade-in">
       <div class="filter-grid">
         <div class="filter-item">
-          <label>Estado</label>
-          <input v-model="filters.estado" type="text" placeholder="NUEVO, ACTIVO..." class="filter-input">
-        </div>
-        <div class="filter-item">
           <label>Severidad</label>
           <input v-model="filters.severidad" type="text" placeholder="CRITICAL, HIGH..." class="filter-input">
         </div>
@@ -77,17 +73,34 @@
     <!-- Table -->
     <div v-else class="card" style="padding: 0;">
       <div class="table-wrapper">
+        <div v-if="totalPages > 1" class="pagination-header">
+          <span class="pagination-info">
+            Mostrando {{ (currentPage - 1) * itemsPerPage + 1 }} - {{ Math.min(currentPage * itemsPerPage, sortedVulns.length) }} de {{ sortedVulns.length }} vulnerabilidades
+          </span>
+          <div class="pagination-nav">
+            <button class="btn-icon-page" :disabled="currentPage === 1" @click="prevPage" title="Anterior">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+            <div class="page-numbers">
+              <button 
+                v-for="page in visiblePages" 
+                :key="page" 
+                class="btn-page" 
+                :class="{ 'active': currentPage === page }"
+                @click="currentPage = page"
+              >
+                {{ page }}
+              </button>
+            </div>
+            <button class="btn-icon-page" :disabled="currentPage === totalPages" @click="nextPage" title="Siguiente">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+          </div>
+        </div>
+
         <table v-if="vulns.length > 0">
           <thead>
             <tr>
-              <th width="10%" @click="sortBy('first_seen')">
-                Estado
-                <span v-if="sortKey === 'first_seen'" class="sort-indicator">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
-                    <path d="M7 14l5-5 5 5z"/>
-                  </svg>
-                </span>
-              </th>
               <th width="12%" @click="sortBy('severity')">
                 Severidad
                 <span v-if="sortKey === 'severity'" class="sort-indicator">
@@ -131,15 +144,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="vuln in sortedVulns" :key="vuln.id">
-              <td>
-                <span v-if="isNew(vuln.first_seen)" class="badge badge-new">
-                  <span class="pulse-dot"></span> NUEVO
-                </span>
-                <span v-else class="badge" style="background-color: var(--bg-hover); color: var(--text-muted);">
-                  ACTIVO
-                </span>
-              </td>
+            <tr v-for="vuln in paginatedVulns" :key="vuln.id">
               <td>
                 <span :class="getSeverityClass(vuln.severity)">
                   {{ (vuln.severity || 'UNKNOWN').toUpperCase() }}
@@ -191,7 +196,31 @@
             </tr>
           </tbody>
         </table>
-        <div v-else class="empty-state" style="padding: 4rem 2rem;">
+
+        <!-- Controles de Paginación Abajo -->
+        <div v-if="totalPages > 1" class="pagination-controls-bottom">
+          <div class="pagination-nav" style="margin-left: auto;">
+            <button class="btn-icon-page" :disabled="currentPage === 1" @click="prevPage" title="Anterior">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+            <div class="page-numbers">
+              <button 
+                v-for="page in visiblePages" 
+                :key="page" 
+                class="btn-page" 
+                :class="{ 'active': currentPage === page }"
+                @click="currentPage = page"
+              >
+                {{ page }}
+              </button>
+            </div>
+            <button class="btn-icon-page" :disabled="currentPage === totalPages" @click="nextPage" title="Siguiente">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="vulns.length === 0 && !loading" class="empty-state" style="padding: 4rem 2rem;">
           <div class="shield-box">
              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M9 12l2 2 4-4"></path></svg>
           </div>
@@ -214,8 +243,12 @@ const error = ref('')
 const sortKey = ref('last_seen')
 const sortOrder = ref('desc')
 const showFilters = ref(false)
+
+// Paginación
+const currentPage = ref(1)
+const itemsPerPage = 50
+
 const filters = ref({
-  estado: '',
   severidad: '',
   cveId: '',
   agente: '',
@@ -255,14 +288,6 @@ const compareValues = (a, b, key) => {
   }
 }
 
-const estadoOptions = computed(() => {
-  const estados = new Set()
-  vulns.value.forEach(vuln => {
-    const estado = isNew(vuln.first_seen) ? 'NUEVO' : 'ACTIVO'
-    estados.add(estado)
-  })
-  return Array.from(estados).sort()
-})
 
 const severidadOptions = computed(() => {
   const severidades = new Set()
@@ -280,7 +305,6 @@ const severidadOptions = computed(() => {
 
 const filteredVulns = computed(() => {
   return vulns.value.filter(vuln => {
-    const estadoText = isNew(vuln.first_seen) ? 'NUEVO' : 'ACTIVO'
     const severidadText = (vuln.severity || 'UNKNOWN').toUpperCase()
     const cveText = vuln.cve_id || 'N/A'
     const agenteText = vuln.agent_name || vuln.agent_id || 'N/A'
@@ -304,7 +328,6 @@ const filteredVulns = computed(() => {
     }
 
     return (
-      (!filters.value.estado || estadoText.toLowerCase().includes(filters.value.estado.toLowerCase())) &&
       (!filters.value.severidad || severidadText.toLowerCase().includes(filters.value.severidad.toLowerCase())) &&
       (!filters.value.cveId || cveText.toLowerCase().includes(filters.value.cveId.toLowerCase())) &&
       (!filters.value.agente || agenteText.toLowerCase().includes(filters.value.agente.toLowerCase())) &&
@@ -322,6 +345,57 @@ const sortedVulns = computed(() => {
   })
 })
 
+// === LOGICA DE PAGINACION ===
+const totalPages = computed(() => {
+  return Math.ceil(sortedVulns.value.length / itemsPerPage)
+})
+
+const paginatedVulns = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  const end = start + itemsPerPage
+  return sortedVulns.value.slice(start, end)
+})
+
+const visiblePages = computed(() => {
+  const pages = []
+  const maxPages = 5 // Botones numéricos visibles
+  const half = Math.floor(maxPages / 2)
+  
+  let start = currentPage.value - half
+  let end = currentPage.value + half
+
+  if (start < 1) {
+    start = 1
+    end = Math.min(maxPages, totalPages.value)
+  }
+  
+  if (end > totalPages.value) {
+    end = totalPages.value
+    start = Math.max(1, end - maxPages + 1)
+  }
+  
+  for (let i = start; i <= end; i++) {
+    pages.push(i)
+  }
+  return pages
+})
+
+const nextPage = () => {
+  if (currentPage.value < totalPages.value) currentPage.value++
+}
+
+const prevPage = () => {
+  if (currentPage.value > 1) currentPage.value--
+}
+
+import { watch } from 'vue'
+
+// Al filtrar o ordenar volvemos a la pagina 1
+watch(filters, () => { currentPage.value = 1 }, { deep: true })
+watch(sortKey, () => { currentPage.value = 1 })
+watch(sortOrder, () => { currentPage.value = 1 })
+
+
 const sortBy = (key) => {
   if (sortKey.value !== key) {
     sortKey.value = key
@@ -336,7 +410,6 @@ const sortBy = (key) => {
 
 const clearFilters = () => {
   filters.value = {
-    estado: '',
     severidad: '',
     cveId: '',
     agente: '',
@@ -354,54 +427,14 @@ const fetchVulns = async () => {
     if (res.data && res.data.length > 0) {
       vulns.value = res.data
     } else {
-      // Fallback a datos mock si no hay nada en la DB
-      injectMockData()
+      
     }
   } catch (err) {
     console.error('Error fetching vulns:', err)
-    // Fallback a datos mock en caso de error para visualización
-    injectMockData()
-    // No mostramos el error para que la UI se vea limpia con los mocks
-    // error.value = 'Error al cargar los datos reales. Mostrando datos de ejemplo.'
+    
   } finally {
     loading.value = false
   }
-}
-
-const injectMockData = () => {
-  const now = new Date()
-  vulns.value = [
-    {
-      id: 'm1',
-      agent_name: 'srv-web-prod-01',
-      cve_id: 'CVE-2024-21626',
-      severity: 'CRITICAL',
-      package_name: 'runc',
-      package_version: '1.1.11-1',
-      first_seen: new Date(now.getTime() - 1000 * 60 * 45).toISOString(), // 45 min ago
-      last_seen: now.toISOString()
-    },
-    {
-      id: 'm2',
-      agent_name: 'srv-db-prod-02',
-      cve_id: 'CVE-2023-44487',
-      severity: 'HIGH',
-      package_name: 'nginx-common',
-      package_version: '1.18.0-6ubuntu14.4',
-      first_seen: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 2).toISOString(), // 2 days ago
-      last_seen: now.toISOString()
-    },
-    {
-      id: 'm3',
-      agent_name: 'workstation-dev-05',
-      cve_id: 'CVE-2023-38545',
-      severity: 'MEDIUM',
-      package_name: 'libcurl4',
-      package_version: '7.81.0-1ubuntu1.13',
-      first_seen: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 7).toISOString(), // 7 days ago
-      last_seen: new Date(now.getTime() - 1000 * 60 * 60 * 5).toISOString() // 5 hours ago
-    }
-  ]
 }
 
 const syncVulns = async () => {
@@ -778,5 +811,93 @@ th {
   color: var(--danger);
   background-color: var(--danger-bg);
   border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* PAGINACION */
+.pagination-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background-color: var(--bg-panel);
+}
+
+.pagination-info {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.pagination-controls-bottom {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border);
+  background-color: var(--bg-card);
+}
+
+.pagination-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.page-numbers {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.btn-icon-page {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-icon-page:hover:not(:disabled) {
+  background-color: var(--bg-hover);
+  border-color: var(--text-muted);
+}
+
+.btn-icon-page:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  border-color: transparent;
+}
+
+.btn-page {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 0.25rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-page:hover:not(.active) {
+  background-color: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.btn-page.active {
+  background-color: var(--primary);
+  color: #000;
 }
 </style>

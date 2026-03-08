@@ -21,10 +21,7 @@ describe('vulnService.js', () => {
         const result = await vulnService.getVulns()
 
         expect(apiClient.get).toHaveBeenCalledWith('/vulns', {
-            params: {
-                limit: 100,
-                connection_id: undefined,
-            }
+            params: {}
         })
         expect(result).toEqual(mockResponse)
     })

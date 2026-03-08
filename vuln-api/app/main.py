@@ -6,7 +6,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import set_key, find_dotenv
 from sqlalchemy.orm import Session
-from typing import List, Annotated
+from typing import List, Annotated, Optional
 from pydantic import BaseModel
 from sqlalchemy.sql import func
 from .db import Base, engine, get_db, SessionLocal
@@ -465,7 +465,7 @@ def sync_all_connections(
 
 @app.get("/vulns")
 def list_vulns(
-    limit: int = 100,
+    limit: Optional[int] = None,
     connection_id: int = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -474,8 +474,11 @@ def list_vulns(
     
     if connection_id:
         query = query.filter(WazuhVulnerability.connection_id == connection_id)
-    
-    vulns = query.limit(limit).all()
+
+    if limit is not None:
+        query = query.limit(limit)
+
+    vulns = query.all()
 
     return [
         {
