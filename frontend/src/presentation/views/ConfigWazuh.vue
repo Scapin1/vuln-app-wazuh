@@ -215,9 +215,9 @@ const submitConnection = async () => {
       await wazuhService.createConnection(payload)
     }
     closeModal()
-    fetchConnections()
+    await fetchConnections()
   } catch (err) {
-    newConnError.value = err.response?.data?.detail || 'Error al editar la conexión.'
+    newConnError.value = err.response?.data?.detail || 'Error al guardar la conexión. Verifica que los datos sean correctos.'
   } finally {
     creatingConn.value = false
   }
