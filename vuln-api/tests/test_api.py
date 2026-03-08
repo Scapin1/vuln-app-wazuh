@@ -143,16 +143,16 @@ def test_sync_vulnerabilities_success(mock_fetch, client, db_session):
 def test_change_password_success(client, db_session):
     _create_user(db_session)
     client.post("/auth/change-password",
-                json={"old_password": "admin", "new_password": "nueva123"},
+                json={"old_password": "admin", "new_password": "Nueva123!", "confirm_password": "Nueva123!"},
                 headers=_get_headers(client))
-    res = client.post("/auth/login", data={"username": "admin", "password": "nueva123"})
+    res = client.post("/auth/login", data={"username": "admin", "password": "Nueva123!"})
     assert res.status_code == 200
 
 
 def test_change_password_wrong_old(client, db_session):
     _create_user(db_session)
     res = client.post("/auth/change-password",
-                      json={"old_password": "incorrecta", "new_password": "nueva123"},
+                      json={"old_password": "incorrecta", "new_password": "Nueva123!", "confirm_password": "Nueva123!"},
                       headers=_get_headers(client))
     assert res.status_code == 400
 
@@ -160,16 +160,22 @@ def test_change_password_wrong_old(client, db_session):
 def test_change_password_same_as_old(client, db_session):
     _create_user(db_session)
     res = client.post("/auth/change-password",
-                      json={"old_password": "admin", "new_password": "admin"},
+                      json={"old_password": "admin", "new_password": "admin", "confirm_password": "admin"},
                       headers=_get_headers(client))
     assert res.status_code == 400
 
 
 def test_change_password_unauthenticated(client):
     res = client.post("/auth/change-password",
-                      json={"old_password": "admin", "new_password": "nueva"})
+                      json={"old_password": "admin", "new_password": "Nueva123!", "confirm_password": "Nueva123!"})
     assert res.status_code == 401
 
+def test_change_password_mismatch(client, db_session):
+    _create_user(db_session)
+    res = client.post("/auth/change-password",
+                      json={"old_password": "admin", "new_password": "Nueva123!", "confirm_password": "Otra456!"},
+                      headers=_get_headers(client))
+    assert res.status_code == 400
 
 #users me
 

@@ -46,7 +46,7 @@ def create_default_admin():
         admin_exists = db.query(User).filter(User.username == "admin").first()
         if not admin_exists:
             print("Creando usuario admin default...")
-            default_admin = User(username="admin", password_hash=hash_password("admin"))
+            default_admin = User(username="admin", password_hash=hash_password("admin"), is_active=True)
             db.add(default_admin)
             db.commit()
     finally:
@@ -135,15 +135,11 @@ def change_password(
 
 @app.get("/users/me")
 def get_user_me(current_user: User = Depends(get_current_user)):
-    is_default = current_user.username == "admin" and verify_password(
-        "admin", current_user.password_hash
-    )
     return {
         "id": current_user.id,
         "username": current_user.username,
-        "is_default_password": is_default,
+        "is_active": current_user.is_active,
     }
-
 
 class NewUserRequest(BaseModel):
     username: str
