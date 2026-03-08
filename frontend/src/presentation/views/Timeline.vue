@@ -3,7 +3,6 @@
     <div class="header-actions">
       <div>
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
         <h1 class="title">Linea de Tiempo</h1>
         <p class="subtitle">Dias continuos, solo se pintan los dias con cambios.</p>
       </div>
@@ -14,8 +13,6 @@
         <div class="f-group">
           <label>Conexion Wazuh</label>
 =======
-=======
->>>>>>> Stashed changes
         <h1 class="title">Línea de Tiempo</h1>
         <p class="subtitle">Evolución cronológica de vulnerabilidades detectadas y resueltas.</p>
       </div>
@@ -29,9 +26,6 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 7h-9m3 3V7m0-3h-4a2 2 0 00-2 2v12a2 2 0 002 2h4a2 2 0 002-2v-5"/><circle cx="12" cy="12" r="3"/></svg>
             Conexión Wazuh
           </label>
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
 >>>>>>> Stashed changes
           <select v-model="selectedConnection" @change="onConnectionChange" class="filter-input">
             <option value="" disabled>Selecciona servidor...</option>
@@ -40,15 +34,12 @@
         </div>
 
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
         <div class="f-group popover-wrap" v-click-outside="() => dd.agents = false">
           <label>Equipos / Agentes</label>
           <button class="filter-input dd-btn" @click="dd.agents = !dd.agents">
             <span>{{ selectedAgents.length ? selectedAgents.length + ' sel.' : 'Todos' }}</span>
             <span>▼</span>
 =======
-=======
->>>>>>> Stashed changes
         <!-- Equipos dropdown -->
         <div class="f-group popover-wrap" v-click-outside="() => dd.agents = false">
           <label>
@@ -58,9 +49,6 @@
           <button class="filter-input dd-btn" @click="dd.agents = !dd.agents">
             <span>{{ selectedAgents.length ? selectedAgents.length + ' sel.' : 'Todos' }}</span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg>
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
 >>>>>>> Stashed changes
           </button>
           <div v-if="dd.agents" class="dd-panel fade-in">
@@ -74,10 +62,6 @@
                 <input type="checkbox" :value="a" v-model="selectedAgents"> {{ a }}
               </label>
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
-              <p v-if="filteredAgents.length === 0" class="dd-empty">Sin resultados</p>
->>>>>>> Stashed changes
 =======
               <p v-if="filteredAgents.length === 0" class="dd-empty">Sin resultados</p>
 >>>>>>> Stashed changes
@@ -86,15 +70,12 @@
         </div>
 
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
         <div class="f-group popover-wrap" v-click-outside="() => dd.vulns = false">
           <label>Vulnerabilidad</label>
           <button class="filter-input dd-btn" @click="dd.vulns = !dd.vulns">
             <span>{{ selectedVulns.length ? selectedVulns.length + ' sel.' : 'Todas' }}</span>
             <span>▼</span>
 =======
-=======
->>>>>>> Stashed changes
         <!-- CVE dropdown -->
         <div class="f-group popover-wrap" v-click-outside="() => dd.vulns = false">
           <label>
@@ -104,9 +85,6 @@
           <button class="filter-input dd-btn" @click="dd.vulns = !dd.vulns">
             <span>{{ selectedVulns.length ? selectedVulns.length + ' sel.' : 'Todas' }}</span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg>
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
 >>>>>>> Stashed changes
           </button>
           <div v-if="dd.vulns" class="dd-panel fade-in">
@@ -120,10 +98,6 @@
                 <input type="checkbox" :value="c" v-model="selectedVulns"> {{ c }}
               </label>
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
-              <p v-if="filteredVulns.length === 0" class="dd-empty">Sin resultados</p>
->>>>>>> Stashed changes
 =======
               <p v-if="filteredVulns.length === 0" class="dd-empty">Sin resultados</p>
 >>>>>>> Stashed changes
@@ -132,21 +106,15 @@
         </div>
 
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
         <div class="f-group">
           <label>Periodo</label>
 =======
-=======
->>>>>>> Stashed changes
         <!-- Periodo -->
         <div class="f-group">
           <label>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             Periodo de Análisis
           </label>
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
 >>>>>>> Stashed changes
           <div class="chip-row">
             <button v-for="p in periods" :key="p.v" class="chip" :class="{ on: period === p.v }" @click="setPeriod(p.v)">{{ p.l }}</button>
@@ -154,14 +122,8 @@
         </div>
 
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
         <div class="f-group" v-if="period === 'day'">
           <label>Dia</label>
-=======
-        <!-- Día específico -->
-        <div class="f-group" v-if="period === 'day'">
-          <label>Día</label>
->>>>>>> Stashed changes
 =======
         <!-- Día específico -->
         <div class="f-group" v-if="period === 'day'">
@@ -173,10 +135,6 @@
         <div class="f-group f-action">
           <button class="btn btn-primary" @click="build" :disabled="!selectedConnection || loading">
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
-            <svg v-if="loading" class="spin" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
->>>>>>> Stashed changes
 =======
             <svg v-if="loading" class="spin" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
 >>>>>>> Stashed changes
@@ -186,7 +144,6 @@
       </div>
     </div>
 
-<<<<<<< Updated upstream
 <<<<<<< Updated upstream
     <div class="kpi-strip" v-if="hasBuilt">
       <div class="kpi-card">
@@ -257,8 +214,6 @@
           </template>
           <div class="tl-dot" :class="slot.type"></div>
 =======
-=======
->>>>>>> Stashed changes
     <!-- Resumen KPI -->
     <div class="kpi-strip" v-if="events.length > 0">
       <div class="kpi-card">
@@ -323,15 +278,11 @@
               </div>
             </div>
           </div>
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
 >>>>>>> Stashed changes
         </div>
       </div>
     </div>
 
-<<<<<<< Updated upstream
 <<<<<<< Updated upstream
     <div v-else class="card empty-card">
       <div v-if="loading" class="empty-center"><p>Escaneando historial...</p></div>
@@ -342,8 +293,6 @@
     </div>
 
 =======
-=======
->>>>>>> Stashed changes
     <!-- Vacío -->
     <div v-else class="card empty-card">
       <div v-if="loading" class="empty-center">
@@ -358,22 +307,14 @@
     </div>
 
     <!-- Modal -->
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
 >>>>>>> Stashed changes
     <div v-if="modal.show" class="modal-overlay" @click.self="modal.show = false">
       <div class="modal-box fade-in">
         <div class="modal-top">
           <div>
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
             <h2>Detalle de {{ modal.ev.cardLabel }}</h2>
             <p class="text-muted">{{ modal.ev.details.length }} registros</p>
-=======
-            <h2>Captura de Estado</h2>
-            <p class="text-muted">{{ modal.ev.timeLabel }} · {{ modal.ev.details.length }} registradas · {{ getConnName() }}</p>
->>>>>>> Stashed changes
 =======
             <h2>Captura de Estado</h2>
             <p class="text-muted">{{ modal.ev.timeLabel }} · {{ modal.ev.details.length }} registradas · {{ getConnName() }}</p>
@@ -385,10 +326,7 @@
           </div>
         </div>
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
 =======
-=======
->>>>>>> Stashed changes
 
         <!-- MiniKPIs en modal -->
         <div class="modal-kpis">
@@ -397,15 +335,11 @@
           <div class="mkpi mkpi-green"><span class="mkpi-n">{{ modal.ev.resolved }}</span><span class="mkpi-l">Resueltos</span></div>
         </div>
 
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
 >>>>>>> Stashed changes
         <div class="modal-content custom-scroll">
           <table class="modal-table">
             <thead>
               <tr>
-<<<<<<< Updated upstream
 <<<<<<< Updated upstream
                 <th @click="msort('connection_name')">Conexion</th>
                 <th @click="msort('agent_name')">Equipo</th>
@@ -426,8 +360,6 @@
                 <td>{{ v.status === 'ACTIVE' ? 'ACTIVO' : 'RESUELTO' }}</td>
                 <td>{{ v.resolved_at ? fmtDateTime(v.resolved_at) : '-' }}</td>
 =======
-=======
->>>>>>> Stashed changes
                 <th @click="msort('connection_name')">Conexión <span class="s-arr" v-if="modal.sk==='connection_name'">{{ modal.so===1?'↑':'↓' }}</span></th>
                 <th @click="msort('agent_name')">Equipo <span class="s-arr" v-if="modal.sk==='agent_name'">{{ modal.so===1?'↑':'↓' }}</span></th>
                 <th @click="msort('cve_id')">Vulnerabilidad <span class="s-arr" v-if="modal.sk==='cve_id'">{{ modal.so===1?'↑':'↓' }}</span></th>
@@ -446,9 +378,6 @@
                 <td>{{ fmtShort(v.first_seen) }}</td>
                 <td><span :class="'st ' + v.status.toLowerCase()">{{ v.status === 'ACTIVE' ? 'ACTIVO' : 'RESUELTO' }}</span></td>
                 <td>{{ v.resolved_at ? fmtShort(v.resolved_at) : '-' }}</td>
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
 >>>>>>> Stashed changes
               </tr>
               <tr v-if="modalRows.length === 0"><td colspan="7" class="empty-row">Sin coincidencias</td></tr>
@@ -475,7 +404,6 @@ const vClickOutside = {
     document.addEventListener('click', el._co)
   },
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
   unmounted(el) {
     document.removeEventListener('click', el._co)
   }
@@ -500,11 +428,6 @@ const zoomLevels = [
 }
 
 >>>>>>> Stashed changes
-=======
-  unmounted(el) { document.removeEventListener('click', el._co) }
-}
-
->>>>>>> Stashed changes
 const connections = ref([])
 const agentOpts = ref([])
 const vulnOpts = ref([])
@@ -513,7 +436,6 @@ const selectedAgents = ref([])
 const selectedVulns = ref([])
 const search = reactive({ agent: '', vuln: '' })
 const dd = reactive({ agents: false, vulns: false })
-<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 const period = ref('30d')
 const customDate = ref(new Date().toISOString().split('T')[0])
@@ -527,16 +449,11 @@ const rangeEndMs = ref(0)
 const zoomLevelIndex = ref(0)
 const viewStartIndex = ref(0)
 =======
-=======
->>>>>>> Stashed changes
 const period = ref('7d')
 const customDate = ref(new Date().toISOString().split('T')[0])
 const loading = ref(false)
 const events = ref([])
 const scrollRef = ref(null)
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
 >>>>>>> Stashed changes
 
 const periods = [
@@ -544,11 +461,7 @@ const periods = [
   { l: '7D', v: '7d' },
   { l: '30D', v: '30d' },
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
   { l: 'Dia', v: 'day' },
-=======
-  { l: 'Día', v: 'day' },
->>>>>>> Stashed changes
 =======
   { l: 'Día', v: 'day' },
 >>>>>>> Stashed changes
@@ -556,7 +469,6 @@ const periods = [
 ]
 
 const setPeriod = v => { period.value = v }
-<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 const filteredAgents = computed(() => agentOpts.value.filter(a => a.toLowerCase().includes(search.agent.toLowerCase())))
 const filteredVulns = computed(() => vulnOpts.value.filter(v => v.toLowerCase().includes(search.vuln.toLowerCase())))
@@ -640,8 +552,6 @@ const onConnectionChange = async () => {
     console.error(e)
   }
 =======
-=======
->>>>>>> Stashed changes
 
 const filteredAgents = computed(() => agentOpts.value.filter(a => a.toLowerCase().includes(search.agent.toLowerCase())))
 const filteredVulns = computed(() => vulnOpts.value.filter(v => v.toLowerCase().includes(search.vuln.toLowerCase())))
@@ -668,15 +578,11 @@ const onConnectionChange = async () => {
     agentOpts.value = Array.from(ag).sort()
     vulnOpts.value = Array.from(cv).sort()
   } catch(e) {}
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
 >>>>>>> Stashed changes
 }
 
 const build = async () => {
   if (!selectedConnection.value) return
-<<<<<<< Updated upstream
 <<<<<<< Updated upstream
   loading.value = true
   hasBuilt.value = false
@@ -971,8 +877,6 @@ onMounted(async () => {
   .kpi-strip { grid-template-columns: 1fr 1fr; }
   .tl-stage { min-height: 500px; }
 =======
-=======
->>>>>>> Stashed changes
   loading.value = true; events.value = []
   try {
     const res = await vulnService.getVulns({ connectionId: selectedConnection.value, limit: 2000 })
@@ -1425,9 +1329,6 @@ onMounted(async () => { try { connections.value = (await wazuhService.getConnect
   .filter-row { flex-direction: column; align-items: stretch; }
   .f-action { margin-left: 0; }
   .kpi-strip { grid-template-columns: repeat(2, 1fr); }
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
 >>>>>>> Stashed changes
 }
 </style>
