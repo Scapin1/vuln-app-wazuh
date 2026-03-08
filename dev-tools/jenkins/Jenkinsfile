@@ -18,6 +18,7 @@ pipeline {
             steps {
                 script {
                     sh '''
+                        docker rm -f temp-tests || true
                         docker compose run --name temp-tests api sh -c "PYTHONPATH=/app pytest tests --cov=app --cov-report=xml:coverage.xml"
                         docker cp temp-tests:/app/coverage.xml vuln-api/coverage.xml
                         docker rm temp-tests
