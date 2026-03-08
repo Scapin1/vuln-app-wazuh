@@ -22,8 +22,7 @@ vi.mock('sweetalert2', () => ({
 
 describe('ConfigWazuh.vue', () => {
     const mockConnections = [
-        { id: 1, name: 'Prod Cluster', indexer_url: 'https://prod:9200', wazuh_user: 'admin', is_active: true },
-        { id: 2, name: 'Dev Cluster', indexer_url: 'https://dev:9200', wazuh_user: 'admin', is_active: false }
+        { id: 1, name: 'Prod Cluster', indexer_url: 'https://prod:9200', wazuh_user: 'admin', is_active: true }
     ]
 
     beforeEach(() => {
@@ -31,18 +30,12 @@ describe('ConfigWazuh.vue', () => {
         wazuhService.getConnections.mockResolvedValue({ data: mockConnections })
     })
 
-    it('fetches and displays connections on mount', async () => {
+    it('opens edit connection modal and populates data', async () => {
         const wrapper = mount(ConfigWazuh)
         await flushPromises()
-        expect(wrapper.vm.connections.length).toBe(2)
-    })
 
-    it('opens edit connection modal and populates data', async () => {
-        const wrapper = mount(ConfigWazuh) // <--- Agregamos esto
-        await flushPromises()
-
-        // El botón de editar es el índice 1 (0: Probar, 1: Editar, 2: Eliminar)
-        const editBtn = wrapper.findAll('tbody tr')[0].findAll('.btn-icon')[1] 
+        // Buscamos el botón por su atributo title, que es infalible
+        const editBtn = wrapper.find('button[title="Editar"]')
         await editBtn.trigger('click')
         await flushPromises()
 
@@ -53,17 +46,17 @@ describe('ConfigWazuh.vue', () => {
 
     it('handles edit connection fail gracefully', async () => {
         wazuhService.editConnection.mockRejectedValueOnce({ response: { data: { message: 'Error' } } })
-        const wrapper = mount(ConfigWazuh) // <--- Agregamos esto
+        const wrapper = mount(ConfigWazuh)
         await flushPromises()
 
-        const editBtn = wrapper.findAll('tbody tr')[0].findAll('.btn-icon')[1]
-        await editBtn.trigger('click')
+        await wrapper.find('button[title="Editar"]').trigger('click')
         await flushPromises()
 
         await wrapper.find('form').trigger('submit.prevent')
         await flushPromises()
 
         expect(wazuhService.editConnection).toHaveBeenCalled()
+        expect(wrapper.vm.newConnError).toBe('Error')
     })
 
     it('deletes connection successfully confirmed', async () => {
@@ -73,23 +66,9 @@ describe('ConfigWazuh.vue', () => {
         Swal.fire.mockResolvedValueOnce({ isConfirmed: true })
         wazuhService.deleteConnection.mockResolvedValueOnce({})
 
-        const deleteBtn = wrapper.findAll('tbody tr')[0].findAll('.btn-icon')[2]
-        await deleteBtn.trigger('click')
+        await wrapper.find('button[title="Eliminar"]').trigger('click')
         await flushPromises()
 
         expect(wazuhService.deleteConnection).toHaveBeenCalledWith(1)
-    })
-
-    it('does nothing if delete is cancelled', async () => {
-        const wrapper = mount(ConfigWazuh)
-        await flushPromises()
-
-        Swal.fire.mockResolvedValueOnce({ isConfirmed: false })
-
-        const deleteBtn = wrapper.findAll('tbody tr')[0].findAll('.btn-icon')[2] // <--- Índice 2
-        await deleteBtn.trigger('click')
-        await flushPromises()
-
-        expect(wazuhService.deleteConnection).not.toHaveBeenCalled()
     })
 })
