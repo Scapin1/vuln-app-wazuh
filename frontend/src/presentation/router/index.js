@@ -10,6 +10,8 @@ import userService from '../../application/services/userService'
 
 import Timeline from '../views/Timeline.vue'
 
+import Timeline from '../views/Timeline.vue'
+
 const routes = [
   { path: '/login', name: 'Login', component: Login },
   { path: '/', redirect: '/login' },

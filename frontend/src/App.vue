@@ -23,8 +23,13 @@
 
         <a href="#" @click.prevent="handleNavClick('/timeline')" class="nav-item" :class="{ 'router-link-active': route.path === '/timeline' }">
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="M7 14l3-3 3 2 4-6"></path></svg>
           Timeline
+=======
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          Línea de Tiempo
+>>>>>>> Stashed changes
 =======
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
           Línea de Tiempo
@@ -101,7 +106,11 @@ const currentRouteName = computed(() => {
   switch(route.name) {
     case 'Dashboard': return 'Vulnerabilidades Wazuh'
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     case 'Timeline': return 'Linea de tiempo'
+=======
+    case 'Timeline': return 'Línea de Tiempo de Seguridad'
+>>>>>>> Stashed changes
 =======
     case 'Timeline': return 'Línea de Tiempo de Seguridad'
 >>>>>>> Stashed changes
