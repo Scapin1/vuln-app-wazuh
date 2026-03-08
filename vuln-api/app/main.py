@@ -24,6 +24,8 @@ from .crypto import encrypt, decrypt
 
 Base.metadata.create_all(bind=engine)
 
+CONNECTION_NOT_FOUND = "Conexión no encontrada"
+
 
 class WazuhConnectionRequest(BaseModel):
     name: str
@@ -242,7 +244,7 @@ def update_connection(
 ):
     conn = db.query(WazuhConnection).filter(WazuhConnection.id == conn_id).first()
     if not conn:
-        raise HTTPException(status_code=404, detail="Conexión no encontrada")
+        raise HTTPException(status_code=404, detail=CONNECTION_NOT_FOUND)
 
     conn.name = request.name
     conn.indexer_url = request.indexer_url
@@ -261,7 +263,7 @@ def delete_connection(
 ):
     conn = db.query(WazuhConnection).filter(WazuhConnection.id == conn_id).first()
     if not conn:
-        raise HTTPException(status_code=404, detail="Conexión no encontrada")
+        raise HTTPException(status_code=404, detail=CONNECTION_NOT_FOUND)
     db.delete(conn)
     db.commit()
     return {"message": "Conexión eliminada"}
@@ -275,7 +277,7 @@ def test_wazuh_connection(
 ):
     conn = db.query(WazuhConnection).filter(WazuhConnection.id == conn_id).first()
     if not conn:
-        raise HTTPException(status_code=404, detail="Conexión no encontrada")
+        raise HTTPException(status_code=404, detail=CONNECTION_NOT_FOUND)
 
     ok = test_connection(
         conn.indexer_url, conn.wazuh_user, decrypt(conn.wazuh_password)
@@ -297,7 +299,7 @@ def sync_connection(
 ):
     conn = db.query(WazuhConnection).filter(WazuhConnection.id == conn_id).first()
     if not conn:
-        raise HTTPException(status_code=404, detail="Conexión no encontrada")
+        raise HTTPException(status_code=404, detail=CONNECTION_NOT_FOUND)
     if not conn.is_active:
         raise HTTPException(status_code=400, detail="La conexión está inactiva")
 
@@ -311,115 +313,106 @@ def sync_connection(
     return {"synced": count, "connection": conn.name}
 
 
+def _handle_existing_vuln(db: Session, existing: WazuhVulnerability, vuln: dict) -> None:
+    if existing.status == "RESOLVED":
+        existing.status = "ACTIVE"
+        db.add(VulnerabilityHistory(
+            vulnerability_id=existing.id,
+            action="REOPENED",
+            details="La vulnerabilidad fue detectada nuevamente por Wazuh",
+        ))
+
+    if existing.severity != vuln.get("severity"):
+        db.add(VulnerabilityHistory(
+            vulnerability_id=existing.id,
+            action="SEVERITY_CHANGED",
+            details=f"Severidad cambió de {existing.severity} a {vuln.get('severity')}",
+        ))
+        existing.severity = vuln.get("severity")
+
+    existing.score_base = (vuln.get("score") or {}).get("base")
+    existing.last_seen = func.now()
+
+
 def process_wazuh_vulnerabilities(db: Session, conn_id: int, raw_vulns: list) -> int:
-    """Procesa el payload de Wazuh, actualiza estados y genera historial de auditoría."""
     count = 0
     seen_vuln_ids = set()
 
-    active_vulns_in_db = (
-        db.query(WazuhVulnerability)
-        .filter_by(connection_id=conn_id, status="ACTIVE")
-        .all()
-    )
+    active_vulns_in_db = db.query(WazuhVulnerability).filter_by(connection_id=conn_id, status="ACTIVE").all()
     active_vuln_dict = {v.id: v for v in active_vulns_in_db}
 
     for v in raw_vulns:
         agent = v.get("agent", {})
-        host = v.get("host", {})
-        osinfo = host.get("os") or {}
+        osinfo = (v.get("host") or {}).get("os") or {}
         pkg = v.get("package", {})
         vuln = v.get("vulnerability", {})
 
         if not vuln.get("id"):
             continue
 
-        existing = (
-            db.query(WazuhVulnerability)
-            .filter_by(
-                connection_id=conn_id,
-                agent_id=agent.get("id"),
-                package_name=pkg.get("name"),
-                package_version=pkg.get("version"),
-                cve_id=vuln.get("id"),
-            )
-            .first()
-        )
+        existing = db.query(WazuhVulnerability).filter_by(
+            connection_id=conn_id,
+            agent_id=agent.get("id"),
+            package_name=pkg.get("name"),
+            package_version=pkg.get("version"),
+            cve_id=vuln.get("id"),
+        ).first()
 
         if existing:
             seen_vuln_ids.add(existing.id)
-
-            if existing.status == "RESOLVED":
-                existing.status = "ACTIVE"
-                db.add(
-                    VulnerabilityHistory(
-                        vulnerability_id=existing.id,
-                        action="REOPENED",
-                        details="La vulnerabilidad fue detectada nuevamente por Wazuh",
-                    )
-                )
-
-            if existing.severity != vuln.get("severity"):
-                db.add(
-                    VulnerabilityHistory(
-                        vulnerability_id=existing.id,
-                        action="SEVERITY_CHANGED",
-                        details=f"Severidad cambió de {existing.severity} a {vuln.get('severity')}",
-                    )
-                )
-                existing.severity = vuln.get("severity")
-
-            existing.score_base = (vuln.get("score") or {}).get("base")
-            existing.last_seen = func.now()
-
+            _handle_existing_vuln(db, existing, vuln)
         else:
-            new_vuln = WazuhVulnerability(
-                connection_id=conn_id,
-                status="ACTIVE",
-                agent_id=agent.get("id"),
-                agent_name=agent.get("name"),
-                os_full=osinfo.get("full"),
-                os_platform=osinfo.get("platform"),
-                os_version=osinfo.get("version"),
-                package_name=pkg.get("name"),
-                package_version=pkg.get("version"),
-                package_type=pkg.get("type"),
-                package_arch=pkg.get("architecture"),
-                cve_id=vuln.get("id"),
-                severity=vuln.get("severity"),
-                score_base=(vuln.get("score") or {}).get("base"),
-                score_version=(vuln.get("score") or {}).get("version"),
-                detected_at=vuln.get("detected_at"),
-                published_at=vuln.get("published_at"),
-                description=vuln.get("description"),
-                reference=vuln.get("reference"),
-                scanner_vendor=(vuln.get("scanner") or {}).get("vendor"),
-            )
-            db.add(new_vuln)
-            db.flush()
-
+            new_vuln = _create_new_vuln(db, conn_id, agent, osinfo, pkg, vuln)
             seen_vuln_ids.add(new_vuln.id)
-            db.add(
-                VulnerabilityHistory(
-                    vulnerability_id=new_vuln.id,
-                    action="DETECTED",
-                    details="Vulnerabilidad identificada por primera vez",
-                )
-            )
 
         count += 1
 
+    _resolve_missing_vulns(db, active_vuln_dict, seen_vuln_ids)
+    return count
+
+
+def _create_new_vuln(db, conn_id, agent, osinfo, pkg, vuln):
+    new_vuln = WazuhVulnerability(
+        connection_id=conn_id,
+        status="ACTIVE",
+        agent_id=agent.get("id"),
+        agent_name=agent.get("name"),
+        os_full=osinfo.get("full"),
+        os_platform=osinfo.get("platform"),
+        os_version=osinfo.get("version"),
+        package_name=pkg.get("name"),
+        package_version=pkg.get("version"),
+        package_type=pkg.get("type"),
+        package_arch=pkg.get("architecture"),
+        cve_id=vuln.get("id"),
+        severity=vuln.get("severity"),
+        score_base=(vuln.get("score") or {}).get("base"),
+        score_version=(vuln.get("score") or {}).get("version"),
+        detected_at=vuln.get("detected_at"),
+        published_at=vuln.get("published_at"),
+        description=vuln.get("description"),
+        reference=vuln.get("reference"),
+        scanner_vendor=(vuln.get("scanner") or {}).get("vendor"),
+    )
+    db.add(new_vuln)
+    db.flush()
+    db.add(VulnerabilityHistory(
+        vulnerability_id=new_vuln.id,
+        action="DETECTED",
+        details="Vulnerabilidad identificada por primera vez",
+    ))
+    return new_vuln
+
+
+def _resolve_missing_vulns(db, active_vuln_dict, seen_vuln_ids):
     for vuln_id, db_vuln in active_vuln_dict.items():
         if vuln_id not in seen_vuln_ids:
             db_vuln.status = "RESOLVED"
-            db.add(
-                VulnerabilityHistory(
-                    vulnerability_id=vuln_id,
-                    action="RESOLVED",
-                    details="Ya no es reportada por el agente (Probablemente parcheada)",
-                )
-            )
-
-    return count
+            db.add(VulnerabilityHistory(
+                vulnerability_id=vuln_id,
+                action="RESOLVED",
+                details="Ya no es reportada por el agente (Probablemente parcheada)",
+            ))
 
 
 @app.post("/vulns/sync-all")
