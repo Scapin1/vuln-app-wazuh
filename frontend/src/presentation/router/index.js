@@ -38,7 +38,7 @@ router.beforeEach(async (to, from) => {
   }
 
   if (token && to.path === '/login') {
-    return true
+    return '/dashboard'
   }
 
   // Si hay token, preguntamos SIEMPRE al backend
