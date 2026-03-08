@@ -44,6 +44,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import authService from '../../application/services/authService'
+import userService from '../../application/services/userService'
 
 const router = useRouter()
 const username = ref('')
@@ -65,14 +66,12 @@ const handleLogin = async () => {
     
     // Save token
     localStorage.setItem('token', res.data.access_token)
-    
-    // save user 
     localStorage.setItem('username', username.value)
 
-    // Revisar flag por usuario -> ya q es unico
-    const passwordChanged = localStorage.getItem(`pwd_changed_${username.value}`)
-    
-    if (passwordChanged !== 'true') {
+    const userMeRes = await userService.getUserMe()
+    const user = userMeRes.data
+
+    if (user.is_default_password) {
       sessionStorage.setItem(
         'force_password_message',
         'Por seguridad, debe cambiar tu contraseña inmediatamente antes de continuar. Todas las demás rutas se están bloqueadas hasta que cambies tu contraseña.'

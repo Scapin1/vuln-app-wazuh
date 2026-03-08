@@ -11,6 +11,10 @@ const userService = {
 
   deleteUser: async (userId) => {
     return apiClient.delete(`/users/${userId}`)
+  },
+
+  getUserMe: async () => {
+    return apiClient.get('/users/me')
   }
 }
 

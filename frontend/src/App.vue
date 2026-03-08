@@ -76,7 +76,7 @@ const router = useRouter()
 const route = useRoute()
 
 const isAuthenticated = computed(() => {
-  return route.name !== 'Login'
+  return !['Login', 'NotFound'].includes(route.name)
 })
 
 const currentRouteName = computed(() => {
@@ -85,6 +85,7 @@ const currentRouteName = computed(() => {
     case 'ConfigUser': return 'Gestión de Usuarios'
     case 'ConfigWazuh': return 'Configuración de Wazuh'
     case 'ChangePassword': return 'Seguridad de Cuenta'
+    case 'NotFound': return 'Página no encontrada'
     default: return ''
   }
 })
