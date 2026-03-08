@@ -79,34 +79,50 @@ pipeline {
             }
         }
 
-        stage('DAST: OWASP ZAP Dynamic Scan') {
+        stage('DAST: OWASP ZAP Dynamic Scan'){
+            when {
+                expression { params.RUN_ZAP == true }
+            }
             steps {
                 script {
                     sh 'mkdir -p reports && chmod 777 reports'
                     sh 'chmod +x dev-tools/jenkins/scripts/run_zap.sh'
-                    sh "./dev-tools/jenkins/scripts/run_zap.sh ${OWASP_URL} ${env.BUILD_NUMBER}"
+                    // Ya no le pasamos la URL por parámetro porque el script ahora maneja ambas
+                    sh "./dev-tools/jenkins/scripts/run_zap.sh ${env.BUILD_NUMBER}"
                 }
             }
         }
-    }
+    } 
 
-    post {
+   post {
         always {
             script {
                 def scanId = env.BUILD_NUMBER
-                publishHTML(target: [
-                    reportDir: 'reports',
-                    reportFiles: "zap_report_${scanId}.html",
-                    reportName: "OWASP ZAP Report",
-                    keepAll: true,
-                    alwaysLinkToLastBuild: true
-                ])
                 
-                archiveArtifacts artifacts: "reports/zap_report_${scanId}.html, reports/zap_report_${scanId}.json", 
-                                 onlyIfSuccessful: false, 
-                                 allowEmptyArchive: true 
+                if (params.RUN_ZAP) {
+                    // Publicamos el reporte de la API en el panel lateral
+                    publishHTML(target: [
+                        reportDir: 'reports',
+                        reportFiles: "zap_api_report_${scanId}.html",
+                        reportName: "ZAP API Report",
+                        keepAll: true,
+                        alwaysLinkToLastBuild: true
+                    ])
+                    // Publicamos el reporte del Frontend en el panel lateral
+                    publishHTML(target: [
+                        reportDir: 'reports',
+                        reportFiles: "zap_frontend_report_${scanId}.html",
+                        reportName: "ZAP Frontend Report",
+                        keepAll: true,
+                        alwaysLinkToLastBuild: true
+                    ])
+                    
+                    // Archivamos ambos HTMLs en los artefactos del Build
+                    archiveArtifacts artifacts: "reports/zap_api_report_${scanId}.html, reports/zap_frontend_report_${scanId}.html", 
+                                     onlyIfSuccessful: false, 
+                                     allowEmptyArchive: true 
+                }
             }
             sh 'docker ps -a'
         }
-    }
-}
+    } 

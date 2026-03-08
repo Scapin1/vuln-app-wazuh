@@ -21,3 +21,9 @@ volumes:
 networks:
   jenkins-network:
     driver: bridge
+  sonar-network:
+    external: true
+    name: sonarqube_sonar-network
+  app-network:
+    external: true
+    name: vuln-app-wazuh_app-network
