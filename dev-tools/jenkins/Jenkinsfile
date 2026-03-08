@@ -20,10 +20,32 @@ pipeline {
             }
         }
 
-        stage('CI: Frontend Build & Check') {
+        stage('CI: Frontend Tests & Build') {
             steps {
                 script {
-                    sh 'docker compose build frontend'  
+                    sh '''
+                        # 1. Creamos un Dockerfile temporal para correr los tests aislados
+                        cat << 'EOF' > frontend/Dockerfile.test
+                        FROM node:20-alpine
+                        WORKDIR /app
+                        COPY package*.json ./
+                        RUN npm install
+                        COPY . .
+                        RUN npm run test:coverage
+                        EOF
+
+                        # 2. Al hacer el build de esta imagen, se ejecutan las pruebas internamente
+                        docker build -t frontend-test-img -f frontend/Dockerfile.test frontend/
+
+                        # 3. Extraemos la carpeta de "coverage" hacia el workspace de Jenkins
+                        docker rm -f temp-front-tests || true
+                        docker create --name temp-front-tests frontend-test-img
+                        docker cp temp-front-tests:/app/coverage frontend/coverage
+                        docker rm temp-front-tests
+
+                        # 4. Construimos tu frontend real para validar que compila correctamente
+                        docker compose build frontend
+                    '''
                 }
             }
         }
