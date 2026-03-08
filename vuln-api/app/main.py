@@ -206,6 +206,9 @@ def list_connections(
             "indexer_url": c.indexer_url,
             "wazuh_user": c.wazuh_user,
             "is_active": c.is_active,
+            "tested": c.tested,
+            "last_tested_at": c.last_tested_at,
+            "last_test_ok": c.last_test_ok,
         }
         for c in conns
     ]
@@ -281,6 +284,12 @@ def test_wazuh_connection(
     ok = test_connection(
         conn.indexer_url, conn.wazuh_user, decrypt(conn.wazuh_password)
     )
+
+    conn.tested = True
+    conn.last_tested_at = func.now()
+    conn.last_test_ok = ok
+    db.commit()
+
     return {"ok": ok, "message": "Conexión exitosa" if ok else "No se pudo conectar"}
 
 
@@ -450,5 +459,47 @@ def list_vulns(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    vulns = db.query(WazuhVulnerability).limit(limit).all()
-    return vulns
+    query = db.query(WazuhVulnerability)
+    
+    if connection_id:
+        query = query.filter(WazuhVulnerability.connection_id == connection_id)
+    
+    vulns = query.limit(limit).all()
+
+    return [
+        {
+            "id": v.id,
+            "connection_id": v.connection_id,
+            "status": v.status,
+            "agent_id": v.agent_id,
+            "agent_name": v.agent_name,
+            "os_full": v.os_full,
+            "os_platform": v.os_platform,
+            "os_version": v.os_version,
+            "package_name": v.package_name,
+            "package_version": v.package_version,
+            "package_type": v.package_type,
+            "package_arch": v.package_arch,
+            "cve_id": v.cve_id,
+            "severity": v.severity,
+            "score_base": float(v.score_base) if v.score_base else None,
+            "score_version": v.score_version,
+            "detected_at": v.detected_at,
+            "published_at": v.published_at,
+            "description": v.description,
+            "reference": v.reference,
+            "scanner_vendor": v.scanner_vendor,
+            "first_seen": v.first_seen,
+            "last_seen": v.last_seen,
+            "history": [
+                {
+                    "id": h.id,
+                    "action": h.action,
+                    "details": h.details,
+                    "timestamp": h.timestamp,
+                }
+                for h in sorted(v.history, key=lambda h: h.timestamp)
+            ],
+        }
+        for v in vulns
+    ]
