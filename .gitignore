@@ -6,3 +6,4 @@ reports/
 vuln-api/coverage.xml
 frontend/coverage/
 frontend/node_modules/
+certbot/*

@@ -47,21 +47,12 @@ services:
       - "443:443"
     volumes:
       - ./nginx/ssl:/etc/nginx/ssl:ro
-      - ./certbot/conf:/etc/letsencrypt # <-- Certificados finales
-      - ./certbot/www:/var/www/certbot  # <-- Archivos de validación
     depends_on:
       api:
         condition: service_healthy
     restart: unless-stopped
     networks:
       - app-network
-
-  certbot:
-    image: certbot/certbot
-    container_name: certbot
-    volumes:
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
 
 volumes:
   postgres_api_data:
