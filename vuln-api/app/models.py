@@ -33,7 +33,7 @@ class WazuhConnection(Base):
     indexer_url = Column(String, nullable=False)
     wazuh_user = Column(String, nullable=False)
     wazuh_password = Column(String, nullable=False)
-    is_active = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     vulnerabilities = relationship("WazuhVulnerability", back_populates="connection")
     tested = Column(Boolean, default=False)

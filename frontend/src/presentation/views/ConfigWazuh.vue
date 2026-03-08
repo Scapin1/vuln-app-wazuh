@@ -27,12 +27,13 @@
           <table v-else-if="connections.length > 0">
             <thead>
               <tr>
-                <th width="10%">ID</th>
-                <th width="25%">Nombre</th>
-                <th width="35%">Indexer URL</th>
-                <th width="20%">Nombre del Usuario</th>
-                <th width="5%">Estado</th>
-                <th width="10%"></th>
+                <th width="5%">ID</th>
+                <th width="20%">Nombre</th>
+                <th width="25%">Indexer URL</th>
+                <th width="10%">Estado</th>
+                <th width="15%">Último Test</th>
+                <th width="10%">Test OK?</th>
+                <th width="15%"></th>
               </tr>
             </thead>
             <tbody>
@@ -40,12 +41,20 @@
                 <td>{{ conn.id }}</td>
                 <td class="font-medium text-black">{{ conn.name }}</td>
                 <td>{{ conn.indexer_url }}</td>
-                <td>{{ conn.wazuh_user }}</td>
                 <td>
                   <span v-if="conn.is_active" class="badge badge-success">ACTIVO</span>
                   <span v-else class="badge badge-low">INACTIVO</span>
                 </td>
-                <td style="text-align: right;">
+                <td style="font-size: 0.85rem; color: var(--text-muted);">{{ formatDate(conn.last_tested_at) }}</td>
+                <td>
+                  <span v-if="conn.tested && conn.last_test_ok" class="badge badge-success">OK</span>
+                  <span v-else-if="conn.tested && !conn.last_test_ok" class="badge badge-danger">ERROR</span>
+                  <span v-else class="badge" style="color:var(--text-muted)">N/D</span>
+                </td>
+                <td style="text-align: right; white-space: nowrap;">
+                  <button class="btn-icon" @click="handleTestConnection(conn.id)" title="Testear conexión">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                  </button>
                   <button class="btn-icon" @click="openEditModal(conn)" title="Editar">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
                   </button>
@@ -194,7 +203,7 @@ const submitConnection = async () => {
       wazuh_password: newConn.value.wazuh_password.trim()
     }
 
-    if(newConn.value.name === '' || newConn.value.indexer_url === '' || newConn.value.wazuh_user === '') {
+    if(newConn.value.name === '' || newConn.value.indexer_url === '' || newConn.value.wazuh_user === '' || newConn.value.wazuh_password === '') {
       newConnError.value = 'Por favor, completa todos los campos requeridos.'
       creatingConn.value = false
       return
@@ -257,17 +266,48 @@ const handleTestConnection = async (connId) => {
   try {
     const response = await wazuhService.testConnection(connId)
 
-    if (response.data.ok) {
-      alert('Conexión exitosa')
+    console.log('TEST RESPONSE:', response)
+    console.log('TEST RESPONSE DATA:', response.data)
+
+    if (response.data && response.data.ok) {
+      Swal.fire({
+        title: 'Conexión exitosa',
+        text: 'La prueba de conexión se realizó correctamente.',
+        icon: 'success',
+        background: 'var(--bg-panel)',
+        color: 'var(--text-main)',
+        confirmButtonColor: 'var(--primary)'
+      })
     } else {
-      alert('No se pudo conectar')
+      Swal.fire({
+        title: 'Conexión Fallida',
+        text: 'No se pudo conectar al clúster de Wazuh.',
+        icon: 'warning',
+        background: 'var(--bg-panel)',
+        color: 'var(--text-main)',
+        confirmButtonColor: 'var(--warning, #f59e0b)'
+      })
     }
 
-    await loadConnections() // refrescar la tabla
+    await fetchConnections()
   } catch (error) {
     console.error('Error probando conexión:', error)
-    alert('Error al probar conexión')
+    Swal.fire({
+      title: 'Error',
+      text: error.response?.data?.detail || 'Ocurrió un error al intentar probar la conexión.',
+      icon: 'error',
+      background: 'var(--bg-panel)',
+      color: 'var(--text-main)',
+      confirmButtonColor: 'var(--primary)'
+    })
+    await fetchConnections()
   }
+}
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return 'Nunca'
+  const d = new Date(dateStr)
+  return d.toLocaleString()
 }
 
 onMounted(() => {
@@ -296,6 +336,7 @@ onMounted(() => {
 .btn-outline { background-color: transparent; border: 1px solid var(--border); color: var(--text-main); padding: 0.5rem 1rem; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.9rem; transition: all 0.2s ease; }
 .btn-outline:hover { background-color: var(--bg-hover); border-color: var(--text-muted); }
 .badge-success { background-color: var(--success-bg); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
+.badge-danger { background-color: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;}
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(2px); }
 .modal-content { width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; position: relative; padding: 2rem; }
 .btn-close { background: none; border: none; font-size: 2rem; line-height: 1; cursor: pointer; color: var(--text-muted); transition: color 0.2s; }
