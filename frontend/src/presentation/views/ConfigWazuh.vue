@@ -99,7 +99,11 @@
             <label class="form-label">Contraseña Wazuh <span v-if="isEditing" style="font-weight:400; color:var(--text-muted);">(Vacío para mantener)</span></label>
             <div class="input-icon">
               <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-              <input type="password" v-model="newConn.wazuh_password" class="form-input" :required="!isEditing" placeholder="••••••••">
+              <input :type="showPassword ? 'text' : 'password'" v-model="newConn.wazuh_password" class="form-input" :required="!isEditing" placeholder="••••••••">
+              <button type="button" class="eye-btn" @click="showPassword = !showPassword">
+                <svg v-if="!showPassword" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+              </button>
             </div>
           </div>
 
@@ -133,6 +137,7 @@ const connsError = ref('')
 const showAddModal = ref(false)
 const isEditing = ref(false)
 const creatingConn = ref(false)
+const showPassword = ref(false)
 const newConnError = ref('')
 const newConn = ref({ id: null, name: '', indexer_url: '', wazuh_user: '', wazuh_password: '' })
 
@@ -260,7 +265,9 @@ onMounted(() => {
 .icon-box { width: 48px; height: 48px; background-color: var(--primary-glow); color: var(--primary); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .input-icon { position: relative; }
 .input-icon .icon { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
-.input-icon .form-input { padding-left: 3rem; }
+.input-icon .form-input { padding-left: 3rem; padding-right: 3rem; }
+.eye-btn { position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: var(--transition); }
+.eye-btn:hover { color: var(--text-main); }
 .alert { padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem; font-weight: 500; }
 .alert-danger { color: var(--danger); background-color: var(--danger-bg); border: 1px solid rgba(239, 68, 68, 0.3); }
 .alert-success { color: var(--success); background-color: var(--success-bg); border: 1px solid rgba(16, 185, 129, 0.3); }

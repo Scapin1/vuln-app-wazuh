@@ -25,34 +25,15 @@ router.beforeEach((to, from) => {
   const token = localStorage.getItem('token')
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
 
-  // si la ruta requiere auten- pero no tiene token pal login
+  if (to.matched.length === 0) {
+    return '/login'
+  }
+
   if (requiresAuth && !token) {
     return '/login'
-
   }
 
-  // si no hay token, dejar pasar solo al login
-  if (!token) {
-    return true
-  }
-
-  // Si ya está logeado pero no ha cambiado contraseña,
-  // solo puede entrar a /change-password
-  const username = localStorage.getItem('username')
-  const passwordChanged = username
-    ? localStorage.getItem(`pwd_changed_${username}`)
-    : null
-
-  if (passwordChanged !== 'true' && to.path !== '/change-password') {
-    sessionStorage.setItem(
-      'force_password_message',
-      'Para seguir navegando, debes cambiar tu contraseña.'
-    )
-    return '/change-password'
-  }
-
-  // Si ya cambió contraseña y trata de ir al login, lo mandas al dashboard
-  if (passwordChanged === 'true' && to.path === '/login') {
+  if (token && to.path === '/login') {
     return '/dashboard'
   }
 
