@@ -24,15 +24,15 @@ pipeline {
             steps {
                 script {
                     sh '''
-                        # 1. Creamos un Dockerfile temporal para correr los tests aislados
+                        # 1. Creamos un Dockerfile temporal sin indentar para evitar problemas de bash
                         cat << 'EOF' > frontend/Dockerfile.test
-                        FROM node:20-alpine
-                        WORKDIR /app
-                        COPY package*.json ./
-                        RUN npm install
-                        COPY . .
-                        RUN npm run test:coverage
-                        EOF
+FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run test:coverage
+EOF
 
                         # 2. Al hacer el build de esta imagen, se ejecutan las pruebas internamente
                         docker build -t frontend-test-img -f frontend/Dockerfile.test frontend/
