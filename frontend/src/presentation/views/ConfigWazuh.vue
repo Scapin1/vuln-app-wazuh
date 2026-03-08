@@ -253,6 +253,23 @@ const deleteConn = async (id) => {
   }
 }
 
+const handleTestConnection = async (connId) => {
+  try {
+    const response = await wazuhService.testConnection(connId)
+
+    if (response.data.ok) {
+      alert('Conexión exitosa')
+    } else {
+      alert('No se pudo conectar')
+    }
+
+    await loadConnections() // refrescar la tabla
+  } catch (error) {
+    console.error('Error probando conexión:', error)
+    alert('Error al probar conexión')
+  }
+}
+
 onMounted(() => {
   fetchConnections()
 })

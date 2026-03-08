@@ -10,7 +10,7 @@
       </div>
 
       <div class="not-found-body">
-        <router-link to="/" class="btn btn-primary btn-block">
+        <router-link to="/login" class="btn btn-primary btn-block">
           Volver al Inicio
         </router-link>
       </div>

@@ -5,6 +5,7 @@ import ConfigUser from '../views/ConfigUser.vue'
 import ConfigWazuh from '../views/ConfigWazuh.vue'
 import ChangePassword from '../views/ChangePassword.vue'
 import NotFound from '../views/NotFound.vue'
+import userService from '../../application/services/userService'
 
 const routes = [
   { path: '/login', name: 'Login', component: Login },
@@ -21,7 +22,7 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, from) => {
+router.beforeEach(async (to, from) => {
   const token = localStorage.getItem('token')
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
 
@@ -34,7 +35,31 @@ router.beforeEach((to, from) => {
   }
 
   if (token && to.path === '/login') {
-    return '/dashboard'
+    return true
+  }
+
+  // Si hay token, preguntamos SIEMPRE al backend
+  if (token) {
+    try {
+      const userMeRes = await userService.getUserMe()
+      const user = userMeRes.data
+
+      // Si sigue con contraseña por defecto, solo puede entrar a change-password
+      if (user.is_default_password && to.path !== '/change-password') {
+        sessionStorage.setItem(
+          'force_password_message',
+          'Para continuar, debes cambiar tu contraseña obligatoriamente.'
+        )
+        return '/change-password'
+      }
+      
+      return true
+    } catch (error) {
+      // Si falla getUserMe, token inválido/expirado o backend no responde
+      localStorage.removeItem('token')
+      localStorage.removeItem('username')
+      return '/login'
+    }
   }
 
   return true
