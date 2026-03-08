@@ -12,6 +12,7 @@ services:
       - /home/fabian/vuln-app-wazuh/dev-tools/reports:/reports 
     environment:
       - DOCKER_HOST=unix:///var/run/docker.sock
+      - JAVA_OPTS=-Xmx4096m -Xms1024m -XX:+UseG1GC -XX:+ExplicitGCInvokesConcurrent -XX:+ParallelRefProcEnabled -XX:+UseStringDeduplication
     networks:
       - jenkins-network
 
@@ -21,6 +22,8 @@ volumes:
 networks:
   jenkins-network:
     driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 1460
   sonar-network:
     external: true
     name: sonarqube_sonar-network
