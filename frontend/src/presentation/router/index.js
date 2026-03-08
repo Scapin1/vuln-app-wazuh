@@ -8,7 +8,6 @@ import ChangePassword from '../views/ChangePassword.vue'
 import NotFound from '../views/NotFound.vue'
 import userService from '../../application/services/userService'
 
-import Timeline from '../views/Timeline.vue'
 
 const routes = [
   { path: '/login', name: 'Login', component: Login },
@@ -56,7 +55,7 @@ router.beforeEach(async (to, from) => {
         )
         return '/change-password'
       }
-      
+
       return true
     } catch (error) {
       // Si falla getUserMe, token inválido/expirado o backend no responde
