@@ -106,10 +106,13 @@
           </div>
         </div>
 
-        <table v-if="vulns.length > 0">
+        <table v-if="vulns.length > 0" class="vuln-table">
+          <caption class="visually-hidden">
+            Tabla de vulnerabilidades con severidad, CVE, agente, software afectado y linea de tiempo de actividad.
+          </caption>
           <thead>
             <tr>
-              <th width="12%" @click="sortBy('severity')">
+              <th class="col-severity" @click="sortBy('severity')">
                 Severidad
                 <span v-if="sortKey === 'severity'" class="sort-indicator">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
@@ -117,7 +120,7 @@
                   </svg>
                 </span>
               </th>
-              <th width="15%" @click="sortBy('cve_id')">
+              <th class="col-cve" @click="sortBy('cve_id')">
                 CVE ID
                 <span v-if="sortKey === 'cve_id'" class="sort-indicator">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
@@ -125,7 +128,7 @@
                   </svg>
                 </span>
               </th>
-              <th width="15%" @click="sortBy('agent_name')">
+              <th class="col-agent" @click="sortBy('agent_name')">
                 Agente
                 <span v-if="sortKey === 'agent_name'" class="sort-indicator">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
@@ -133,7 +136,7 @@
                   </svg>
                 </span>
               </th>
-              <th width="28%" @click="sortBy('package_name')">
+              <th class="col-package" @click="sortBy('package_name')">
                 Software Afectado
                 <span v-if="sortKey === 'package_name'" class="sort-indicator">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
@@ -141,7 +144,7 @@
                   </svg>
                 </span>
               </th>
-              <th width="20%" @click="sortBy('last_seen')">
+              <th class="col-timeline" @click="sortBy('last_seen')">
                 Línea de Tiempo
                 <span v-if="sortKey === 'last_seen'" class="sort-indicator">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
@@ -249,7 +252,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import vulnService from '../../application/services/vulnService'
 
 const vulns = ref([])
@@ -320,39 +323,51 @@ const severidadOptions = computed(() => {
   })
 })
 
-const filteredVulns = computed(() => {
-  return vulns.value.filter(vuln => {
+const normalizeText = (value, fallback = '') => String(value || fallback).toLowerCase()
+
+const textMatches = (value, filterValue) => {
+  if (!filterValue) return true
+  return normalizeText(value).includes(normalizeText(filterValue))
+}
+
+const parseDate = value => (value ? new Date(value) : null)
+
+const inDateRange = (date, start, end) => {
+  if (!date) return false
+  if (start && end) return date >= start && date <= end
+  if (start) return date >= start
+  if (end) return date <= end
+  return true
+}
+
+const dateMatches = vuln => {
+  const { startDate, endDate } = filters.value
+  if (!startDate && !endDate) return true
+
+  const start = parseDate(startDate)
+  const end = parseDate(endDate)
+  const firstSeen = parseDate(vuln.first_seen)
+  const lastSeen = parseDate(vuln.last_seen)
+
+  return inDateRange(firstSeen, start, end) || inDateRange(lastSeen, start, end)
+}
+
+const filteredVulns = computed(() =>
+  vulns.value.filter(vuln => {
     const severidadText = (vuln.severity || 'UNKNOWN').toUpperCase()
     const cveText = vuln.cve_id || 'N/A'
     const agenteText = vuln.agent_name || vuln.agent_id || 'N/A'
     const softwareText = vuln.package_name || ''
 
-    // Date filtering
-    let dateMatch = true
-    if (filters.value.startDate || filters.value.endDate) {
-      const firstSeen = vuln.first_seen ? new Date(vuln.first_seen) : null
-      const lastSeen = vuln.last_seen ? new Date(vuln.last_seen) : null
-      const start = filters.value.startDate ? new Date(filters.value.startDate) : null
-      const end = filters.value.endDate ? new Date(filters.value.endDate) : null
-
-      if (start && end) {
-        dateMatch = (firstSeen && firstSeen >= start && firstSeen <= end) || (lastSeen && lastSeen >= start && lastSeen <= end)
-      } else if (start) {
-        dateMatch = (firstSeen && firstSeen >= start) || (lastSeen && lastSeen >= start)
-      } else if (end) {
-        dateMatch = (firstSeen && firstSeen <= end) || (lastSeen && lastSeen <= end)
-      }
-    }
-
     return (
-      (!filters.value.severidad || severidadText.toLowerCase().includes(filters.value.severidad.toLowerCase())) &&
-      (!filters.value.cveId || cveText.toLowerCase().includes(filters.value.cveId.toLowerCase())) &&
-      (!filters.value.agente || agenteText.toLowerCase().includes(filters.value.agente.toLowerCase())) &&
-      (!filters.value.software || softwareText.toLowerCase().includes(filters.value.software.toLowerCase())) &&
-      dateMatch
+      textMatches(severidadText, filters.value.severidad) &&
+      textMatches(cveText, filters.value.cveId) &&
+      textMatches(agenteText, filters.value.agente) &&
+      textMatches(softwareText, filters.value.software) &&
+      dateMatches(vuln)
     )
   })
-})
+)
 
 const sortedVulns = computed(() => {
   if (!sortKey.value) return filteredVulns.value
@@ -419,8 +434,6 @@ const jumpForward = () => {
   currentPage.value = Math.min(totalPages.value, currentPage.value + pageJump)
 }
 
-import { watch } from 'vue'
-
 // Al filtrar o ordenar volvemos a la pagina 1
 watch(filters, () => { currentPage.value = 1 }, { deep: true })
 watch(sortKey, () => { currentPage.value = 1 })
@@ -458,11 +471,10 @@ const fetchVulns = async () => {
     if (res.data && res.data.length > 0) {
       vulns.value = res.data
     } else {
-      
+      vulns.value = []
     }
   } catch (err) {
     console.error('Error fetching vulns:', err)
-    
   } finally {
     loading.value = false
   }
@@ -615,7 +627,6 @@ onMounted(() => {
 }
 
 .timeline-track {
-  height: 4px;
   background-color: #f3f4f6;
   border-radius: 2px;
   margin-left: 10px;
@@ -668,6 +679,24 @@ th {
   margin-left: 0.5rem;
   display: inline-block;
   transition: transform 0.2s ease;
+}
+
+.vuln-table .col-severity { width: 12%; }
+.vuln-table .col-cve { width: 15%; }
+.vuln-table .col-agent { width: 15%; }
+.vuln-table .col-package { width: 28%; }
+.vuln-table .col-timeline { width: 20%; }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .rotate-180 {
