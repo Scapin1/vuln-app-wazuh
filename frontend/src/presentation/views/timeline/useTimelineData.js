@@ -79,45 +79,63 @@ export default function useTimelineData({
     return { hasDetection, hasResolution }
   }
 
+  const getVulnerabilityStateAtTime = (vuln, ms) => {
+    const firstSeenMs = new Date(vuln.first_seen).getTime()
+    if (Number.isNaN(firstSeenMs) || firstSeenMs > ms) {
+      return null // Vulnerability not yet seen
+    }
+
+    let state = 'ACTIVE'
+    let resolvedAt = null
+
+    for (const historyItem of vuln.historySorted) {
+      const historyMs = new Date(historyItem.timestamp).getTime()
+      if (Number.isNaN(historyMs) || historyMs > ms) break
+      if (historyItem.action === 'RESOLVED') {
+        state = 'RESOLVED'
+        resolvedAt = historyItem.timestamp
+      } else {
+        state = 'ACTIVE'
+        resolvedAt = null
+      }
+    }
+
+    return { state, resolvedAt }
+  }
+
+  const buildSnapshotDetails = (vulns, ms) => {
+    const details = []
+
+    vulns.forEach(vuln => {
+      const vulnState = getVulnerabilityStateAtTime(vuln, ms)
+      if (!vulnState) return
+
+      details.push({
+        ...vuln,
+        status: vulnState.state,
+        resolved_at: vulnState.resolvedAt,
+        connection_name: getConnectionName()
+      })
+    })
+
+    return details
+  }
+
   const snapshotAt = ms => {
     if (snapshotCache.value.has(ms)) {
       return snapshotCache.value.get(ms)
     }
 
+    const details = buildSnapshotDetails(filteredVulnsData.value, ms)
+
     let total = 0
     let pending = 0
     let resolved = 0
-    const details = []
 
-    filteredVulnsData.value.forEach(vuln => {
-      const firstSeenMs = new Date(vuln.first_seen).getTime()
-      if (Number.isNaN(firstSeenMs) || firstSeenMs > ms) return
-
-      let state = 'ACTIVE'
-      let resolvedAt = null
-
-      for (const historyItem of vuln.historySorted) {
-        const historyMs = new Date(historyItem.timestamp).getTime()
-        if (Number.isNaN(historyMs) || historyMs > ms) break
-        if (historyItem.action === 'RESOLVED') {
-          state = 'RESOLVED'
-          resolvedAt = historyItem.timestamp
-        } else {
-          state = 'ACTIVE'
-          resolvedAt = null
-        }
-      }
-
+    details.forEach(vuln => {
       total += 1
-      if (state === 'ACTIVE') pending += 1
+      if (vuln.status === 'ACTIVE') pending += 1
       else resolved += 1
-
-      details.push({
-        ...vuln,
-        status: state,
-        resolved_at: resolvedAt,
-        connection_name: getConnectionName()
-      })
     })
 
     const snapshot = { total, pending, resolved, details }
@@ -156,6 +174,47 @@ export default function useTimelineData({
     return candidates[0]
   }
 
+  const getSlotType = (summary) => {
+    if (summary.hasDetection && summary.hasResolution) return 'mixed'
+    if (summary.hasDetection) return 'detection'
+    if (summary.hasResolution) return 'resolution'
+    return 'none'
+  }
+
+  const getSlotDetails = (snapshot, startMs, endMs) => {
+    if (!snapshot) return []
+    return snapshot.details.map(vuln => {
+      const timelineEvent = getTimelineEventInSlot(vuln, startMs, endMs)
+      return {
+        ...vuln,
+        timeline_event_at: timelineEvent?.at ?? null,
+        timeline_event_label: timelineEvent?.label ?? null,
+        timeline_event_source: timelineEvent?.source ?? null
+      }
+    })
+  }
+
+  const createSlot = (startMs, endMs, summary, snapshot, slotHours) => {
+    const painted = summary.hasDetection || summary.hasResolution
+    const type = getSlotType(summary)
+    const details = getSlotDetails(snapshot, startMs, endMs)
+
+    return {
+      startMs,
+      endMs,
+      painted,
+      type,
+      total: snapshot?.total ?? 0,
+      pending: snapshot?.pending ?? 0,
+      resolved: snapshot?.resolved ?? 0,
+      details,
+      tickLabel: slotHours >= 24 ? fmtDDMM(startMs) : fmtHour(startMs),
+      cardLabel: slotHours >= 24
+        ? `${fmtDDMM(startMs)} ${fmtYear(startMs)}`
+        : `${fmtDDMM(startMs)} ${fmtHour(startMs)}`
+    }
+  }
+
   const allSlots = computed(() => {
     if (!hasBuilt.value || !rangeStartMs.value || !rangeEndMs.value) return []
 
@@ -170,39 +229,9 @@ export default function useTimelineData({
       const endMs = Math.min(rangeEndMs.value, startMs + slotMs - 1)
       const summary = summarizeChanges(startMs, endMs)
       const painted = summary.hasDetection || summary.hasResolution
-      const type = summary.hasDetection && summary.hasResolution
-        ? 'mixed'
-        : summary.hasDetection
-          ? 'detection'
-          : summary.hasResolution
-            ? 'resolution'
-            : 'none'
-
       const snapshot = painted ? snapshotAt(endMs) : null
-      const details = snapshot?.details?.map(vuln => {
-        const timelineEvent = getTimelineEventInSlot(vuln, startMs, endMs)
-        return {
-          ...vuln,
-          timeline_event_at: timelineEvent?.at ?? null,
-          timeline_event_label: timelineEvent?.label ?? null,
-          timeline_event_source: timelineEvent?.source ?? null
-        }
-      }) ?? []
 
-      slots.push({
-        startMs,
-        endMs,
-        painted,
-        type,
-        total: snapshot?.total ?? 0,
-        pending: snapshot?.pending ?? 0,
-        resolved: snapshot?.resolved ?? 0,
-        details,
-        tickLabel: activeZoom.value.slotHours >= 24 ? fmtDDMM(startMs) : fmtHour(startMs),
-        cardLabel: activeZoom.value.slotHours >= 24
-          ? `${fmtDDMM(startMs)} ${fmtYear(startMs)}`
-          : `${fmtDDMM(startMs)} ${fmtHour(startMs)}`
-      })
+      slots.push(createSlot(startMs, endMs, summary, snapshot, activeZoom.value.slotHours))
     }
 
     return slots
@@ -225,9 +254,7 @@ export default function useTimelineData({
     return data
   }
 
-  const build = async () => {
-    if (!selectedConnection.value) return { initialZoom: 0 }
-
+  const resetBuildState = () => {
     loading.value = true
     hasBuilt.value = false
     errorMessage.value = ''
@@ -235,47 +262,72 @@ export default function useTimelineData({
     changeEvents.value = []
     filteredVulnsData.value = []
     snapshotCache.value.clear()
+  }
+
+  const filterVulnerabilities = (data) => {
+    return data.filter(vuln => {
+      const byAgent = selectedAgents.value.length === 0 || selectedAgents.value.includes(vuln.agent_name)
+      const byVuln = selectedVulns.value.length === 0 || selectedVulns.value.includes(vuln.cve_id)
+      return byAgent && byVuln
+    })
+  }
+
+  const processVulnerabilities = (vulns) => {
+    return vulns.map(vuln => ({
+      ...vuln,
+      historySorted: [...(vuln.history || [])].sort(
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      )
+    }))
+  }
+
+  const buildChangeEvents = (vulns) => {
+    const events = []
+
+    vulns.forEach(vuln => {
+      const firstSeenMs = new Date(vuln.first_seen).getTime()
+      if (firstSeenMs >= rangeStartMs.value && firstSeenMs <= rangeEndMs.value) {
+        events.push({ ms: firstSeenMs, kind: 'detection' })
+      }
+
+      vuln.historySorted.forEach(historyItem => {
+        const historyMs = new Date(historyItem.timestamp).getTime()
+        if (historyMs < rangeStartMs.value || historyMs > rangeEndMs.value) return
+        if (historyItem.action === 'RESOLVED') {
+          events.push({ ms: historyMs, kind: 'resolution' })
+        }
+      })
+    })
+
+    return events
+  }
+
+  const finalizeBuild = (events) => {
+    const sortedEvents = [...events].sort((a, b) => a.ms - b.ms)
+    changeEvents.value = sortedEvents
+    latestSnap.value = snapshotAt(rangeEndMs.value)
+    hasBuilt.value = true
+    return { initialZoom: initialZoomForPeriod(period.value) }
+  }
+
+  const build = async () => {
+    if (!selectedConnection.value) return { initialZoom: 0 }
+
+    resetBuildState()
 
     try {
       const data = await fetchConnectionVulns()
-      const vulns = data.filter(vuln => {
-        const byAgent = selectedAgents.value.length === 0 || selectedAgents.value.includes(vuln.agent_name)
-        const byVuln = selectedVulns.value.length === 0 || selectedVulns.value.includes(vuln.cve_id)
-        return byAgent && byVuln
-      })
+      const filteredVulns = filterVulnerabilities(data)
+      const processedVulns = processVulnerabilities(filteredVulns)
 
-      filteredVulnsData.value = vulns.map(vuln => ({
-        ...vuln,
-        historySorted: [...(vuln.history || [])].sort(
-          (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        )
-      }))
+      filteredVulnsData.value = processedVulns
 
       const { start, end } = computeRange(filteredVulnsData.value)
       rangeStartMs.value = alignHour(start.getTime())
       rangeEndMs.value = end.getTime()
 
-      const events = []
-      filteredVulnsData.value.forEach(vuln => {
-        const firstSeenMs = new Date(vuln.first_seen).getTime()
-        if (firstSeenMs >= rangeStartMs.value && firstSeenMs <= rangeEndMs.value) {
-          events.push({ ms: firstSeenMs, kind: 'detection' })
-        }
-
-        vuln.historySorted.forEach(historyItem => {
-          const historyMs = new Date(historyItem.timestamp).getTime()
-          if (historyMs < rangeStartMs.value || historyMs > rangeEndMs.value) return
-          if (historyItem.action === 'RESOLVED') {
-            events.push({ ms: historyMs, kind: 'resolution' })
-          }
-        })
-      })
-
-      changeEvents.value = events.sort((a, b) => a.ms - b.ms)
-      latestSnap.value = snapshotAt(rangeEndMs.value)
-      hasBuilt.value = true
-
-      return { initialZoom: initialZoomForPeriod(period.value) }
+      const events = buildChangeEvents(filteredVulnsData.value)
+      return finalizeBuild(events)
     } catch (error) {
       errorMessage.value = 'No se pudo generar la linea de tiempo. Intenta nuevamente.'
       throw error
