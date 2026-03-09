@@ -565,4 +565,428 @@ describe('Dashboard.vue', () => {
         wrapper.vm.dropdowns.severity = false
         expect(wrapper.vm.dropdowns.severity).toBe(false)
     })
+
+    // --- NEW COMPREHENSIVE UTILITY FUNCTION TESTS ---
+
+    describe('getSeverityLevel utility function', () => {
+        it('returns null/undefined handling', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            expect(wrapper.vm.getSeverityLevel(null)).toBe(0)
+            expect(wrapper.vm.getSeverityLevel(undefined)).toBe(0)
+            expect(wrapper.vm.getSeverityLevel('')).toBe(0)
+        })
+
+        it('returns correct level for critical severity', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            expect(wrapper.vm.getSeverityLevel('critical')).toBe(4)
+            expect(wrapper.vm.getSeverityLevel('CRITICAL')).toBe(4)
+            expect(wrapper.vm.getSeverityLevel('Critical')).toBe(4)
+            expect(wrapper.vm.getSeverityLevel('critica')).toBe(4)
+            expect(wrapper.vm.getSeverityLevel('CRITICA')).toBe(4)
+        })
+
+        it('returns correct level for high severity', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            expect(wrapper.vm.getSeverityLevel('high')).toBe(3)
+            expect(wrapper.vm.getSeverityLevel('HIGH')).toBe(3)
+            expect(wrapper.vm.getSeverityLevel('alta')).toBe(3)
+            expect(wrapper.vm.getSeverityLevel('ALTA')).toBe(3)
+        })
+
+        it('returns correct level for medium severity', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            expect(wrapper.vm.getSeverityLevel('medium')).toBe(2)
+            expect(wrapper.vm.getSeverityLevel('MEDIUM')).toBe(2)
+            expect(wrapper.vm.getSeverityLevel('media')).toBe(2)
+            expect(wrapper.vm.getSeverityLevel('MEDIA')).toBe(2)
+        })
+
+        it('returns default level for low and unknown', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            expect(wrapper.vm.getSeverityLevel('low')).toBe(1)
+            expect(wrapper.vm.getSeverityLevel('LOW')).toBe(1)
+            expect(wrapper.vm.getSeverityLevel('unknown')).toBe(1)
+            expect(wrapper.vm.getSeverityLevel('UNKNOWN')).toBe(1)
+            expect(wrapper.vm.getSeverityLevel('random')).toBe(1)
+        })
+    })
+
+    describe('compareValues utility function', () => {
+        beforeEach(() => {
+            vi.clearAllMocks()
+            wazuhService.getConnections.mockResolvedValue({ data: [] })
+        })
+
+        it('compares date fields (first_seen, last_seen)', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            const now = new Date().getTime()
+            const past = new Date(now - 86400000).getTime()
+            const future = new Date(now + 86400000).getTime()
+
+            const obj1 = { first_seen: new Date(past).toISOString() }
+            const obj2 = { first_seen: new Date(future).toISOString() }
+
+            expect(wrapper.vm.compareValues(obj1, obj2, 'first_seen')).toBeLessThan(0)
+            expect(wrapper.vm.compareValues(obj2, obj1, 'first_seen')).toBeGreaterThan(0)
+        })
+
+        it('handles null dates in comparison', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            const obj1 = { last_seen: null }
+            const obj2 = { last_seen: new Date().toISOString() }
+
+            expect(wrapper.vm.compareValues(obj1, obj2, 'last_seen')).toBeLessThan(0)
+            expect(wrapper.vm.compareValues(obj2, obj1, 'last_seen')).toBeGreaterThan(0)
+        })
+
+        it('compares severity levels', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            const critical = { severity: 'critical' }
+            const low = { severity: 'low' }
+
+            expect(wrapper.vm.compareValues(critical, low, 'severity')).toBeGreaterThan(0)
+            expect(wrapper.vm.compareValues(low, critical, 'severity')).toBeLessThan(0)
+        })
+
+        it('compares string fields case-insensitively', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            const objA = { agent_name: 'Agent-A' }
+            const objB = { agent_name: 'Agent-B' }
+
+            expect(wrapper.vm.compareValues(objA, objB, 'agent_name')).toBeLessThan(0)
+            expect(wrapper.vm.compareValues(objB, objA, 'agent_name')).toBeGreaterThan(0)
+        })
+
+        it('handles null/undefined string values', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            const objA = { cve_id: null }
+            const objB = { cve_id: 'CVE-2023-1234' }
+
+            expect(wrapper.vm.compareValues(objA, objB, 'cve_id')).toBeLessThan(0)
+        })
+
+        it('compares numeric fields', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            const obj1 = { score_base: 3.5 }
+            const obj2 = { score_base: 8.9 }
+
+            expect(wrapper.vm.compareValues(obj1, obj2, 'score_base')).toBeLessThan(0)
+            expect(wrapper.vm.compareValues(obj2, obj1, 'score_base')).toBeGreaterThan(0)
+        })
+    })
+
+    describe('Filter matching functions', () => {
+        const mockVulns = [
+            {
+                id: 1,
+                connection_id: 'conn-1',
+                connection_name: 'Conn A',
+                agent_name: 'Agent-1',
+                cve_id: 'CVE-2023-1234',
+                package_name: 'bash',
+                severity: 'critical',
+                score_base: 9.8
+            },
+            {
+                id: 2,
+                connection_id: 'conn-2',
+                connection_name: 'Conn B',
+                agent_name: 'Agent-2',
+                cve_id: 'CVE-2022-0001',
+                package_name: 'curl',
+                severity: 'low',
+                score_base: 4.2
+            }
+        ]
+
+        beforeEach(() => {
+            vi.clearAllMocks()
+            wazuhService.getConnections.mockResolvedValue({ data: [] })
+        })
+
+        it('matchesConnection returns true when no connection selected', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            wrapper.vm.selectedConnection = ''
+            expect(wrapper.vm.matchesConnection(mockVulns[0])).toBe(true)
+            expect(wrapper.vm.matchesConnection(mockVulns[1])).toBe(true)
+        })
+
+        it('matchesConnection filters by connection_id', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            wrapper.vm.selectedConnection = 'conn-1'
+            expect(wrapper.vm.matchesConnection(mockVulns[0])).toBe(true)
+            expect(wrapper.vm.matchesConnection(mockVulns[1])).toBe(false)
+        })
+
+        it('matchesAgent with empty selection matches all', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            wrapper.vm.selectedAgents = []
+            expect(wrapper.vm.matchesAgent(mockVulns[0])).toBe(true)
+            expect(wrapper.vm.matchesAgent(mockVulns[1])).toBe(true)
+        })
+
+        it('matchesAgent filters by selected agents', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            wrapper.vm.selectedAgents = ['Agent-1']
+            expect(wrapper.vm.matchesAgent(mockVulns[0])).toBe(true)
+            expect(wrapper.vm.matchesAgent(mockVulns[1])).toBe(false)
+        })
+
+        it('matchesVuln filters by CVE ID', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            wrapper.vm.selectedVulns = ['CVE-2023-1234']
+            expect(wrapper.vm.matchesVuln(mockVulns[0])).toBe(true)
+            expect(wrapper.vm.matchesVuln(mockVulns[1])).toBe(false)
+        })
+
+        it('matchesPackage filters by package name', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            wrapper.vm.selectedPackages = ['bash']
+            expect(wrapper.vm.matchesPackage(mockVulns[0])).toBe(true)
+            expect(wrapper.vm.matchesPackage(mockVulns[1])).toBe(false)
+        })
+
+        it('matchesSeverity filters by severity level', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            wrapper.vm.selectedSeverities = ['CRITICAL']
+            expect(wrapper.vm.matchesSeverity(mockVulns[0])).toBe(true)
+            expect(wrapper.vm.matchesSeverity(mockVulns[1])).toBe(false)
+        })
+
+        it('matchesSeverity handles uppercasing', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            wrapper.vm.selectedSeverities = ['LOW']
+            const vulnWithLower = { ...mockVulns[1], severity: 'low' }
+            expect(wrapper.vm.matchesSeverity(vulnWithLower)).toBe(true)
+        })
+
+        it('matchesSeverity handles null severity', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            wrapper.vm.selectedSeverities = ['UNKNOWN']
+            const vulnNoSeverity = { ...mockVulns[0], severity: null }
+            expect(wrapper.vm.matchesSeverity(vulnNoSeverity)).toBe(true)
+        })
+
+        it('matchesScore filters by CVSS score range', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            wrapper.vm.scoreMin = 5
+            wrapper.vm.scoreMax = 10
+            expect(wrapper.vm.matchesScore(mockVulns[0])).toBe(true)
+            expect(wrapper.vm.matchesScore(mockVulns[1])).toBe(false)
+        })
+
+        it('matchesScore handles null score', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            wrapper.vm.scoreMin = 0
+            wrapper.vm.scoreMax = 10
+            const vulnNoScore = { ...mockVulns[0], score_base: null }
+            expect(wrapper.vm.matchesScore(vulnNoScore)).toBe(false)
+        })
+
+        it('matchesScore with empty min returns true', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            wrapper.vm.scoreMin = ''
+            wrapper.vm.scoreMax = ''
+            expect(wrapper.vm.matchesScore(mockVulns[0])).toBe(true)
+        })
+    })
+
+    describe('updateFilterOptions utility function', () => {
+        it('extracts unique agents from vulnerabilities', async () => {
+            const vulnsWithAgents = [
+                { agent_name: 'Agent-1', cve_id: 'CVE-1', package_name: 'pkg1', severity: 'critical' },
+                { agent_name: 'Agent-2', cve_id: 'CVE-2', package_name: 'pkg2', severity: 'low' },
+                { agent_name: 'Agent-1', cve_id: 'CVE-3', package_name: 'pkg3', severity: 'medium' }
+            ]
+            vulnService.getVulns.mockResolvedValueOnce({ data: vulnsWithAgents })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            expect(wrapper.vm.agentOptions).toEqual(['Agent-1', 'Agent-2'])
+        })
+
+        it('extracts unique CVE IDs', async () => {
+            const vulnsWithCVE = [
+                { agent_name: 'A1', cve_id: 'CVE-2023-1234', package_name: 'pkg1', severity: 'critical' },
+                { agent_name: 'A2', cve_id: 'CVE-2022-0001', package_name: 'pkg2', severity: 'low' }
+            ]
+            vulnService.getVulns.mockResolvedValueOnce({ data: vulnsWithCVE })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            expect(wrapper.vm.vulnOptions).toEqual(['CVE-2022-0001', 'CVE-2023-1234'])
+        })
+
+        it('extracts unique package names', async () => {
+            const vulnsWithPackages = [
+                { agent_name: 'A1', cve_id: 'CVE-1', package_name: 'bash', severity: 'critical' },
+                { agent_name: 'A2', cve_id: 'CVE-2', package_name: 'curl', severity: 'low' }
+            ]
+            vulnService.getVulns.mockResolvedValueOnce({ data: vulnsWithPackages })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            expect(wrapper.vm.packageOptions).toEqual(['bash', 'curl'])
+        })
+
+        it('handles missing fields gracefully', async () => {
+            const vulnsWithMissing = [
+                { agent_name: null, cve_id: 'CVE-1', package_name: 'pkg1', severity: 'critical' },
+                { agent_name: 'Agent-2', cve_id: undefined, package_name: 'pkg2', severity: 'low' },
+                { agent_name: 'Agent-3', cve_id: 'CVE-3', package_name: null, severity: 'medium' }
+            ]
+            vulnService.getVulns.mockResolvedValueOnce({ data: vulnsWithMissing })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            expect(wrapper.vm.agentOptions).toEqual(['Agent-2', 'Agent-3'])
+            expect(wrapper.vm.vulnOptions).toEqual(['CVE-1', 'CVE-3'])
+            expect(wrapper.vm.packageOptions).toEqual(['pkg1', 'pkg2'])
+        })
+
+        it('sorts severity options by severity level (descending)', async () => {
+            const vulnsWithSeverity = [
+                { agent_name: 'A1', cve_id: 'CVE-1', package_name: 'pkg1', severity: 'low' },
+                { agent_name: 'A2', cve_id: 'CVE-2', package_name: 'pkg2', severity: 'critical' },
+                { agent_name: 'A3', cve_id: 'CVE-3', package_name: 'pkg3', severity: 'medium' },
+                { agent_name: 'A4', cve_id: 'CVE-4', package_name: 'pkg4', severity: 'high' }
+            ]
+            vulnService.getVulns.mockResolvedValueOnce({ data: vulnsWithSeverity })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            // Should be sorted: CRITICAL, HIGH, MEDIUM, LOW
+            expect(wrapper.vm.severityOptions[0]).toBe('CRITICAL')
+            expect(wrapper.vm.severityOptions[1]).toBe('HIGH')
+            expect(wrapper.vm.severityOptions[2]).toBe('MEDIUM')
+            expect(wrapper.vm.severityOptions[3]).toBe('LOW')
+        })
+
+        it('uppercases severity values', async () => {
+            const vulnsWithLowerSeverity = [
+                { agent_name: 'A1', cve_id: 'CVE-1', package_name: 'pkg1', severity: 'critical' }
+            ]
+            vulnService.getVulns.mockResolvedValueOnce({ data: vulnsWithLowerSeverity })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            expect(wrapper.vm.severityOptions).toContain('CRITICAL')
+        })
+    })
+
+    describe('isNew utility function', () => {
+        it('returns false for null/undefined dates', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            expect(wrapper.vm.isNew(null)).toBe(false)
+            expect(wrapper.vm.isNew(undefined)).toBe(false)
+        })
+
+        it('returns true for dates within last 24 hours', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            const now = new Date().toISOString()
+            expect(wrapper.vm.isNew(now)).toBe(true)
+        })
+
+        it('returns true for dates 24 hours ago (boundary)', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            const oneDayAgo = new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString()
+            expect(wrapper.vm.isNew(oneDayAgo)).toBe(true)
+        })
+
+        it('returns false for dates older than 24 hours', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            const twoDaysAgo = new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString()
+            expect(wrapper.vm.isNew(twoDaysAgo)).toBe(false)
+        })
+
+        it('handles edge case of exactly 1 day', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            const date = new Date(Date.now() - 1000 * 60 * 60 * 24 + 1000)
+            expect(wrapper.vm.isNew(date.toISOString())).toBe(true)
+        })
+    })
 })

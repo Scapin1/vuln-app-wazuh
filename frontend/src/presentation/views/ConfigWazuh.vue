@@ -206,7 +206,12 @@ const submitConnection = async () => {
       wazuh_password: newConn.value.wazuh_password.trim()
     }
 
-    if(newConn.value.name === '' || newConn.value.indexer_url === '' || newConn.value.wazuh_user === '' || newConn.value.wazuh_password === '') {
+    const isInvalid = newConn.value.name === '' || 
+                     newConn.value.indexer_url === '' || 
+                     newConn.value.wazuh_user === '' || 
+                     (!isEditing.value && newConn.value.wazuh_password === '')
+
+    if (isInvalid) {
       newConnError.value = 'Por favor, completa todos los campos requeridos.'
       creatingConn.value = false
       return

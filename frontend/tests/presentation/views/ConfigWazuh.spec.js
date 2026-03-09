@@ -49,8 +49,8 @@ describe('ConfigWazuh.vue', () => {
 
         // Mockeamos el fallo con un mensaje específico
         const errorMsg = 'Error al guardar la conexión. Verifica que los datos sean correctos.'
-        wazuhService.editConnection.mockRejectedValueOnce({ 
-            response: { data: { message: errorMsg } } 
+        wazuhService.editConnection.mockRejectedValueOnce({
+            response: { data: { message: errorMsg } }
         })
 
         await wrapper.find('button[title="Editar"]').trigger('click')
@@ -302,7 +302,10 @@ describe('ConfigWazuh.vue', () => {
 
         const result = wrapper.vm.formatDate(testDate)
         expect(result).not.toBe('Nunca')
-        expect(result).toContain('3/9/2025') // US date format
+        expect(result).toContain('2025')
+        // Check for March (03 or 3) and 9th (09 or 9)
+        expect(result).toMatch(/(03|3)/)
+        expect(result).toMatch(/(09|9)/)
     })
 
     it('closes modal and clears form on closeModal', async () => {

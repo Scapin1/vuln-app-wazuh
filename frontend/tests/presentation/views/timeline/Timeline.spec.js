@@ -3,6 +3,8 @@ import { mount, flushPromises } from '@vue/test-utils'
 import Timeline from '@/presentation/views/Timeline.vue'
 import wazuhService from '@/application/services/wazuhService'
 import vulnService from '@/application/services/vulnService'
+import TimelineFilters from '@/presentation/views/timeline/components/TimelineFilters.vue'
+import TimelineDetailModal from '@/presentation/views/timeline/components/TimelineDetailModal.vue'
 
 // Mock services
 vi.mock('@/application/services/wazuhService', () => ({
@@ -83,8 +85,7 @@ describe('Timeline.vue', () => {
     wrapper.vm.selectedAgents = ['agent1']
     wrapper.vm.selectedVulns = ['CVE-123']
 
-    await wrapper.vm.onConnectionChange() // No argument needed in component
-    // Wait, the componentRenamed connections use ref, so onConnectionChange doesn't take argument
+    await wrapper.vm.onConnectionChange()
 
     expect(wrapper.vm.selectedAgents).toEqual([])
     expect(wrapper.vm.selectedVulns).toEqual([])
@@ -176,7 +177,7 @@ describe('Timeline.vue', () => {
     await flushPromises()
 
     wrapper.vm.selectedConnection = '1'
-    vi.spyOn(wrapper.vm, 'fetchConnectionVulns').mockRejectedValueOnce(new Error('Fetch failed'))
+    vulnService.getVulns.mockRejectedValueOnce(new Error('Fetch failed'))
 
     await wrapper.vm.onConnectionChange()
     await flushPromises()
@@ -188,7 +189,8 @@ describe('Timeline.vue', () => {
     const wrapper = mount(Timeline)
     await flushPromises()
 
-    vi.spyOn(wrapper.vm, 'build').mockRejectedValueOnce(new Error('Build failed'))
+    wrapper.vm.selectedConnection = '1'
+    vulnService.getVulns.mockRejectedValueOnce(new Error('Build failed'))
 
     await wrapper.vm.buildTimeline()
     await flushPromises()
@@ -206,6 +208,31 @@ describe('Timeline.vue', () => {
     expect(wrapper.vm.selectedEvent).toEqual(slot)
   })
 
+  it('computes yearLabel correctly with data', async () => {
+    vulnService.getVulns.mockResolvedValueOnce({
+      data: [
+        { agent_name: 'Agent 1', cve_id: 'CVE-001', first_seen: '2025-01-01T00:00:00Z' },
+        { agent_name: 'Agent 1', cve_id: 'CVE-002', first_seen: '2026-01-01T00:00:00Z' }
+      ]
+    })
+
+    const wrapper = mount(Timeline)
+    await flushPromises()
+
+    wrapper.vm.selectedConnection = '1'
+    wrapper.vm.period = 'all'
+    await wrapper.vm.buildTimeline()
+    await flushPromises()
+
+    expect(wrapper.vm.yearLabel).toBeTruthy()
+  })
+
+  it('updates period via setPeriod method', () => {
+    const wrapper = mount(Timeline)
+    wrapper.vm.setPeriod('7d')
+    expect(wrapper.vm.period).toBe('7d')
+  })
+
   it('displays error banner when statusError is computed', async () => {
     const wrapper = mount(Timeline)
     wrapper.vm.errorBanner = 'Custom Error'
@@ -213,5 +240,34 @@ describe('Timeline.vue', () => {
 
     expect(wrapper.find('.status-error').exists()).toBe(true)
     expect(wrapper.text()).toContain('Custom Error')
+  })
+
+  it('updates state when filters emit updates', async () => {
+    const wrapper = mount(Timeline)
+    await flushPromises()
+
+    const filters = wrapper.findComponent(TimelineFilters)
+
+    await filters.vm.$emit('update:selectedConnection', '2')
+    expect(wrapper.vm.selectedConnection).toBe('2')
+
+    await filters.vm.$emit('update:selectedAgents', ['Agent X'])
+    expect(wrapper.vm.selectedAgents).toEqual(['Agent X'])
+
+    await filters.vm.$emit('update:selectedVulns', ['CVE-Y'])
+    expect(wrapper.vm.selectedVulns).toEqual(['CVE-Y'])
+
+    await filters.vm.$emit('update:customDate', '2026-05-05')
+    expect(wrapper.vm.customDate).toBe('2026-05-05')
+  })
+
+  it('closes modal when detail modal emits close', async () => {
+    const wrapper = mount(Timeline)
+    wrapper.vm.modalOpen = true
+
+    const modal = wrapper.findComponent(TimelineDetailModal)
+    await modal.vm.$emit('close')
+
+    expect(wrapper.vm.modalOpen).toBe(false)
   })
 })
