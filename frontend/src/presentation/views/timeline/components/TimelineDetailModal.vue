@@ -13,6 +13,7 @@
       </div>
       <div class="modal-content custom-scroll">
         <table class="modal-table">
+          <caption class="sr-only">Tabla de vulnerabilidades detectadas en el período seleccionado, mostrando detalles como conexión, equipo, CVE, severidad y estado</caption>
           <thead>
             <tr>
               <th @click="sortBy('connection_name')">Conexion</th>
@@ -112,7 +113,10 @@ const rows = computed(() => {
   return filtered.slice().sort((a, b) => {
     const av = a[key] ?? ''
     const bv = b[key] ?? ''
-    return av < bv ? -order : av > bv ? order : 0
+
+    if (av < bv) return -order
+    if (av > bv) return order
+    return 0
   })
 })
 </script>
