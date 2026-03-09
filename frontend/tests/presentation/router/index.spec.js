@@ -10,9 +10,14 @@ vi.mock('@/application/services/userService', () => ({
 }))
 
 describe('router/index.js global guard', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
         localStorage.clear()
+        sessionStorage.clear()
         vi.clearAllMocks()
+
+        if (router.currentRoute.value.path !== '/login') {
+            await router.push('/login').catch(() => {})
+        }
     })
 
     it('redirects to /login if navigating to auth route without token', async () => {
@@ -36,6 +41,7 @@ describe('router/index.js global guard', () => {
         localStorage.setItem('token', 'fake-token')
         userService.getUserMe.mockResolvedValueOnce({ data: { is_default_password: false } })
 
+        await router.push('/dashboard').catch(() => {})
         await router.push('/login')
         await router.isReady()
 
@@ -46,5 +52,48 @@ describe('router/index.js global guard', () => {
         await router.push('/non-existent-route-123')
         await router.isReady()
         expect(router.currentRoute.value.name).toBe('NotFound')
+    })
+
+    it('redirects to /change-password when user has default password', async () => {
+        localStorage.setItem('token', 'fake-token')
+
+        userService.getUserMe.mockResolvedValue({
+            data: { is_default_password: true }
+        })
+
+        await router.push('/dashboard')
+        await router.isReady()
+
+        expect(router.currentRoute.value.path).toBe('/change-password')
+        expect(sessionStorage.getItem('force_password_message')).toBe(
+            'Para continuar, debes cambiar tu contraseña obligatoriamente.'
+        )
+    })
+
+    it('allows navigation to /change-password when user has default password', async () => {
+        localStorage.setItem('token', 'fake-token')
+
+        userService.getUserMe.mockResolvedValue({
+            data: { is_default_password: true }
+        })
+
+        await router.push('/change-password')
+        await router.isReady()
+
+        expect(router.currentRoute.value.path).toBe('/change-password')
+    })
+
+    it('redirects to /login and clears storage when getUserMe fails', async () => {
+        localStorage.setItem('token', 'fake-token')
+        localStorage.setItem('username', 'clau')
+
+        userService.getUserMe.mockRejectedValueOnce(new Error('Unauthorized'))
+
+        await router.push('/dashboard')
+        await router.isReady()
+
+        expect(router.currentRoute.value.path).toBe('/login')
+        expect(localStorage.getItem('token')).toBeNull()
+        expect(localStorage.getItem('username')).toBeNull()
     })
 })
