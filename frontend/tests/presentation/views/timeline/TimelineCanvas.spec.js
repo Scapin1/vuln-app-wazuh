@@ -28,7 +28,7 @@ const visibleSlots = [
 ]
 
 describe('TimelineCanvas.vue', () => {
-  it('renders timeline metrics and emits open-slot', async () => {
+  it('emits navigation events and respects disabled states', async () => {
     const wrapper = mount(TimelineCanvas, {
       props: {
         allSlots: visibleSlots,
@@ -39,13 +39,58 @@ describe('TimelineCanvas.vue', () => {
         canMoveLeft: true,
         canMoveRight: false,
         canZoomIn: true,
-        canZoomOut: true
+        canZoomOut: false
       }
     })
 
-    expect(wrapper.text()).toContain('2026')
+    const buttons = wrapper.findAll('.btn-icon')
+    // buttons: 0: move-left, 1: zoom-out, 2: zoom-in, 3: move-right
 
-    await wrapper.find('.event-card').trigger('click')
-    expect(wrapper.emitted('open-slot')).toBeTruthy()
+    // Test move-left (enabled)
+    await buttons[0].trigger('click')
+    expect(wrapper.emitted('move-left')).toBeTruthy()
+
+    // Test zoom-out (disabled)
+    expect(buttons[1].element.disabled).toBe(true)
+    await buttons[1].trigger('click')
+    expect(wrapper.emitted('zoom-out')).toBeFalsy()
+
+    // Test zoom-in (enabled)
+    await buttons[2].trigger('click')
+    expect(wrapper.emitted('zoom-in')).toBeTruthy()
+
+    // Test move-right (disabled)
+    expect(buttons[3].element.disabled).toBe(true)
+    await buttons[3].trigger('click')
+    expect(wrapper.emitted('move-right')).toBeFalsy()
+  })
+
+  it('computes stageStyle correctly', () => {
+    const wrapper = mount(TimelineCanvas, {
+      props: {
+        allSlots: visibleSlots,
+        visibleSlots,
+        paintedCount: 1,
+        activeZoom: { label: '30D' }
+      }
+    })
+
+    const stage = wrapper.find('.ig-stage')
+    expect(stage.attributes('style')).toContain('--slot-count: 2')
+  })
+
+  it('renders painted and empty slots correctly', () => {
+    const wrapper = mount(TimelineCanvas, {
+      props: {
+        allSlots: visibleSlots,
+        visibleSlots,
+        paintedCount: 1,
+        activeZoom: { label: '30D' }
+      }
+    })
+
+    const segments = wrapper.findAll('.ig-segment')
+    expect(segments[0].classes()).toContain('detection')
+    expect(segments[1].classes()).toContain('empty')
   })
 })

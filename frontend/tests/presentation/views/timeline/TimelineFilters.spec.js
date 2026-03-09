@@ -34,7 +34,7 @@ describe('TimelineFilters.vue', () => {
 
     const select = wrapper.find('select')
     expect(select.exists()).toBe(true)
-    
+
     await select.setValue('1')
     expect(wrapper.emitted('update:selectedConnection')).toBeTruthy()
     expect(wrapper.emitted('update:selectedConnection')[0]).toEqual([1])
@@ -62,7 +62,7 @@ describe('TimelineFilters.vue', () => {
 
     const ddButtons = wrapper.findAll('.dd-btn')
     await ddButtons[0].trigger('click')
-    
+
     await wrapper.vm.$nextTick()
     expect(wrapper.find('.dd-panel').exists()).toBe(true)
   })
@@ -78,14 +78,14 @@ describe('TimelineFilters.vue', () => {
     // Open dropdown
     const ddButtons = wrapper.findAll('.dd-btn')
     await ddButtons[0].trigger('click')
-    
+
     // Search input should be visible
     const searchInput = wrapper.find('.dd-search')
     expect(searchInput.exists()).toBe(true)
-    
+
     await searchInput.setValue('Agent 2')
     await wrapper.vm.$nextTick()
-    
+
     // Check filtered results
     const options = wrapper.findAll('.dd-item')
     expect(options.length).toBeLessThanOrEqual(defaultProps.agentOptions.length)
@@ -131,7 +131,7 @@ describe('TimelineFilters.vue', () => {
     const ddButtons = wrapper.findAll('.dd-btn')
     await ddButtons[1].trigger('click')
     await wrapper.vm.$nextTick()
-   
+
     // Check dropdown opened
     expect(wrapper.findAll('.dd-panel').length).toBeGreaterThan(0)
   })
@@ -239,5 +239,55 @@ describe('TimelineFilters.vue', () => {
 
     expect(wrapper.emitted('update:selectedAgents')).toBeTruthy()
     expect(wrapper.emitted('update:selectedAgents')[0][0]).toHaveLength(0)
+  })
+
+  it('selects all vulnerabilities when "Todas" is clicked', async () => {
+    const wrapper = mount(TimelineFilters, {
+      props: {
+        ...defaultProps,
+        selectedConnection: '1'
+      }
+    })
+
+    const ddButtons = wrapper.findAll('.dd-btn')
+    await ddButtons[1].trigger('click') // Vulns dropdown
+
+    const todosButton = wrapper.findAll('.dd-panel .dd-actions span')[0]
+    await todosButton.trigger('click')
+
+    expect(wrapper.emitted('update:selectedVulns')).toBeTruthy()
+    expect(wrapper.emitted('update:selectedVulns')[0][0]).toHaveLength(defaultProps.vulnOptions.length)
+  })
+
+  it('filters vulnerabilities by search query', async () => {
+    const wrapper = mount(TimelineFilters, {
+      props: {
+        ...defaultProps,
+        selectedConnection: '1'
+      }
+    })
+
+    const ddButtons = wrapper.findAll('.dd-btn')
+    await ddButtons[1].trigger('click')
+
+    const searchInput = wrapper.find('.dd-search')
+    await searchInput.setValue('CVE-2023-002')
+
+    expect(wrapper.vm.filteredVulns).toEqual(['CVE-2023-002'])
+  })
+
+  it('updates custom date when input changes', async () => {
+    const wrapper = mount(TimelineFilters, {
+      props: {
+        ...defaultProps,
+        period: 'day'
+      }
+    })
+
+    const dateInput = wrapper.find('input[type="date"]')
+    await dateInput.setValue('2026-03-10')
+
+    expect(wrapper.emitted('update:customDate')).toBeTruthy()
+    expect(wrapper.emitted('update:customDate')[0]).toEqual(['2026-03-10'])
   })
 })

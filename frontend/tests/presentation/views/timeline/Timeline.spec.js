@@ -59,7 +59,7 @@ describe('Timeline.vue', () => {
 
   it('displays empty card initially', () => {
     const wrapper = mount(Timeline)
-    
+
     const card = wrapper.find('.empty-card')
     expect(card.exists()).toBe(true)
   })
@@ -83,7 +83,8 @@ describe('Timeline.vue', () => {
     wrapper.vm.selectedAgents = ['agent1']
     wrapper.vm.selectedVulns = ['CVE-123']
 
-    await wrapper.vm.onConnectionChange('2')
+    await wrapper.vm.onConnectionChange() // No argument needed in component
+    // Wait, the componentRenamed connections use ref, so onConnectionChange doesn't take argument
 
     expect(wrapper.vm.selectedAgents).toEqual([])
     expect(wrapper.vm.selectedVulns).toEqual([])
@@ -107,7 +108,7 @@ describe('Timeline.vue', () => {
 
   it('handles connection load error gracefully', async () => {
     wazuhService.getConnections.mockRejectedValueOnce(new Error('Network error'))
-    
+
     const wrapper = mount(Timeline)
     await flushPromises()
 
@@ -166,8 +167,51 @@ describe('Timeline.vue', () => {
 
     const buildSpy = vi.spyOn(wrapper.vm, 'buildTimeline')
     await wrapper.vm.buildTimeline()
-    
+
     expect(buildSpy).toHaveBeenCalled()
   })
-})
 
+  it('handles error in onConnectionChange', async () => {
+    const wrapper = mount(Timeline)
+    await flushPromises()
+
+    wrapper.vm.selectedConnection = '1'
+    vi.spyOn(wrapper.vm, 'fetchConnectionVulns').mockRejectedValueOnce(new Error('Fetch failed'))
+
+    await wrapper.vm.onConnectionChange()
+    await flushPromises()
+
+    expect(wrapper.vm.errorBanner).toBe('No se pudieron cargar agentes y CVEs para la conexion seleccionada.')
+  })
+
+  it('handles error in buildTimeline', async () => {
+    const wrapper = mount(Timeline)
+    await flushPromises()
+
+    vi.spyOn(wrapper.vm, 'build').mockRejectedValueOnce(new Error('Build failed'))
+
+    await wrapper.vm.buildTimeline()
+    await flushPromises()
+
+    expect(wrapper.vm.hasBuilt).toBe(false)
+  })
+
+  it('provides openModal method for canvas interaction', () => {
+    const wrapper = mount(Timeline)
+    const slot = { cardLabel: 'test', details: [] }
+
+    wrapper.vm.openModal(slot)
+
+    expect(wrapper.vm.modalOpen).toBe(true)
+    expect(wrapper.vm.selectedEvent).toEqual(slot)
+  })
+
+  it('displays error banner when statusError is computed', async () => {
+    const wrapper = mount(Timeline)
+    wrapper.vm.errorBanner = 'Custom Error'
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.status-error').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Custom Error')
+  })
+})

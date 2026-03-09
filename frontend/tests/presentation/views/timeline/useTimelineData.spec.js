@@ -422,11 +422,19 @@ describe('useTimelineData', () => {
       const slots = zoomTimeline.allSlots.value
       expect(slots.length).toBeGreaterThan(0)
 
-      // Check that slots are 1 hour apart (3600000 ms)
-      if (slots.length > 1) {
-        const timeDiff = slots[1].startMs - slots[0].startMs
-        expect(timeDiff).toBe(3600000) // 1 hour in milliseconds
-      }
+      // Verificar que solo hay slots con eventos reales (painted)
+      slots.forEach(slot => {
+        expect(slot.painted).toBe(true)
+        expect(slot.details.length).toBeGreaterThan(0)
+      })
+
+      // Verificar que cada slot tiene eventos reales en "Evento en slot"
+      slots.forEach(slot => {
+        slot.details.forEach(vuln => {
+          expect(vuln.timeline_event_at).not.toBeNull()
+          expect(vuln.timeline_event_label).not.toBeNull()
+        })
+      })
     })
 
     it('handles day granularity correctly', async () => {

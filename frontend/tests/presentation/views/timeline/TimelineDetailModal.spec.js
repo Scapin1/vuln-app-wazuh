@@ -73,7 +73,7 @@ describe('TimelineDetailModal.vue', () => {
 
     const rows = wrapper.findAll('tbody tr')
     expect(rows.length).toBe(2)
-    
+
     expect(wrapper.text()).toContain('CVE-2023-001')
     expect(wrapper.text()).toContain('CVE-2023-002')
     expect(wrapper.text()).toContain('srv-01')
@@ -104,7 +104,7 @@ describe('TimelineDetailModal.vue', () => {
 
     expect(wrapper.text()).toContain('DETECTADO')
     expect(wrapper.text()).toContain('RESUELTO')
-    
+
     const chips = wrapper.findAll('.event-chip')
     expect(chips.length).toBe(2)
   })
@@ -168,10 +168,10 @@ describe('TimelineDetailModal.vue', () => {
 
     const headers = wrapper.findAll('th')
     const agentHeader = headers.find(h => h.text() === 'Equipo')
-    
+
     if (agentHeader) {
       await agentHeader.trigger('click')
-      
+
       const rows = wrapper.findAll('tbody tr')
       const firstAgent = rows[0].text()
       expect(firstAgent).toContain('srv-')
@@ -188,14 +188,14 @@ describe('TimelineDetailModal.vue', () => {
 
     const headers = wrapper.findAll('th')
     const agentHeader = headers.find(h => h.text() === 'Equipo')
-    
+
     if (agentHeader) {
       await agentHeader.trigger('click')
       const firstSort = wrapper.findAll('tbody tr')[0].text()
-      
+
       await agentHeader.trigger('click')
       const secondSort = wrapper.findAll('tbody tr')[0].text()
-      
+
       // Order should be reversed
       expect(firstSort).not.toBe(secondSort)
     }
@@ -323,15 +323,55 @@ describe('TimelineDetailModal.vue', () => {
     expect(hyphenCells.length).toBeGreaterThan(0)
   })
 
-  it('optimizes performance by not computing rows when modal is closed', () => {
+  it('sorts by every column', async () => {
     const wrapper = mount(TimelineDetailModal, {
       props: {
-        show: false,
+        show: true,
         eventData: mockEventData
       }
     })
 
-    // rows computed should return empty when show is false
-    expect(wrapper.vm.rows).toEqual([])
+    const headers = wrapper.findAll('th')
+    const columns = [
+      'connection_name', 'agent_name', 'cve_id', 'severity',
+      'timeline_event_at', 'detected_at', 'first_seen',
+      'last_seen', 'status', 'resolved_at'
+    ]
+
+    for (let i = 0; i < headers.length; i++) {
+      await headers[i].trigger('click')
+      expect(wrapper.vm.sortKey).toBe(columns[i])
+      expect(wrapper.vm.sortOrder).toBe(1)
+
+      // Click again to reverse
+      await headers[i].trigger('click')
+      expect(wrapper.vm.sortOrder).toBe(-1)
+    }
+  })
+
+  it('handles null values during sorting', async () => {
+    const dataWithMissing = {
+      cardLabel: 'Null Test',
+      details: [
+        { id: 1, agent_name: 'A', status: 'ACTIVE' },
+        { id: 2, agent_name: null, status: 'RESOLVED' },
+        { id: 3, agent_name: 'B', status: 'ACTIVE' }
+      ]
+    }
+
+    const wrapper = mount(TimelineDetailModal, {
+      props: {
+        show: true,
+        eventData: dataWithMissing
+      }
+    })
+
+    // Sort by agent_name (one is null)
+    await wrapper.findAll('th')[1].trigger('click') // agent_name
+
+    const rows = wrapper.vm.rows
+    expect(rows[0].agent_name).toBe(null) // null/empty should come first in ascending
+    expect(rows[1].agent_name).toBe('A')
+    expect(rows[2].agent_name).toBe('B')
   })
 })

@@ -183,15 +183,18 @@ export default function useTimelineData({
 
   const getSlotDetails = (snapshot, startMs, endMs) => {
     if (!snapshot) return []
-    return snapshot.details.map(vuln => {
-      const timelineEvent = getTimelineEventInSlot(vuln, startMs, endMs)
-      return {
-        ...vuln,
-        timeline_event_at: timelineEvent?.at ?? null,
-        timeline_event_label: timelineEvent?.label ?? null,
-        timeline_event_source: timelineEvent?.source ?? null
-      }
-    })
+    // Solo incluir vulnerabilidades que tienen un evento EN este slot específico
+    return snapshot.details
+      .map(vuln => {
+        const timelineEvent = getTimelineEventInSlot(vuln, startMs, endMs)
+        return {
+          ...vuln,
+          timeline_event_at: timelineEvent?.at ?? null,
+          timeline_event_label: timelineEvent?.label ?? null,
+          timeline_event_source: timelineEvent?.source ?? null
+        }
+      })
+      .filter(vuln => vuln.timeline_event_at !== null) // Solo vulnerabilidades con eventos reales
   }
 
   const createSlot = (startMs, endMs, summary, snapshot, slotHours) => {
@@ -199,14 +202,19 @@ export default function useTimelineData({
     const type = getSlotType(summary)
     const details = getSlotDetails(snapshot, startMs, endMs)
 
+    // Contadores basados en vulnerabilidades con eventos, no en snapshot completo
+    const total = details.length
+    const pending = details.filter(v => v.status === 'ACTIVE').length
+    const resolved = details.filter(v => v.status === 'RESOLVED').length
+
     return {
       startMs,
       endMs,
       painted,
       type,
-      total: snapshot?.total ?? 0,
-      pending: snapshot?.pending ?? 0,
-      resolved: snapshot?.resolved ?? 0,
+      total,
+      pending,
+      resolved,
       details,
       tickLabel: slotHours >= 24 ? fmtDDMM(startMs) : fmtHour(startMs),
       cardLabel: slotHours >= 24
@@ -229,9 +237,12 @@ export default function useTimelineData({
       const endMs = Math.min(rangeEndMs.value, startMs + slotMs - 1)
       const summary = summarizeChanges(startMs, endMs)
       const painted = summary.hasDetection || summary.hasResolution
-      const snapshot = painted ? snapshotAt(endMs) : null
-
-      slots.push(createSlot(startMs, endMs, summary, snapshot, activeZoom.value.slotHours))
+      
+      // Solo crear slot si hay eventos reales (detecciones o resoluciones)
+      if (painted) {
+        const snapshot = snapshotAt(endMs)
+        slots.push(createSlot(startMs, endMs, summary, snapshot, activeZoom.value.slotHours))
+      }
     }
 
     return slots
