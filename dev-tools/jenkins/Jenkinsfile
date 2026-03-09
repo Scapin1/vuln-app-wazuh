@@ -42,21 +42,15 @@ EOF
                         docker rm -f temp-front-tests || true
                         docker create --name temp-front-tests frontend-test-img
                         
-                        # Extraemos la carpeta coverage completa
+                        rm -rf frontend/coverage
+                        
                         docker cp temp-front-tests:/app/coverage frontend/coverage
                         docker rm temp-front-tests
                         
-                        echo "--- DEBUG ANTES DEL SED ---"
-                        grep -m 5 "^SF:" frontend/coverage/lcov.info
+                        sed -i 's|SF:/app/src/|SF:frontend/src/|g' frontend/coverage/lcov.info
+                        sed -i 's|SF:src/|SF:frontend/src/|g' frontend/coverage/lcov.info
                         
-                        # Reemplazamos la ruta absoluta del contenedor (/app/) por la ruta relativa del repo (frontend/)
-                        sed -i 's|SF:/app/|SF:frontend/|g' frontend/coverage/lcov.info
-
-                        echo "--- DEBUG DESPUÉS DEL SED ---"
-                        grep -m 5 "^SF:" frontend/coverage/lcov.info
-                        
-                        docker compose build frontend
-                    '''
+                        docker compose build frontend                    '''
                 }
             }
         }
