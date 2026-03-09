@@ -50,6 +50,8 @@ describe('useTimelineData', () => {
     expect(timeline.hasBuilt.value).toBe(true)
     expect(timeline.allSlots.value.length).toBeGreaterThan(0)
     expect(timeline.latestSnap.value.total).toBe(1)
+    // connection_name should be assigned using fallback function
+    expect(timeline.latestSnap.value.details[0].connection_name).toBe('Demo Conn')
   })
 
   it('sets warning when limit threshold is reached', async () => {

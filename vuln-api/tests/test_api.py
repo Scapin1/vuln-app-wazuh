@@ -137,7 +137,10 @@ def test_sync_vulnerabilities_success(mock_fetch, client, db_session):
 
     get_res = client.get("/vulns", headers=headers)
     assert len(get_res.json()) == 1
-    assert get_res.json()[0]["cve_id"] == "CVE-2023-1234"
+    vuln_item = get_res.json()[0]
+    assert vuln_item["cve_id"] == "CVE-2023-1234"
+    # new requirement: response should include origin connection name
+    assert vuln_item.get("connection_name") == "test"
 
 
 def test_change_password_success(client, db_session):
@@ -408,6 +411,16 @@ def test_list_vulns_limit_zero(mock_fetch, client, db_session):
     conn = _create_connection(db_session)
     client.post(f"/wazuh-connections/{conn.id}/sync", headers=_get_headers(client))
     assert client.get("/vulns?limit=0", headers=_get_headers(client)).json() == []
+
+
+def test_list_vulns_shows_connection_name(mock_fetch, client, db_session):
+    # newly added test ensures connection_name field is returned
+    _create_user(db_session)
+    conn = _create_connection(db_session, name="myconn")
+    client.post(f"/wazuh-connections/{conn.id}/sync", headers=_get_headers(client))
+    res_list = client.get("/vulns", headers=_get_headers(client)).json()
+    assert len(res_list) == 1
+    assert res_list[0].get("connection_name") == "myconn"
 
 
 # fetch vulns

@@ -484,6 +484,7 @@ def list_vulns(
         {
             "id": v.id,
             "connection_id": v.connection_id,
+            "connection_name": v.connection.name if v.connection else None,
             "status": v.status,
             "agent_id": v.agent_id,
             "agent_name": v.agent_name,

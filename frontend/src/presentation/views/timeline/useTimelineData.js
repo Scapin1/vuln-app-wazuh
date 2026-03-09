@@ -114,7 +114,7 @@ export default function useTimelineData({
         ...vuln,
         status: vulnState.state,
         resolved_at: vulnState.resolvedAt,
-        connection_name: getConnectionName()
+        connection_name: vulnState.connection_name || getConnectionName()
       })
     })
 

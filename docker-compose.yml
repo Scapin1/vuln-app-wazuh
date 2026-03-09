@@ -5,6 +5,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    ports:
+      - "5433:5432"   # host puerto modificado para evitar conflicto
     volumes:
       - postgres_api_data:/var/lib/postgresql/data
     networks:

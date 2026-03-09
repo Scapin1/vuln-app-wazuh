@@ -14,6 +14,7 @@ describe('Dashboard.vue', () => {
     const mockVulns = [
         {
             id: 1,
+            connection_name: 'Conn A',
             severity: 'critical',
             cve_id: 'CVE-2023-1234',
             first_seen: new Date().toISOString(),
@@ -24,6 +25,7 @@ describe('Dashboard.vue', () => {
         },
         {
             id: 2,
+            connection_name: 'Conn B',
             severity: 'low',
             cve_id: 'CVE-2022-0001',
             first_seen: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
@@ -55,6 +57,9 @@ describe('Dashboard.vue', () => {
         // Check if table rendered with correct number of rows (excluding header)
         const rows = wrapper.findAll('tbody tr')
         expect(rows.length).toBe(2)
+        // verify connection names rendered in first column
+        expect(rows[0].text()).toContain('Conn A')
+        expect(rows[1].text()).toContain('Conn B')
     })
 
     it('injects mock data when getVulns fails', async () => {
@@ -64,7 +69,7 @@ describe('Dashboard.vue', () => {
         await flushPromises()
 
         expect(wrapper.vm.loading).toBe(false)
-        expect(wrapper.vm.error).toBe('') 
+        expect(wrapper.vm.error).toBe('')
     })
 
     it('syncs vulns correctly', async () => {

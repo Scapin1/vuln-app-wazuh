@@ -112,7 +112,15 @@
           </caption>
           <thead>
             <tr>
-              <th class="col-severity" @click="sortBy('severity')">
+              <th width="10%" @click="sortBy('connection_name')">
+                Conexión
+                <span v-if="sortKey === 'connection_name'" class="sort-indicator">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
+                    <path d="M7 14l5-5 5 5z"/>
+                  </svg>
+                </span>
+              </th>
+              <th width="12%" @click="sortBy('severity')">
                 Severidad
                 <span v-if="sortKey === 'severity'" class="sort-indicator">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
@@ -161,6 +169,7 @@
                   {{ (vuln.severity || 'UNKNOWN').toUpperCase() }}
                 </span>
               </td>
+              <td>{{ vuln.connection_name || '-' }}</td>
               <td class="font-medium text-black">{{ vuln.cve_id || 'N/A' }}</td>
               <td>
                 <div class="agent-info">
