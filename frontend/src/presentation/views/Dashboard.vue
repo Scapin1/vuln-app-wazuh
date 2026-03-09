@@ -78,22 +78,30 @@
             Mostrando {{ (currentPage - 1) * itemsPerPage + 1 }} - {{ Math.min(currentPage * itemsPerPage, sortedVulns.length) }} de {{ sortedVulns.length }} vulnerabilidades
           </span>
           <div class="pagination-nav">
+            <button class="btn-icon-page" :disabled="currentPage === 1" @click="jumpBackward" title="Retroceder 5 páginas" aria-label="Retroceder 5 páginas">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 8 12 13 7"></polyline><polyline points="19 17 14 12 19 7"></polyline></svg>
+            </button>
             <button class="btn-icon-page" :disabled="currentPage === 1" @click="prevPage" title="Anterior">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
             <div class="page-numbers">
-              <button 
-                v-for="page in visiblePages" 
-                :key="page" 
-                class="btn-page" 
-                :class="{ 'active': currentPage === page }"
-                @click="currentPage = page"
-              >
-                {{ page }}
-              </button>
+              <template v-for="(item, idx) in visiblePages" :key="`top-${item}-${idx}`">
+                <button
+                  v-if="typeof item === 'number'"
+                  class="btn-page"
+                  :class="{ 'active': currentPage === item }"
+                  @click="currentPage = item"
+                >
+                  {{ item }}
+                </button>
+                <span v-else class="pagination-ellipsis">...</span>
+              </template>
             </div>
             <button class="btn-icon-page" :disabled="currentPage === totalPages" @click="nextPage" title="Siguiente">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+            <button class="btn-icon-page" :disabled="currentPage === totalPages" @click="jumpForward" title="Avanzar 5 páginas" aria-label="Avanzar 5 páginas">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 17 16 12 11 7"></polyline><polyline points="5 17 10 12 5 7"></polyline></svg>
             </button>
           </div>
         </div>
@@ -200,22 +208,30 @@
         <!-- Controles de Paginación Abajo -->
         <div v-if="totalPages > 1" class="pagination-controls-bottom">
           <div class="pagination-nav" style="margin-left: auto;">
+            <button class="btn-icon-page" :disabled="currentPage === 1" @click="jumpBackward" title="Retroceder 5 páginas" aria-label="Retroceder 5 páginas">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 8 12 13 7"></polyline><polyline points="19 17 14 12 19 7"></polyline></svg>
+            </button>
             <button class="btn-icon-page" :disabled="currentPage === 1" @click="prevPage" title="Anterior">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
             <div class="page-numbers">
-              <button 
-                v-for="page in visiblePages" 
-                :key="page" 
-                class="btn-page" 
-                :class="{ 'active': currentPage === page }"
-                @click="currentPage = page"
-              >
-                {{ page }}
-              </button>
+              <template v-for="(item, idx) in visiblePages" :key="`bottom-${item}-${idx}`">
+                <button
+                  v-if="typeof item === 'number'"
+                  class="btn-page"
+                  :class="{ 'active': currentPage === item }"
+                  @click="currentPage = item"
+                >
+                  {{ item }}
+                </button>
+                <span v-else class="pagination-ellipsis">...</span>
+              </template>
             </div>
             <button class="btn-icon-page" :disabled="currentPage === totalPages" @click="nextPage" title="Siguiente">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+            <button class="btn-icon-page" :disabled="currentPage === totalPages" @click="jumpForward" title="Avanzar 5 páginas" aria-label="Avanzar 5 páginas">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 17 16 12 11 7"></polyline><polyline points="5 17 10 12 5 7"></polyline></svg>
             </button>
           </div>
         </div>
@@ -247,6 +263,7 @@ const showFilters = ref(false)
 // Paginación
 const currentPage = ref(1)
 const itemsPerPage = 50
+const pageJump = 10
 
 const filters = ref({
   severidad: '',
@@ -358,25 +375,31 @@ const paginatedVulns = computed(() => {
 
 const visiblePages = computed(() => {
   const pages = []
-  const maxPages = 5 // Botones numéricos visibles
-  const half = Math.floor(maxPages / 2)
-  
-  let start = currentPage.value - half
-  let end = currentPage.value + half
+  const total = totalPages.value
+  const current = currentPage.value
+  const maxNumericButtons = 7
 
-  if (start < 1) {
-    start = 1
-    end = Math.min(maxPages, totalPages.value)
+  if (total <= maxNumericButtons) {
+    for (let i = 1; i <= total; i++) pages.push(i)
+    return pages
   }
-  
-  if (end > totalPages.value) {
-    end = totalPages.value
-    start = Math.max(1, end - maxPages + 1)
+
+  const middleSlots = maxNumericButtons - 2 // Reservamos 1 y ultima pagina.
+  pages.push(1)
+
+  let start = Math.max(2, current - Math.floor(middleSlots / 2))
+  let end = start + middleSlots - 1
+
+  if (end > total - 1) {
+    end = total - 1
+    start = end - middleSlots + 1
   }
-  
-  for (let i = start; i <= end; i++) {
-    pages.push(i)
-  }
+
+  if (start > 2) pages.push('left-ellipsis')
+  for (let i = start; i <= end; i++) pages.push(i)
+  if (end < total - 1) pages.push('right-ellipsis')
+
+  pages.push(total)
   return pages
 })
 
@@ -386,6 +409,14 @@ const nextPage = () => {
 
 const prevPage = () => {
   if (currentPage.value > 1) currentPage.value--
+}
+
+const jumpBackward = () => {
+  currentPage.value = Math.max(1, currentPage.value - pageJump)
+}
+
+const jumpForward = () => {
+  currentPage.value = Math.min(totalPages.value, currentPage.value + pageJump)
 }
 
 import { watch } from 'vue'
@@ -841,24 +872,24 @@ th {
 .pagination-nav {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.35rem;
 }
 
 .page-numbers {
   display: flex;
-  gap: 0.25rem;
+  gap: 0.2rem;
 }
 
 .btn-icon-page {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-main);
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -878,14 +909,14 @@ th {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 32px;
-  height: 32px;
+  min-width: 28px;
+  height: 28px;
   padding: 0 0.25rem;
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-muted);
-  border-radius: 4px;
-  font-size: 0.85rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
@@ -899,5 +930,15 @@ th {
 .btn-page.active {
   background-color: var(--primary);
   color: #000;
+}
+
+.pagination-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 </style>
