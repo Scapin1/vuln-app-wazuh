@@ -454,45 +454,44 @@ const updateFilterOptions = () => {
   })
 }
 
+const matchesConnection = (vuln) => 
+  !selectedConnection.value || vuln.connection_id === selectedConnection.value
+
+const matchesAgent = (vuln) => 
+  selectedAgents.value.length === 0 || selectedAgents.value.includes(vuln.agent_name)
+
+const matchesVuln = (vuln) => 
+  selectedVulns.value.length === 0 || selectedVulns.value.includes(vuln.cve_id)
+
+const matchesPackage = (vuln) => 
+  selectedPackages.value.length === 0 || selectedPackages.value.includes(vuln.package_name)
+
+const matchesSeverity = (vuln) => {
+  if (selectedSeverities.value.length === 0) return true
+  const vulnSeverity = (vuln.severity || 'UNKNOWN').toUpperCase()
+  return selectedSeverities.value.includes(vulnSeverity)
+}
+
+const matchesScore = (vuln) => {
+  if (scoreMin.value === '' && scoreMax.value === '') return true
+  
+  const score = vuln.score_base
+  if (score === null || score === undefined) return false
+  
+  const minOk = scoreMin.value === '' || score >= scoreMin.value
+  const maxOk = scoreMax.value === '' || score <= scoreMax.value
+  
+  return minOk && maxOk
+}
+
 const filteredVulns = computed(() => {
   return vulns.value.filter(vuln => {
-    // Connection filter
-    if (selectedConnection.value && vuln.connection_id !== selectedConnection.value) {
-      return false
-    }
-
-    // Agents filter
-    if (selectedAgents.value.length > 0 && !selectedAgents.value.includes(vuln.agent_name)) {
-      return false
-    }
-
-    // Vulns filter
-    if (selectedVulns.value.length > 0 && !selectedVulns.value.includes(vuln.cve_id)) {
-      return false
-    }
-
-    // Packages filter
-    if (selectedPackages.value.length > 0 && !selectedPackages.value.includes(vuln.package_name)) {
-      return false
-    }
-
-    // Severities filter
-    if (selectedSeverities.value.length > 0) {
-      const vulnSeverity = (vuln.severity || 'UNKNOWN').toUpperCase()
-      if (!selectedSeverities.value.includes(vulnSeverity)) {
-        return false
-      }
-    }
-
-    // Score filter
-    if (scoreMin.value !== '' || scoreMax.value !== '') {
-      const score = vuln.score_base
-      if (score === null || score === undefined) return false
-      if (scoreMin.value !== '' && score < scoreMin.value) return false
-      if (scoreMax.value !== '' && score > scoreMax.value) return false
-    }
-
-    return true
+    return matchesConnection(vuln) &&
+           matchesAgent(vuln) &&
+           matchesVuln(vuln) &&
+           matchesPackage(vuln) &&
+           matchesSeverity(vuln) &&
+           matchesScore(vuln)
   })
 })
 
