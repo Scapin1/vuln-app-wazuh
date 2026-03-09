@@ -190,7 +190,7 @@
           </caption>
           <thead>
             <tr>
-              <th width="10%" @click="sortBy('connection_name')">
+              <th style="width: 10%;" @click="sortBy('connection_name')">
                 Conexión Wazuh
                 <span v-if="sortKey === 'connection_name'" class="sort-indicator">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
@@ -198,7 +198,7 @@
                   </svg>
                 </span>
               </th>
-              <th width="12%" @click="sortBy('severity')">
+              <th style="width: 12%;" @click="sortBy('severity')">
                 Severidad
                 <span v-if="sortKey === 'severity'" class="sort-indicator">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
@@ -206,7 +206,7 @@
                   </svg>
                 </span>
               </th>
-              <th width="8%" @click="sortBy('score_base')">
+              <th style="width: 8%;" @click="sortBy('score_base')">
                 Score CVSS
                 <span v-if="sortKey === 'score_base'" class="sort-indicator">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
@@ -353,7 +353,6 @@
 import { ref, onMounted, computed, watch, reactive } from 'vue'
 import vulnService from '../../application/services/vulnService'
 import wazuhService from '../../application/services/wazuhService'
-import vClickOutside from '../directives/clickOutside'
 
 const vulns = ref([])
 const loading = ref(true)
