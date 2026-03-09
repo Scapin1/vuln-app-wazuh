@@ -24,16 +24,19 @@
             <svg class="spin" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 1rem;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
             <p>Cargando conexiones...</p>
           </div>
-          <table v-else-if="connections.length > 0">
+          <table v-else-if="connections.length > 0" class="connection-table">
+            <caption class="visually-hidden">
+              Tabla de conexiones Wazuh con estado, resultado del ultimo test y acciones disponibles.
+            </caption>
             <thead>
               <tr>
-                <th width="5%">ID</th>
-                <th width="20%">Nombre</th>
-                <th width="25%">Indexer URL</th>
-                <th width="10%">Estado</th>
-                <th width="15%">Último Test</th>
-                <th width="10%">Test OK?</th>
-                <th width="15%"></th>
+                <th class="col-id">ID</th>
+                <th class="col-name">Nombre</th>
+                <th class="col-indexer">Indexer URL</th>
+                <th class="col-status">Estado</th>
+                <th class="col-last-test">Último Test</th>
+                <th class="col-test-ok">Test OK?</th>
+                <th class="col-actions"></th>
               </tr>
             </thead>
             <tbody>
@@ -344,4 +347,24 @@ onMounted(() => {
 .btn-icon { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0.25rem; border-radius: 4px; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; }
 .btn-icon:hover { color: var(--primary); background-color: var(--primary-glow); }
 .btn-icon-danger:hover { color: var(--danger); background-color: var(--danger-bg); }
+
+.connection-table .col-id { width: 5%; }
+.connection-table .col-name { width: 20%; }
+.connection-table .col-indexer { width: 25%; }
+.connection-table .col-status { width: 10%; }
+.connection-table .col-last-test { width: 15%; }
+.connection-table .col-test-ok { width: 10%; }
+.connection-table .col-actions { width: 15%; }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 </style>
