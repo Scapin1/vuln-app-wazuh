@@ -108,7 +108,7 @@ describe('useTimelineData', () => {
 
       await filteredTimeline.build()
 
-      expect(filteredTimeline.latestSnap.value.total).toBe(1)
+      expect(filteredTimeline.latestSnap.value.total).toStrictEqual(1)
       expect(filteredTimeline.latestSnap.value.details[0].cve_id).toBe('CVE-2023-1234')
     })
   })
@@ -169,7 +169,7 @@ describe('useTimelineData', () => {
       const snapshot2 = timeline.snapshotAt(timestamp)
 
       // Should return the same cached object
-      expect(snapshot1).toBe(snapshot2)
+      expect(snapshot1).toStrictEqual(snapshot2)
       expect(snapshot1.total).toBe(2)
     })
 
