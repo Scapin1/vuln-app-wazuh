@@ -627,9 +627,10 @@ const fetchVulns = async () => {
 const fetchConnections = async () => {
   try {
     const res = await wazuhService.getConnections()
-    connections.value = Array.isArray(res.data) ? res.data : []
+    connections.value = res?.data || []
   } catch (err) {
     console.error('Error fetching connections:', err)
+    connections.value = []
   }
 }
 

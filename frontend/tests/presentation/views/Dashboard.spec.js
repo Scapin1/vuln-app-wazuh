@@ -45,6 +45,8 @@ describe('Dashboard.vue', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+
+        wazuhService.getConnections.mockResolvedValue({ data: [] })
     })
 
     it('renders loading state initially and then shows vulns', async () => {
