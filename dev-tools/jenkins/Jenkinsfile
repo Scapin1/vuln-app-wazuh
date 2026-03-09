@@ -46,9 +46,15 @@ EOF
                         docker cp temp-front-tests:/app/coverage frontend/coverage
                         docker rm temp-front-tests
                         
-                        # Le decimos a SonarQube que "src/" en realidad es "frontend/src/"
-                        sed -i 's|SF:src/|SF:frontend/src/|g' frontend/coverage/lcov.info
+                        echo "--- DEBUG ANTES DEL SED ---"
+                        grep -m 5 "^SF:" frontend/coverage/lcov.info
+                        
+                        # Reemplazamos la ruta absoluta del contenedor (/app/) por la ruta relativa del repo (frontend/)
+                        sed -i 's|SF:/app/|SF:frontend/|g' frontend/coverage/lcov.info
 
+                        echo "--- DEBUG DESPUÉS DEL SED ---"
+                        grep -m 5 "^SF:" frontend/coverage/lcov.info
+                        
                         docker compose build frontend
                     '''
                 }
