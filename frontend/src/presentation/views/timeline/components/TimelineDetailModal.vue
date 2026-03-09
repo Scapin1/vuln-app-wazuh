@@ -12,8 +12,7 @@
         </div>
       </div>
       <div class="modal-content custom-scroll">
-        <table class="modal-table">
-          <caption class="sr-only">Tabla de vulnerabilidades detectadas en el período seleccionado, mostrando detalles como conexión, equipo, CVE, severidad y estado</caption>
+        <table class="modal-table" aria-label="Tabla de vulnerabilidades detectadas en el período seleccionado, mostrando detalles como conexión, equipo, CVE, severidad y estado">
           <thead>
             <tr>
               <th @click="sortBy('connection_name')">Conexion</th>
