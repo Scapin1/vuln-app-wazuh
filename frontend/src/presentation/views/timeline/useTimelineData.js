@@ -345,6 +345,7 @@ export default function useTimelineData({
     errorMessage,
     warningMessage,
     build,
-    fetchConnectionVulns
+    fetchConnectionVulns,
+    snapshotAt
   }
 }
