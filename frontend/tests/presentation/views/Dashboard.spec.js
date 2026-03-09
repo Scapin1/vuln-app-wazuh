@@ -425,4 +425,144 @@ describe('Dashboard.vue', () => {
         expect(wrapper.vm.totalPages).toBe(3)
         expect(wrapper.vm.visiblePages).toEqual([1, 2, 3])
     })
+
+    it('formatDate returns formatted and N/A', async () => {
+        vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+        const wrapper = mount(Dashboard)
+        await flushPromises()
+        expect(wrapper.vm.formatDate(null)).toBe('N/A')
+        expect(wrapper.vm.formatDate('2026-03-08T12:34:56Z')).toMatch(/\d{2}.*\d{4}/)
+    })
+
+    it('timeAgo returns all branches', async () => {
+        vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+        const wrapper = mount(Dashboard)
+        await flushPromises()
+        const now = new Date()
+        expect(wrapper.vm.timeAgo(null)).toBe('N/A')
+        expect(wrapper.vm.timeAgo(now)).toBe('Justo ahora')
+        expect(wrapper.vm.timeAgo(new Date(now - 61 * 1000))).toContain('min')
+        expect(wrapper.vm.timeAgo(new Date(now - 2 * 3600 * 1000))).toContain('horas')
+        expect(wrapper.vm.timeAgo(new Date(now - 2 * 86400 * 1000))).toContain('días')
+        expect(wrapper.vm.timeAgo(new Date(now - 2 * 2592000 * 1000))).toContain('meses')
+        expect(wrapper.vm.timeAgo(new Date(now - 2 * 31536000 * 1000))).toContain('años')
+    })
+
+    it('getTimelineProgress returns 0, normal, min/max', async () => {
+        vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+        const wrapper = mount(Dashboard)
+        await flushPromises()
+        expect(wrapper.vm.getTimelineProgress({})).toBe(0)
+        const now = new Date().toISOString()
+        expect(wrapper.vm.getTimelineProgress({ first_seen: now, last_seen: now })).toBe(0)
+        const first = new Date(Date.now() - 1000 * 60 * 60).toISOString()
+        const last = now
+        const prog = wrapper.vm.getTimelineProgress({ first_seen: first, last_seen: last })
+        expect(prog).toBeGreaterThan(0)
+        expect(prog).toBeLessThanOrEqual(100)
+    })
+
+    it('isRecentlySeen returns true/false/null', async () => {
+        vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+        const wrapper = mount(Dashboard)
+        await flushPromises()
+        expect(wrapper.vm.isRecentlySeen(null)).toBe(false)
+        const now = new Date().toISOString()
+        expect(wrapper.vm.isRecentlySeen(now)).toBe(true)
+        const old = new Date(Date.now() - 2 * 3600 * 1000).toISOString()
+        expect(wrapper.vm.isRecentlySeen(old)).toBe(false)
+    })
+
+    it('getSeverityClass returns all branches', async () => {
+        vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+        const wrapper = mount(Dashboard)
+        await flushPromises()
+        expect(wrapper.vm.getSeverityClass(null)).toBe('badge badge-low')
+        expect(wrapper.vm.getSeverityClass('critical')).toBe('badge badge-critical')
+        expect(wrapper.vm.getSeverityClass('critica')).toBe('badge badge-critical')
+        expect(wrapper.vm.getSeverityClass('high')).toBe('badge badge-critical')
+        expect(wrapper.vm.getSeverityClass('alta')).toBe('badge badge-critical')
+        expect(wrapper.vm.getSeverityClass('medium')).toBe('badge badge-medium')
+        expect(wrapper.vm.getSeverityClass('media')).toBe('badge badge-medium')
+        expect(wrapper.vm.getSeverityClass('low')).toBe('badge badge-low')
+    })
+
+    it('dropdown search and filtering', async () => {
+        const mockVulns = [
+            { agent_name: 'Agent-1', cve_id: 'CVE-1', package_name: 'pkg1', severity: 'critical' },
+            { agent_name: 'Agent-2', cve_id: 'CVE-2', package_name: 'pkg2', severity: 'low' }
+        ]
+        vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
+        const wrapper = mount(Dashboard)
+        await flushPromises()
+        wrapper.vm.search.agent = 'Agent-1'
+        expect(wrapper.vm.filteredAgents.length).toBe(1)
+        wrapper.vm.search.vuln = 'CVE-2'
+        expect(wrapper.vm.filteredCVEOptions.length).toBe(1)
+        wrapper.vm.search.package = 'pkg1'
+        expect(wrapper.vm.filteredPackages.length).toBe(1)
+    })
+
+    it('score filter min only, max only, both', async () => {
+        const mockVulns = [
+            { score_base: 2 },
+            { score_base: 5 },
+            { score_base: 8 }
+        ]
+        vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
+        const wrapper = mount(Dashboard)
+        await flushPromises()
+        wrapper.vm.scoreMin = 5
+        await wrapper.vm.$nextTick()
+        expect(wrapper.vm.sortedVulns.length).toBe(2)
+        wrapper.vm.scoreMin = ''
+        wrapper.vm.scoreMax = 5
+        await wrapper.vm.$nextTick()
+        expect(wrapper.vm.sortedVulns.length).toBe(2)
+        wrapper.vm.scoreMin = 5
+        wrapper.vm.scoreMax = 5
+        await wrapper.vm.$nextTick()
+        expect(wrapper.vm.sortedVulns.length).toBe(1)
+    })
+
+    it('sortBy with empty sortKey returns default order', async () => {
+        const mockVulns = [
+            { agent_name: 'A', last_seen: '2026-03-08T12:00:00Z' },
+            { agent_name: 'B', last_seen: '2026-03-08T13:00:00Z' }
+        ]
+        vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
+        const wrapper = mount(Dashboard)
+        await flushPromises()
+        wrapper.vm.sortBy('agent_name')
+        wrapper.vm.sortBy('agent_name')
+        wrapper.vm.sortBy('agent_name') // clears sortKey
+        await wrapper.vm.$nextTick()
+        expect(wrapper.vm.sortKey).toBe('')
+        expect(wrapper.vm.sortedVulns.length).toBe(2)
+    })
+
+    it('dropdown open/close logic', async () => {
+        const mockVulns = [
+            { agent_name: 'Agent-1', cve_id: 'CVE-1', package_name: 'pkg1', severity: 'critical' }
+        ]
+        vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
+        const wrapper = mount(Dashboard)
+        await flushPromises()
+        wrapper.vm.dropdowns.agents = true
+        expect(wrapper.vm.dropdowns.agents).toBe(true)
+        wrapper.vm.dropdowns.agents = false
+        expect(wrapper.vm.dropdowns.agents).toBe(false)
+        wrapper.vm.dropdowns.vulns = true
+        expect(wrapper.vm.dropdowns.vulns).toBe(true)
+        wrapper.vm.dropdowns.vulns = false
+        expect(wrapper.vm.dropdowns.vulns).toBe(false)
+        wrapper.vm.dropdowns.packages = true
+        expect(wrapper.vm.dropdowns.packages).toBe(true)
+        wrapper.vm.dropdowns.packages = false
+        expect(wrapper.vm.dropdowns.packages).toBe(false)
+        wrapper.vm.dropdowns.severity = true
+        expect(wrapper.vm.dropdowns.severity).toBe(true)
+        wrapper.vm.dropdowns.severity = false
+        expect(wrapper.vm.dropdowns.severity).toBe(false)
+    })
 })
