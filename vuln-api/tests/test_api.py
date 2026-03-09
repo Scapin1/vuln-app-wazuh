@@ -413,6 +413,7 @@ def test_list_vulns_limit_zero(mock_fetch, client, db_session):
     assert client.get("/vulns?limit=0", headers=_get_headers(client)).json() == []
 
 
+@patch("app.main.fetch_all_vulns", return_value=MOCK_VULN)
 def test_list_vulns_shows_connection_name(mock_fetch, client, db_session):
     # newly added test ensures connection_name field is returned
     _create_user(db_session)
