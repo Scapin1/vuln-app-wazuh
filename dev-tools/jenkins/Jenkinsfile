@@ -86,26 +86,6 @@ EOF
             }
         }
 
-        stage('CD: Deploy to Development') {
-            steps {
-                script {
-                    sh '''
-                        # 1. Crear carpeta para los certificados
-                        mkdir -p ./nginx/ssl
-                        
-                        # 2. Generar certificado temporal (solo para que Nginx levante en Jenkins)
-                        openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
-                            -keyout ./nginx/ssl/nginx-selfsigned.key \
-                            -out ./nginx/ssl/nginx-selfsigned.crt \
-                            -subj "/C=CL/ST=RM/L=Santiago/O=Jenkins/CN=localhost" 2>/dev/null || true
-
-                        # 3. Desplegar
-                        docker compose up -d --build
-                    '''
-                }
-            }
-        }
-
         stage('DAST: OWASP ZAP Dynamic Scan'){
             steps {
                 script {
