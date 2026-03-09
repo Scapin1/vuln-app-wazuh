@@ -27,9 +27,9 @@
           <table v-else-if="users.length > 0" aria-label="Lista de usuarios administradores">
             <thead>
               <tr>
-                <th width="20%">ID</th>
-                <th width="70%">Nombre de usuario</th>
-                <th width="10%"></th>
+                <th style="width:20%;">ID</th>
+                <th style="width:70%;">Nombre de usuario</th>
+                <th style="width:10%;"></th>
               </tr>
             </thead>
             <tbody>
