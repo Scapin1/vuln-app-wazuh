@@ -12,9 +12,9 @@ vi.mock('@/application/services/vulnService', () => ({
 }))
 
 vi.mock('@/application/services/wazuhService', () => ({
-  default: {
-    getConnections: vi.fn()
-  }
+    default: {
+        getConnections: vi.fn()
+    }
 }))
 
 describe('Dashboard.vue', () => {
@@ -25,7 +25,7 @@ describe('Dashboard.vue', () => {
             severity: 'critical',
             cve_id: 'CVE-2023-1234',
             first_seen: new Date().toISOString(),
-            last_seen: new Date().toISOString(),
+            last_seen: new Date().toISOString(), // More recent
             agent_name: 'Agent-1',
             package_name: 'bash',
             package_version: '5.0'
@@ -36,7 +36,7 @@ describe('Dashboard.vue', () => {
             severity: 'low',
             cve_id: 'CVE-2022-0001',
             first_seen: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-            last_seen: new Date().toISOString(),
+            last_seen: new Date(Date.now() - 1000 * 60 * 60).toISOString(), // Older
             agent_name: 'Agent-2',
             package_name: 'curl',
             package_version: '7.0'
@@ -226,8 +226,8 @@ describe('Dashboard.vue', () => {
         vulnService.getVulns.mockResolvedValueOnce({ data: [] })
         wazuhService.getConnections.mockResolvedValueOnce({
             data: [
-            { id: 1, name: 'Conn A' },
-            { id: 2, name: 'Conn B' }
+                { id: 1, name: 'Conn A' },
+                { id: 2, name: 'Conn B' }
             ]
         })
 
@@ -290,28 +290,28 @@ describe('Dashboard.vue', () => {
     it('filters vulnerabilities by maximum score', async () => {
         const mockVulnsWithScore = [
             {
-            id: 1,
-            connection_name: 'Conn A',
-            severity: 'critical',
-            cve_id: 'CVE-2023-1234',
-            first_seen: new Date().toISOString(),
-            last_seen: new Date().toISOString(),
-            agent_name: 'Agent-1',
-            package_name: 'bash',
-            package_version: '5.0',
-            score_base: 9.8
+                id: 1,
+                connection_name: 'Conn A',
+                severity: 'critical',
+                cve_id: 'CVE-2023-1234',
+                first_seen: new Date().toISOString(),
+                last_seen: new Date().toISOString(),
+                agent_name: 'Agent-1',
+                package_name: 'bash',
+                package_version: '5.0',
+                score_base: 9.8
             },
             {
-            id: 2,
-            connection_name: 'Conn B',
-            severity: 'low',
-            cve_id: 'CVE-2022-0001',
-            first_seen: new Date().toISOString(),
-            last_seen: new Date().toISOString(),
-            agent_name: 'Agent-2',
-            package_name: 'curl',
-            package_version: '7.0',
-            score_base: 4.2
+                id: 2,
+                connection_name: 'Conn B',
+                severity: 'low',
+                cve_id: 'CVE-2022-0001',
+                first_seen: new Date().toISOString(),
+                last_seen: new Date().toISOString(),
+                agent_name: 'Agent-2',
+                package_name: 'curl',
+                package_version: '7.0',
+                score_base: 4.2
             }
         ]
 
@@ -987,6 +987,35 @@ describe('Dashboard.vue', () => {
 
             const date = new Date(Date.now() - 1000 * 60 * 60 * 24 + 1000)
             expect(wrapper.vm.isNew(date.toISOString())).toBe(true)
+        })
+        it('covers additional edge cases and template functions', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+            wazuhService.getConnections.mockRejectedValueOnce(new Error('Fetch error'))
+
+            const wrapper = mount(Dashboard, { attachTo: document.body })
+            await flushPromises()
+
+            // fetchConnections error branch
+            expect(wrapper.vm.connections).toEqual([])
+
+            // fetchVulns no data branch
+            vulnService.getVulns.mockResolvedValueOnce({ data: null })
+            await wrapper.vm.fetchVulns()
+            expect(wrapper.vm.vulns).toEqual([])
+
+            // Click outside functions (anonymous in template)
+            wrapper.vm.dropdowns.agents = true
+            wrapper.vm.dropdowns.vulns = true
+            wrapper.vm.dropdowns.packages = true
+            wrapper.vm.dropdowns.severity = true
+
+            document.body.click()
+            await wrapper.vm.$nextTick()
+
+            expect(wrapper.vm.dropdowns.agents).toBe(false)
+            expect(wrapper.vm.dropdowns.vulns).toBe(false)
+            expect(wrapper.vm.dropdowns.packages).toBe(false)
+            expect(wrapper.vm.dropdowns.severity).toBe(false)
         })
     })
 })

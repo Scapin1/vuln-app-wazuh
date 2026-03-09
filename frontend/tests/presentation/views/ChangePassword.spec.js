@@ -216,15 +216,20 @@ describe('ChangePassword.vue', () => {
         wrapper.vm.newPassword = 'newpass'
         wrapper.vm.confirmPassword = 'newpass'
 
-        // Mock a failure to ensure success is not set back to a value
-        authService.changePassword.mockRejectedValueOnce(new Error('Fail'))
+        // Mock a promise that doesn't resolve yet to capture the intermediate state
+        let resolvePromise;
+        const pendingPromise = new Promise(resolve => { resolvePromise = resolve; });
+        authService.changePassword.mockReturnValueOnce(pendingPromise)
 
         await wrapper.find('form').trigger('submit.prevent')
-        // We don't await flushPromises here to check intermediate state, 
-        // but handleChangePassword is async and clears them immediately before await.
 
+        // Immediate state should be cleared
         expect(wrapper.vm.error).toBe('')
         expect(wrapper.vm.success).toBe('')
+
+        // Cleanup
+        resolvePromise({});
+        await flushPromises();
     })
 
     it('validates that new passwords must match exactly', async () => {

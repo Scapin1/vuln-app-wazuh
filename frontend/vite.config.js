@@ -20,6 +20,7 @@ export default defineConfig({
       all: true,
       include: ['src/**/*.{js,vue}']
     },
-    include: ['tests/**/*.spec.js']
+    include: ['tests/**/*.spec.js'],
+    setupFiles: ['./tests/setup.js']
   }
 })

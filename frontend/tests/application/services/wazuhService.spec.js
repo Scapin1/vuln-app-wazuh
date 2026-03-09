@@ -59,4 +59,11 @@ describe('wazuhService.js', () => {
         expect(apiClient.delete).toHaveBeenCalledWith('/wazuh-connections/5')
         expect(result).toEqual(mockResponse)
     })
+
+    it('testConnection calls the correct endpoint', async () => {
+        apiClient.post.mockResolvedValueOnce({ data: { ok: true } })
+        const response = await wazuhService.testConnection(123)
+        expect(apiClient.post).toHaveBeenCalledWith('/wazuh-connections/123/test')
+        expect(response.data.ok).toBe(true)
+    })
 })
