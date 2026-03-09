@@ -2,61 +2,11 @@ import axios from 'axios';
 import setupAuthInterceptor from './interceptors/authInterceptor';
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+    baseURL: import.meta.env.VITE_API_URL,
 });
 
 setupAuthInterceptor(apiClient);
 
-
-/*
-export default {
-    
-    get: async (url) => {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                if (url === '/users/me') resolve({ data: mockData.user })
-                if (url === '/vulns') resolve({ data: mockData.vulns })
-                if (url === '/wazuh-config') resolve({ data: { indexer_url: 'https://mock-indexer:9200', user: 'admin', password: '' } })
-
-                resolve({ data: {} })
-            }, MOCK_DELAY)
-        })
-    },
-    post: async (url, data) => {
-        return new Promise((resolve, reject) => {
-            setTimeout(() => {
-                if (url === '/auth/login') {
-                    // Acepta cualquier login
-                    resolve({ data: { access_token: 'dummy-token-123' } })
-                }
-                if (url === '/auth/change-password') resolve({ data: { message: 'ok' } })
-                if (url === '/users') resolve({ data: { message: 'ok' } })
-                if (url === '/vulns/sync') {
-                    // Agregar una vulnerabilidad aleatoria al sincronizar
-                    mockData.vulns.unshift({
-                        id: Date.now(),
-                        cve_id: 'CVE-2024-' + Math.floor(Math.random() * 9000 + 1000),
-                        severity: ['critical', 'high', 'medium', 'low'][Math.floor(Math.random() * 4)],
-                        agent_name: 'agente-nuevo-0' + Math.floor(Math.random() * 9),
-                        package_name: 'paquete-random',
-                        package_version: '1.0.' + Math.floor(Math.random() * 10),
-                        first_seen: new Date().toISOString(),
-                        last_seen: new Date().toISOString()
-                    })
-                    resolve({ data: { synced: 1 } })
-                }
-
-                resolve({ data: {} })
-            }, MOCK_DELAY)
-        })
-    },
-    put: async (url, data) => {
-        return new Promise((resolve) => {
-            setTimeout(() => resolve({ data: { message: 'Configuración actualizada.' } }), MOCK_DELAY)
-        })
-    }
-}
-*/
 const MOCK_DELAY = 500;
 
 const mockData = {
