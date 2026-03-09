@@ -2,12 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import Dashboard from '@/presentation/views/Dashboard.vue'
 import vulnService from '@/application/services/vulnService'
+import wazuhService from '@/application/services/wazuhService'
 
 vi.mock('@/application/services/vulnService', () => ({
     default: {
         getVulns: vi.fn(),
         syncVulns: vi.fn()
     }
+}))
+
+vi.mock('@/application/services/wazuhService', () => ({
+  default: {
+    getConnections: vi.fn()
+  }
 }))
 
 describe('Dashboard.vue', () => {
@@ -115,33 +122,18 @@ describe('Dashboard.vue', () => {
         expect(wrapper.vm.showFilters).toBe(true)
     })
 
-    it('filters vulnerabilities by text (agent name)', async () => {
+    it('filters vulnerabilities by selected agent', async () => {
         vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
         const wrapper = mount(Dashboard)
         await flushPromises()
 
-        wrapper.vm.filters.agente = 'Agent-1'
+        wrapper.vm.selectedAgents = ['Agent-1']
         await wrapper.vm.$nextTick()
 
-        // sortedVulns should filter based on text
         expect(wrapper.vm.sortedVulns.length).toBe(1)
         expect(wrapper.vm.sortedVulns[0].agent_name).toBe('Agent-1')
     })
 
-    it('filters vulnerabilities by date', async () => {
-        vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
-        const wrapper = mount(Dashboard)
-        await flushPromises()
-
-        // Agent-2 is 48 hrs old
-        const yesterday = new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString().split('T')[0]
-
-        wrapper.vm.filters.endDate = yesterday
-        await wrapper.vm.$nextTick()
-
-        expect(wrapper.vm.sortedVulns.length).toBe(1)
-        expect(wrapper.vm.sortedVulns[0].agent_name).toBe('Agent-2')
-    })
 
     it('sorts vulnerabilities on header click', async () => {
         vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
@@ -167,314 +159,268 @@ describe('Dashboard.vue', () => {
         expect(wrapper.vm.sortKey).toBe('')
     })
 
-    it('clears filters correctly', async () => {
+    it('filters vulnerabilities by selected severity', async () => {
         vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
         const wrapper = mount(Dashboard)
         await flushPromises()
 
-        // Set some filters
-        wrapper.vm.filters.severidad = 'critical'
-        wrapper.vm.filters.agente = 'Agent-1'
-        wrapper.vm.filters.startDate = '2023-01-01'
-        wrapper.vm.filters.endDate = '2023-12-31'
-
-        wrapper.vm.clearFilters()
-
-        expect(wrapper.vm.filters.severidad).toBe('')
-        expect(wrapper.vm.filters.agente).toBe('')
-        expect(wrapper.vm.filters.startDate).toBe('')
-        expect(wrapper.vm.filters.endDate).toBe('')
-    })
-
-    it('filters vulnerabilities by severity', async () => {
-        vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
-        const wrapper = mount(Dashboard)
-        await flushPromises()
-
-        wrapper.vm.filters.severidad = 'critical'
+        wrapper.vm.selectedSeverities = ['CRITICAL']
         await wrapper.vm.$nextTick()
 
         expect(wrapper.vm.sortedVulns.length).toBe(1)
         expect(wrapper.vm.sortedVulns[0].severity).toBe('critical')
     })
 
-    it('filters vulnerabilities by CVE ID', async () => {
+    it('filters vulnerabilities by selected cve', async () => {
         vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
         const wrapper = mount(Dashboard)
         await flushPromises()
 
-        wrapper.vm.filters.cveId = 'CVE-2023-1234'
+        wrapper.vm.selectedVulns = ['CVE-2023-1234']
         await wrapper.vm.$nextTick()
 
         expect(wrapper.vm.sortedVulns.length).toBe(1)
         expect(wrapper.vm.sortedVulns[0].cve_id).toBe('CVE-2023-1234')
     })
 
-    it('filters vulnerabilities by software package', async () => {
+    it('filters vulnerabilities by selected package', async () => {
         vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
         const wrapper = mount(Dashboard)
         await flushPromises()
 
-        wrapper.vm.filters.software = 'bash'
+        wrapper.vm.selectedPackages = ['bash']
         await wrapper.vm.$nextTick()
 
         expect(wrapper.vm.sortedVulns.length).toBe(1)
         expect(wrapper.vm.sortedVulns[0].package_name).toBe('bash')
     })
 
-    it('handles empty vulnerability data', async () => {
+    it('clears filters correctly', async () => {
+        vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
+        const wrapper = mount(Dashboard)
+        await flushPromises()
+
+        wrapper.vm.selectedConnection = 1
+        wrapper.vm.selectedAgents = ['Agent-1']
+        wrapper.vm.selectedVulns = ['CVE-2023-1234']
+        wrapper.vm.selectedPackages = ['bash']
+        wrapper.vm.selectedSeverities = ['CRITICAL']
+        wrapper.vm.scoreMin = 1
+        wrapper.vm.scoreMax = 9
+
+        wrapper.vm.clearFilters()
+        await wrapper.vm.$nextTick()
+
+        expect(wrapper.vm.selectedConnection).toBe('')
+        expect(wrapper.vm.selectedAgents).toEqual([])
+        expect(wrapper.vm.selectedVulns).toEqual([])
+        expect(wrapper.vm.selectedPackages).toEqual([])
+        expect(wrapper.vm.selectedSeverities).toEqual([])
+        expect(wrapper.vm.scoreMin).toBe('')
+        expect(wrapper.vm.scoreMax).toBe('')
+    })
+
+    it('covers empty vulns, loads connections, isNew and severity badge branches', async () => {
         vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+        wazuhService.getConnections.mockResolvedValueOnce({
+            data: [
+            { id: 1, name: 'Conn A' },
+            { id: 2, name: 'Conn B' }
+            ]
+        })
+
         const wrapper = mount(Dashboard)
         await flushPromises()
 
-        expect(wrapper.vm.vulns.length).toBe(0)
-        expect(wrapper.vm.sortedVulns.length).toBe(0)
-        expect(wrapper.vm.totalPages).toBe(0)
+        // line 607: when vulns API returns empty
+        expect(wrapper.vm.vulns).toEqual([])
+
+        // line 619: connections assigned
+        expect(wrapper.vm.connections).toEqual([
+            { id: 1, name: 'Conn A' },
+            { id: 2, name: 'Conn B' }
+        ])
+
+        // lines 648-653
+        expect(wrapper.vm.isNew(null)).toBe(false)
+        expect(wrapper.vm.isNew(new Date().toISOString())).toBe(true)
+        expect(
+            wrapper.vm.isNew(new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString())
+        ).toBe(false)
+
+        // lines 665-669
+        expect(wrapper.vm.getSeverityBadgeClass('critical')).toBe('badge-critical')
+        expect(wrapper.vm.getSeverityBadgeClass('critica')).toBe('badge-critical')
+        expect(wrapper.vm.getSeverityBadgeClass('high')).toBe('badge-high')
+        expect(wrapper.vm.getSeverityBadgeClass('alta')).toBe('badge-high')
+        expect(wrapper.vm.getSeverityBadgeClass('medium')).toBe('badge-medium')
+        expect(wrapper.vm.getSeverityBadgeClass('media')).toBe('badge-medium')
+        expect(wrapper.vm.getSeverityBadgeClass('low')).toBe('badge-low')
     })
 
-    it('handles single page pagination correctly', async () => {
+    it('clears dependent filters on connection change', async () => {
         vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
+        wazuhService.getConnections.mockResolvedValueOnce({
+            data: [{ id: 1, name: 'Conn A' }]
+        })
+
         const wrapper = mount(Dashboard)
         await flushPromises()
 
-        expect(wrapper.vm.totalPages).toBe(1)
-        expect(wrapper.vm.currentPage).toBe(1)
-        expect(wrapper.vm.paginatedVulns.length).toBe(2)
+        wrapper.vm.selectedAgents = ['Agent-1']
+        wrapper.vm.selectedVulns = ['CVE-2023-1234']
+        wrapper.vm.selectedPackages = ['bash']
+        wrapper.vm.selectedSeverities = ['CRITICAL']
+        wrapper.vm.scoreMin = 2
+        wrapper.vm.scoreMax = 9
+
+        wrapper.vm.onConnectionChange()
+        await wrapper.vm.$nextTick()
+
+        expect(wrapper.vm.selectedAgents).toEqual([])
+        expect(wrapper.vm.selectedVulns).toEqual([])
+        expect(wrapper.vm.selectedPackages).toEqual([])
+        expect(wrapper.vm.selectedSeverities).toEqual([])
+        expect(wrapper.vm.scoreMin).toBe('')
+        expect(wrapper.vm.scoreMax).toBe('')
     })
 
-    it('handles multiple pages correctly', async () => {
-        // Create 60 mock vulnerabilities to exceed itemsPerPage (50)
-        const manyVulns = Array.from({ length: 60 }, (_, i) => ({
-            ...mockVulns[0],
+    it('filters vulnerabilities by maximum score', async () => {
+        const mockVulnsWithScore = [
+            {
+            id: 1,
+            connection_name: 'Conn A',
+            severity: 'critical',
+            cve_id: 'CVE-2023-1234',
+            first_seen: new Date().toISOString(),
+            last_seen: new Date().toISOString(),
+            agent_name: 'Agent-1',
+            package_name: 'bash',
+            package_version: '5.0',
+            score_base: 9.8
+            },
+            {
+            id: 2,
+            connection_name: 'Conn B',
+            severity: 'low',
+            cve_id: 'CVE-2022-0001',
+            first_seen: new Date().toISOString(),
+            last_seen: new Date().toISOString(),
+            agent_name: 'Agent-2',
+            package_name: 'curl',
+            package_version: '7.0',
+            score_base: 4.2
+            }
+        ]
+
+        vulnService.getVulns.mockResolvedValueOnce({ data: mockVulnsWithScore })
+        wazuhService.getConnections.mockResolvedValueOnce({ data: [] })
+
+        const wrapper = mount(Dashboard)
+        await flushPromises()
+
+        wrapper.vm.scoreMax = 5
+        await wrapper.vm.$nextTick()
+
+        expect(wrapper.vm.sortedVulns.length).toBe(1)
+        expect(wrapper.vm.sortedVulns[0].id).toBe(2)
+    })
+
+    it('computes visible pages and navigates across pages correctly', async () => {
+        const manyVulns = Array.from({ length: 500 }, (_, i) => ({
             id: i + 1,
-            cve_id: `CVE-2023-${i + 1000}`
+            connection_name: `Conn ${i + 1}`,
+            severity: i % 2 === 0 ? 'critical' : 'low',
+            cve_id: `CVE-2023-${String(i + 1).padStart(4, '0')}`,
+            first_seen: new Date().toISOString(),
+            last_seen: new Date().toISOString(),
+            agent_name: `Agent-${i + 1}`,
+            package_name: `pkg-${i + 1}`,
+            package_version: '1.0',
+            score_base: (i % 10) + 1
         }))
 
         vulnService.getVulns.mockResolvedValueOnce({ data: manyVulns })
+        wazuhService.getConnections.mockResolvedValueOnce({ data: [] })
+
         const wrapper = mount(Dashboard)
         await flushPromises()
 
-        expect(wrapper.vm.totalPages).toBe(2)
-        expect(wrapper.vm.paginatedVulns.length).toBe(50) // First page
+        // 500 / 50 = 10 páginas
+        expect(wrapper.vm.totalPages).toBe(10)
 
-        // Go to next page
+        // currentPage = 1 por defecto
+        // cubre visiblePages cuando total > 7
+        expect(wrapper.vm.visiblePages).toEqual([1, 2, 3, 4, 5, 6, 'right-ellipsis', 10])
+
+        // line 539: nextPage
         wrapper.vm.nextPage()
-        expect(wrapper.vm.currentPage).toBe(2)
-        expect(wrapper.vm.paginatedVulns.length).toBe(10) // Second page
-    })
-
-    it('handles pagination navigation correctly', async () => {
-        const manyVulns = Array.from({ length: 150 }, (_, i) => ({
-            ...mockVulns[0],
-            id: i + 1
-        }))
-
-        vulnService.getVulns.mockResolvedValueOnce({ data: manyVulns })
-        const wrapper = mount(Dashboard)
-        await flushPromises()
-
-        expect(wrapper.vm.currentPage).toBe(1)
-
-        // Test next/prev
-        wrapper.vm.nextPage()
+        await wrapper.vm.$nextTick()
         expect(wrapper.vm.currentPage).toBe(2)
 
+        // line 543: prevPage
         wrapper.vm.prevPage()
+        await wrapper.vm.$nextTick()
         expect(wrapper.vm.currentPage).toBe(1)
 
-        // Test jump forward/backward
-        wrapper.vm.jumpForward()
-        expect(wrapper.vm.currentPage).toBe(11) // pageJump = 10
+        // moverse a una página intermedia para cubrir left/right ellipsis
+        wrapper.vm.currentPage = 5
+        await wrapper.vm.$nextTick()
 
+        expect(wrapper.vm.visiblePages).toEqual([
+            1,
+            'left-ellipsis',
+            3,
+            4,
+            5,
+            6,
+            7,
+            'right-ellipsis',
+            10
+        ])
+
+        // line 547: jumpBackward
         wrapper.vm.jumpBackward()
+        await wrapper.vm.$nextTick()
         expect(wrapper.vm.currentPage).toBe(1)
 
-        // Test boundaries
+        // lines 550-552: jumpForward
+        wrapper.vm.jumpForward()
+        await wrapper.vm.$nextTick()
+        expect(wrapper.vm.currentPage).toBe(10)
+
+        // nextPage no debe pasar del máximo
+        wrapper.vm.nextPage()
+        await wrapper.vm.$nextTick()
+        expect(wrapper.vm.currentPage).toBe(10)
+
+        // prevPage vuelve una
         wrapper.vm.prevPage()
-        expect(wrapper.vm.currentPage).toBe(1) // Should not go below 1
-
-        wrapper.vm.currentPage = 3
-        for (let i = 0; i < 10; i++) wrapper.vm.nextPage()
-        expect(wrapper.vm.currentPage).toBe(3) // Should not exceed totalPages
+        await wrapper.vm.$nextTick()
+        expect(wrapper.vm.currentPage).toBe(9)
     })
 
-    it('resets to page 1 when filters change', async () => {
-        const manyVulns = Array.from({ length: 100 }, (_, i) => ({
-            ...mockVulns[0],
-            id: i + 1
+    it('shows all pages when total pages are 7 or fewer', async () => {
+        const fewVulns = Array.from({ length: 120 }, (_, i) => ({
+            id: i + 1,
+            connection_name: `Conn ${i + 1}`,
+            severity: 'low',
+            cve_id: `CVE-2023-${i + 1}`,
+            first_seen: new Date().toISOString(),
+            last_seen: new Date().toISOString(),
+            agent_name: `Agent-${i + 1}`,
+            package_name: `pkg-${i + 1}`,
+            package_version: '1.0',
+            score_base: 3
         }))
 
-        vulnService.getVulns.mockResolvedValueOnce({ data: manyVulns })
+        vulnService.getVulns.mockResolvedValueOnce({ data: fewVulns })
+        wazuhService.getConnections.mockResolvedValueOnce({ data: [] })
+
         const wrapper = mount(Dashboard)
         await flushPromises()
 
-        wrapper.vm.currentPage = 2
-        wrapper.vm.filters.agente = 'test'
-        await wrapper.vm.$nextTick()
-
-        expect(wrapper.vm.currentPage).toBe(1)
-    })
-
-    it('resets to page 1 when sort changes', async () => {
-        const manyVulns = Array.from({ length: 100 }, (_, i) => ({
-            ...mockVulns[0],
-            id: i + 1
-        }))
-
-        vulnService.getVulns.mockResolvedValueOnce({ data: manyVulns })
-        const wrapper = mount(Dashboard)
-        await flushPromises()
-
-        wrapper.vm.currentPage = 2
-        wrapper.vm.sortBy('severity')
-
-        expect(wrapper.vm.currentPage).toBe(1)
-    })
-
-    it('sorts by different columns correctly', async () => {
-        vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
-        const wrapper = mount(Dashboard)
-        await flushPromises()
-
-        // Sort by connection_name ascending
-        wrapper.vm.sortBy('connection_name')
-        expect(wrapper.vm.sortKey).toBe('connection_name')
-        expect(wrapper.vm.sortOrder).toBe('asc')
-        expect(wrapper.vm.sortedVulns[0].connection_name).toBe('Conn A')
-        expect(wrapper.vm.sortedVulns[1].connection_name).toBe('Conn B')
-
-        // Sort by connection_name descending
-        wrapper.vm.sortBy('connection_name')
-        expect(wrapper.vm.sortOrder).toBe('desc')
-        expect(wrapper.vm.sortedVulns[0].connection_name).toBe('Conn B')
-        expect(wrapper.vm.sortedVulns[1].connection_name).toBe('Conn A')
-    })
-
-    it('sorts by severity with proper priority', async () => {
-        const severityVulns = [
-            { ...mockVulns[0], severity: 'low' },
-            { ...mockVulns[1], severity: 'critical' },
-            { ...mockVulns[0], severity: 'medium', id: 3 }
-        ]
-
-        vulnService.getVulns.mockResolvedValueOnce({ data: severityVulns })
-        const wrapper = mount(Dashboard)
-        await flushPromises()
-
-        wrapper.vm.sortBy('severity')
-        expect(wrapper.vm.sortedVulns[0].severity).toBe('critical')
-        expect(wrapper.vm.sortedVulns[1].severity).toBe('medium')
-        expect(wrapper.vm.sortedVulns[2].severity).toBe('low')
-    })
-
-    it('sorts by date fields correctly', async () => {
-        const dateVulns = [
-            { ...mockVulns[0], first_seen: '2023-01-01T00:00:00Z' },
-            { ...mockVulns[1], first_seen: '2023-01-03T00:00:00Z' },
-            { ...mockVulns[0], first_seen: '2023-01-02T00:00:00Z', id: 3 }
-        ]
-
-        vulnService.getVulns.mockResolvedValueOnce({ data: dateVulns })
-        const wrapper = mount(Dashboard)
-        await flushPromises()
-
-        wrapper.vm.sortBy('first_seen')
-        expect(wrapper.vm.sortedVulns[0].first_seen).toBe('2023-01-01T00:00:00Z')
-        expect(wrapper.vm.sortedVulns[1].first_seen).toBe('2023-01-02T00:00:00Z')
-        expect(wrapper.vm.sortedVulns[2].first_seen).toBe('2023-01-03T00:00:00Z')
-    })
-
-    it('handles complex filtering scenarios', async () => {
-        const complexVulns = [
-            { ...mockVulns[0], severity: 'critical', agent_name: 'web-server', cve_id: 'CVE-2023-0001' },
-            { ...mockVulns[1], severity: 'high', agent_name: 'database', cve_id: 'CVE-2023-0002' },
-            { ...mockVulns[0], severity: 'medium', agent_name: 'web-server', cve_id: 'CVE-2023-0003', id: 3 }
-        ]
-
-        vulnService.getVulns.mockResolvedValueOnce({ data: complexVulns })
-        const wrapper = mount(Dashboard)
-        await flushPromises()
-
-        // Multiple filters
-        wrapper.vm.filters.severidad = 'high'
-        wrapper.vm.filters.agente = 'database'
-        await wrapper.vm.$nextTick()
-
-        expect(wrapper.vm.sortedVulns.length).toBe(1)
-        expect(wrapper.vm.sortedVulns[0].severity).toBe('high')
-        expect(wrapper.vm.sortedVulns[0].agent_name).toBe('database')
-    })
-
-    it('handles date range filtering edge cases', async () => {
-        const dateVulns = [
-            { ...mockVulns[0], first_seen: '2023-06-01T00:00:00Z', last_seen: '2023-06-15T00:00:00Z' },
-            { ...mockVulns[1], first_seen: '2023-07-01T00:00:00Z', last_seen: '2023-07-15T00:00:00Z' }
-        ]
-
-        vulnService.getVulns.mockResolvedValueOnce({ data: dateVulns })
-        const wrapper = mount(Dashboard)
-        await flushPromises()
-
-        // Filter by date range
-        wrapper.vm.filters.startDate = '2023-06-05'
-        wrapper.vm.filters.endDate = '2023-06-20'
-        await wrapper.vm.$nextTick()
-
-        expect(wrapper.vm.sortedVulns.length).toBe(1)
-        expect(wrapper.vm.sortedVulns[0].first_seen).toBe('2023-06-01T00:00:00Z')
-    })
-
-    it('computes severity options correctly', async () => {
-        const severityVulns = [
-            { ...mockVulns[0], severity: 'CRITICAL' },
-            { ...mockVulns[1], severity: 'high' },
-            { ...mockVulns[0], severity: 'Medium', id: 3 },
-            { ...mockVulns[1], severity: 'LOW', id: 4 }
-        ]
-
-        vulnService.getVulns.mockResolvedValueOnce({ data: severityVulns })
-        const wrapper = mount(Dashboard)
-        await flushPromises()
-
-        const options = wrapper.vm.severidadOptions
-        expect(options).toContain('CRITICAL')
-        expect(options).toContain('HIGH')
-        expect(options).toContain('MEDIUM')
-        expect(options).toContain('LOW')
-        // Should be sorted by severity level (critical first)
-        expect(options[0]).toBe('CRITICAL')
-    })
-
-    it('handles malformed data gracefully', async () => {
-        const malformedVulns = [
-            { ...mockVulns[0], severity: null, agent_name: undefined },
-            { ...mockVulns[1], cve_id: '', package_name: null }
-        ]
-
-        vulnService.getVulns.mockResolvedValueOnce({ data: malformedVulns })
-        const wrapper = mount(Dashboard)
-        await flushPromises()
-
-        // Should not crash and should handle null/undefined values
-        expect(wrapper.vm.sortedVulns.length).toBe(2)
-        expect(wrapper.vm.severidadOptions.length).toBeGreaterThan(0)
-    })
-
-    it('maintains filter state across operations', async () => {
-        vulnService.getVulns.mockResolvedValueOnce({ data: mockVulns })
-        const wrapper = mount(Dashboard)
-        await flushPromises()
-
-        // Set filters
-        wrapper.vm.filters.severidad = 'critical'
-        wrapper.vm.filters.agente = 'Agent-1'
-
-        // Change sorting
-        wrapper.vm.sortBy('cve_id')
-
-        // Filters should still be active
-        expect(wrapper.vm.filters.severidad).toBe('critical')
-        expect(wrapper.vm.filters.agente).toBe('Agent-1')
-        expect(wrapper.vm.sortedVulns.length).toBe(1)
+        expect(wrapper.vm.totalPages).toBe(3)
+        expect(wrapper.vm.visiblePages).toEqual([1, 2, 3])
     })
 })

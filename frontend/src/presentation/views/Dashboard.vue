@@ -7,12 +7,6 @@
         <p class="subtitle">Visualiza y gestiona el inventario de vulnerabilidades reportado por Wazuh.</p>
       </div>
       <div>
-        <button class="btn btn-secondary" @click="showFilters = !showFilters">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-          </svg>
-          {{ showFilters ? 'Ocultar' : 'Filtros' }}
-        </button>
         <button class="btn btn-primary" @click="syncVulns" :disabled="syncing">
           <svg v-if="syncing" class="spin" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
           <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.5l1.75 1.93"></path></svg>
@@ -21,46 +15,130 @@
       </div>
     </div>
 
-    <!-- Filter Tray -->
-    <div v-show="showFilters" class="filter-tray fade-in">
-      <div class="filter-grid">
-        <div class="filter-item">
-          <label>Severidad</label>
-          <input v-model="filters.severidad" type="text" placeholder="CRITICAL, HIGH..." class="filter-input">
-        </div>
-        <div class="filter-item">
-          <label>CVE ID</label>
-          <input v-model="filters.cveId" type="text" placeholder="CVE-2023-..." class="filter-input">
-        </div>
-        <div class="filter-item">
-          <label>Agente</label>
-          <input v-model="filters.agente" type="text" placeholder="Nombre del agente..." class="filter-input">
-        </div>
-        <div class="filter-item">
-          <label>Software Afectado</label>
-          <input v-model="filters.software" type="text" placeholder="Nombre del paquete..." class="filter-input">
-        </div>
-        <div class="filter-item" style="grid-column: span 2;">
-          <label>Rango de Fechas</label>
-          <div style="display: flex; gap: 0.5rem;">
-            <div style="flex: 1;">
-              <input v-model="filters.startDate" type="date" class="filter-input" style="width: 100%;">
-            </div>
-            <div style="flex: 1;">
-              <input v-model="filters.endDate" type="date" class="filter-input" style="width: 100%;">
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="filter-actions">
-        <button class="btn btn-outline" @click="clearFilters">Limpiar Filtros</button>
-      </div>
-    </div>
-
     <!-- Error/Loading states -->
     <div v-if="error" class="alert alert-danger fade-in">
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
       {{ error }}
+    </div>
+
+    <!-- Filter Toggle Bar (minimalista) -->
+    <div v-if="!loading && vulns.length > 0" class="filter-toggle-bar">
+      <button class="btn-filter-toggle" @click="showFilters = !showFilters">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+        </svg>
+        <span>{{ showFilters ? 'Ocultar filtros' : 'Filtros avanzados' }}</span>
+      </button>
+      <button v-if="showFilters" class="btn-clear-filters" @click="clearFilters">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 6h18"></path>
+          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+        </svg>
+        <span>Limpiar</span>
+      </button>
+    </div>
+
+    <!-- Dashboard Filters -->
+    <div v-show="showFilters" class="card filter-panel">
+      <div class="filter-row">
+        <div class="f-group">
+          <label>Conexión Wazuh</label>
+          <select v-model="selectedConnection" @change="onConnectionChange" class="filter-input">
+            <option value="">Todas las conexiones</option>
+            <option v-for="conn in connections" :key="conn.id" :value="conn.id">{{ conn.name }}</option>
+          </select>
+        </div>
+
+        <div class="f-group popover-wrap" v-click-outside="() => (dropdowns.agents = false)">
+          <label>Agentes</label>
+          <button class="filter-input dd-btn" @click="dropdowns.agents = !dropdowns.agents" :disabled="!agentOptions.length">
+            <span>{{ selectedAgents.length ? selectedAgents.length + ' sel.' : 'Todos' }}</span>
+            <span>▼</span>
+          </button>
+          <div v-if="dropdowns.agents" class="dd-panel fade-in">
+            <input type="text" v-model="search.agent" placeholder="Buscar agente..." class="dd-search">
+            <div class="dd-actions">
+              <span @click="selectedAgents = [...agentOptions]">Todos</span>
+              <span @click="selectedAgents = []">Limpiar</span>
+            </div>
+            <div class="dd-list custom-scroll">
+              <label v-for="agent in filteredAgents" :key="agent" class="dd-item">
+                <input type="checkbox" :value="agent" v-model="selectedAgents"> {{ agent }}
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="f-group popover-wrap" v-click-outside="() => (dropdowns.vulns = false)">
+          <label>CVE ID</label>
+          <button class="filter-input dd-btn" @click="dropdowns.vulns = !dropdowns.vulns" :disabled="!vulnOptions.length">
+            <span>{{ selectedVulns.length ? selectedVulns.length + ' sel.' : 'Todas' }}</span>
+            <span>▼</span>
+          </button>
+          <div v-if="dropdowns.vulns" class="dd-panel fade-in">
+            <input type="text" v-model="search.vuln" placeholder="Buscar CVE..." class="dd-search">
+            <div class="dd-actions">
+              <span @click="selectedVulns = [...vulnOptions]">Todas</span>
+              <span @click="selectedVulns = []">Limpiar</span>
+            </div>
+            <div class="dd-list custom-scroll">
+              <label v-for="vuln in filteredCVEOptions" :key="vuln" class="dd-item">
+                <input type="checkbox" :value="vuln" v-model="selectedVulns"> {{ vuln }}
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="f-group popover-wrap" v-click-outside="() => (dropdowns.packages = false)">
+          <label>Software Afectado</label>
+          <button class="filter-input dd-btn" @click="dropdowns.packages = !dropdowns.packages" :disabled="!packageOptions.length">
+            <span>{{ selectedPackages.length ? selectedPackages.length + ' sel.' : 'Todos' }}</span>
+            <span>▼</span>
+          </button>
+          <div v-if="dropdowns.packages" class="dd-panel fade-in">
+            <input type="text" v-model="search.package" placeholder="Buscar software..." class="dd-search">
+            <div class="dd-actions">
+              <span @click="selectedPackages = [...packageOptions]">Todos</span>
+              <span @click="selectedPackages = []">Limpiar</span>
+            </div>
+            <div class="dd-list custom-scroll">
+              <label v-for="pkg in filteredPackages" :key="pkg" class="dd-item">
+                <input type="checkbox" :value="pkg" v-model="selectedPackages"> {{ pkg }}
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="f-group popover-wrap" v-click-outside="() => (dropdowns.severity = false)">
+          <label>Severidad</label>
+          <button class="filter-input dd-btn" @click="dropdowns.severity = !dropdowns.severity" :disabled="!severityOptions.length">
+            <span>{{ selectedSeverities.length ? selectedSeverities.length + ' sel.' : 'Todas' }}</span>
+            <span>▼</span>
+          </button>
+          <div v-if="dropdowns.severity" class="dd-panel fade-in">
+            <div class="dd-actions">
+              <span @click="selectedSeverities = [...severityOptions]">Todas</span>
+              <span @click="selectedSeverities = []">Limpiar</span>
+            </div>
+            <div class="dd-list custom-scroll">
+              <label v-for="sev in severityOptions" :key="sev" class="dd-item">
+                <input type="checkbox" :value="sev" v-model="selectedSeverities"> 
+                <span :class="'badge-mini ' + getSeverityBadgeClass(sev)">{{ sev }}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="f-group">
+          <label>Score CVSS (Base)</label>
+          <div class="range-inputs">
+            <input type="number" v-model.number="scoreMin" min="0" max="10" step="0.1" placeholder="Min" class="filter-input-sm">
+            <span>-</span>
+            <input type="number" v-model.number="scoreMax" min="0" max="10" step="0.1" placeholder="Max" class="filter-input-sm">
+          </div>
+        </div>
+      </div>
     </div>
 
     <div v-if="loading" class="empty-state">
@@ -113,7 +191,7 @@
           <thead>
             <tr>
               <th width="10%" @click="sortBy('connection_name')">
-                Conexión
+                Conexión Wazuh
                 <span v-if="sortKey === 'connection_name'" class="sort-indicator">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
                     <path d="M7 14l5-5 5 5z"/>
@@ -123,6 +201,14 @@
               <th width="12%" @click="sortBy('severity')">
                 Severidad
                 <span v-if="sortKey === 'severity'" class="sort-indicator">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
+                    <path d="M7 14l5-5 5 5z"/>
+                  </svg>
+                </span>
+              </th>
+              <th width="8%" @click="sortBy('score_base')">
+                Score CVSS
+                <span v-if="sortKey === 'score_base'" class="sort-indicator">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" :class="sortOrder === 'asc' ? '' : 'rotate-180'">
                     <path d="M7 14l5-5 5 5z"/>
                   </svg>
@@ -164,12 +250,15 @@
           </thead>
           <tbody>
             <tr v-for="vuln in paginatedVulns" :key="vuln.id">
+              <td>{{ vuln.connection_name || '-' }}</td>
               <td>
                 <span :class="getSeverityClass(vuln.severity)">
                   {{ (vuln.severity || 'UNKNOWN').toUpperCase() }}
                 </span>
               </td>
-              <td>{{ vuln.connection_name || '-' }}</td>
+              <td class="font-medium score-cell">
+                {{ vuln.score_base != null ? vuln.score_base.toFixed(1) : 'N/A' }}
+              </td>
               <td class="font-medium text-black">{{ vuln.cve_id || 'N/A' }}</td>
               <td>
                 <div class="agent-info">
@@ -261,8 +350,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, reactive } from 'vue'
 import vulnService from '../../application/services/vulnService'
+import wazuhService from '../../application/services/wazuhService'
+import vClickOutside from '../directives/clickOutside'
 
 const vulns = ref([])
 const loading = ref(true)
@@ -277,14 +368,37 @@ const currentPage = ref(1)
 const itemsPerPage = 50
 const pageJump = 10
 
-const filters = ref({
-  severidad: '',
-  cveId: '',
-  agente: '',
-  software: '',
-  startDate: '',
-  endDate: ''
-})
+// Filter state
+const connections = ref([])
+const agentOptions = ref([])
+const vulnOptions = ref([])
+const packageOptions = ref([])
+const severityOptions = ref([])
+
+const selectedConnection = ref('')
+const selectedAgents = ref([])
+const selectedVulns = ref([])
+const selectedPackages = ref([])
+const selectedSeverities = ref([])
+const scoreMin = ref('')
+const scoreMax = ref('')
+
+// Dropdown state
+const search = reactive({ agent: '', vuln: '', package: '' })
+const dropdowns = reactive({ agents: false, vulns: false, packages: false, severity: false })
+
+// Filtered lists for search
+const filteredAgents = computed(() =>
+  agentOptions.value.filter(agent => agent.toLowerCase().includes(search.agent.toLowerCase()))
+)
+
+const filteredCVEOptions = computed(() =>
+  vulnOptions.value.filter(vuln => vuln.toLowerCase().includes(search.vuln.toLowerCase()))
+)
+
+const filteredPackages = computed(() =>
+  packageOptions.value.filter(pkg => pkg.toLowerCase().includes(search.package.toLowerCase()))
+)
 
 const getSeverityLevel = (s) => {
   if (!s) return 0
@@ -318,65 +432,70 @@ const compareValues = (a, b, key) => {
 }
 
 
-const severidadOptions = computed(() => {
-  const severidades = new Set()
+const updateFilterOptions = () => {
+  const agents = new Set()
+  const vulnIds = new Set()
+  const packages = new Set()
+  const severities = new Set()
+
   vulns.value.forEach(vuln => {
-    const severidad = (vuln.severity || 'UNKNOWN').toUpperCase()
-    severidades.add(severidad)
+    if (vuln.agent_name) agents.add(vuln.agent_name)
+    if (vuln.cve_id) vulnIds.add(vuln.cve_id)
+    if (vuln.package_name) packages.add(vuln.package_name)
+    if (vuln.severity) severities.add(vuln.severity.toUpperCase())
   })
-  return Array.from(severidades).sort((a, b) => {
-    // Sort by severity level for better UX
+
+  agentOptions.value = Array.from(agents).sort()
+  vulnOptions.value = Array.from(vulnIds).sort()
+  packageOptions.value = Array.from(packages).sort()
+  severityOptions.value = Array.from(severities).sort((a, b) => {
     const levelA = getSeverityLevel(a.toLowerCase())
     const levelB = getSeverityLevel(b.toLowerCase())
-    return levelB - levelA // Higher severity first
+    return levelB - levelA
+  })
+}
+
+const filteredVulns = computed(() => {
+  return vulns.value.filter(vuln => {
+    // Connection filter
+    if (selectedConnection.value && vuln.connection_id !== selectedConnection.value) {
+      return false
+    }
+
+    // Agents filter
+    if (selectedAgents.value.length > 0 && !selectedAgents.value.includes(vuln.agent_name)) {
+      return false
+    }
+
+    // Vulns filter
+    if (selectedVulns.value.length > 0 && !selectedVulns.value.includes(vuln.cve_id)) {
+      return false
+    }
+
+    // Packages filter
+    if (selectedPackages.value.length > 0 && !selectedPackages.value.includes(vuln.package_name)) {
+      return false
+    }
+
+    // Severities filter
+    if (selectedSeverities.value.length > 0) {
+      const vulnSeverity = (vuln.severity || 'UNKNOWN').toUpperCase()
+      if (!selectedSeverities.value.includes(vulnSeverity)) {
+        return false
+      }
+    }
+
+    // Score filter
+    if (scoreMin.value !== '' || scoreMax.value !== '') {
+      const score = vuln.score_base
+      if (score === null || score === undefined) return false
+      if (scoreMin.value !== '' && score < scoreMin.value) return false
+      if (scoreMax.value !== '' && score > scoreMax.value) return false
+    }
+
+    return true
   })
 })
-
-const normalizeText = (value, fallback = '') => String(value || fallback).toLowerCase()
-
-const textMatches = (value, filterValue) => {
-  if (!filterValue) return true
-  return normalizeText(value).includes(normalizeText(filterValue))
-}
-
-const parseDate = value => (value ? new Date(value) : null)
-
-const inDateRange = (date, start, end) => {
-  if (!date) return false
-  if (start && end) return date >= start && date <= end
-  if (start) return date >= start
-  if (end) return date <= end
-  return true
-}
-
-const dateMatches = vuln => {
-  const { startDate, endDate } = filters.value
-  if (!startDate && !endDate) return true
-
-  const start = parseDate(startDate)
-  const end = parseDate(endDate)
-  const firstSeen = parseDate(vuln.first_seen)
-  const lastSeen = parseDate(vuln.last_seen)
-
-  return inDateRange(firstSeen, start, end) || inDateRange(lastSeen, start, end)
-}
-
-const filteredVulns = computed(() =>
-  vulns.value.filter(vuln => {
-    const severidadText = (vuln.severity || 'UNKNOWN').toUpperCase()
-    const cveText = vuln.cve_id || 'N/A'
-    const agenteText = vuln.agent_name || vuln.agent_id || 'N/A'
-    const softwareText = vuln.package_name || ''
-
-    return (
-      textMatches(severidadText, filters.value.severidad) &&
-      textMatches(cveText, filters.value.cveId) &&
-      textMatches(agenteText, filters.value.agente) &&
-      textMatches(softwareText, filters.value.software) &&
-      dateMatches(vuln)
-    )
-  })
-)
 
 const sortedVulns = computed(() => {
   if (!sortKey.value) return filteredVulns.value
@@ -444,7 +563,13 @@ const jumpForward = () => {
 }
 
 // Al filtrar o ordenar volvemos a la pagina 1
-watch(filters, () => { currentPage.value = 1 }, { deep: true })
+watch(selectedConnection, () => { currentPage.value = 1 })
+watch(selectedAgents, () => { currentPage.value = 1 })
+watch(selectedVulns, () => { currentPage.value = 1 })
+watch(selectedPackages, () => { currentPage.value = 1 })
+watch(selectedSeverities, () => { currentPage.value = 1 })
+watch(scoreMin, () => { currentPage.value = 1 })
+watch(scoreMax, () => { currentPage.value = 1 })
 watch(sortKey, () => { currentPage.value = 1 })
 watch(sortOrder, () => { currentPage.value = 1 })
 
@@ -461,15 +586,24 @@ const sortBy = (key) => {
   }
 }
 
+const onConnectionChange = () => {
+  // When connection changes, clear dependent filters
+  selectedAgents.value = []
+  selectedVulns.value = []
+  selectedPackages.value = []
+  selectedSeverities.value = []
+  scoreMin.value = ''
+  scoreMax.value = ''
+}
+
 const clearFilters = () => {
-  filters.value = {
-    severidad: '',
-    cveId: '',
-    agente: '',
-    software: '',
-    startDate: '',
-    endDate: ''
-  }
+  selectedConnection.value = ''
+  selectedAgents.value = []
+  selectedVulns.value = []
+  selectedPackages.value = []
+  selectedSeverities.value = []
+  scoreMin.value = ''
+  scoreMax.value = ''
 }
 
 const fetchVulns = async () => {
@@ -479,6 +613,7 @@ const fetchVulns = async () => {
     const res = await vulnService.getVulns()
     if (res.data && res.data.length > 0) {
       vulns.value = res.data
+      updateFilterOptions()
     } else {
       vulns.value = []
     }
@@ -486,6 +621,15 @@ const fetchVulns = async () => {
     console.error('Error fetching vulns:', err)
   } finally {
     loading.value = false
+  }
+}
+
+const fetchConnections = async () => {
+  try {
+    const res = await wazuhService.getConnections()
+    connections.value = Array.isArray(res.data) ? res.data : []
+  } catch (err) {
+    console.error('Error fetching connections:', err)
   }
 }
 
@@ -526,6 +670,14 @@ const getSeverityClass = (severity) => {
   if (['critical', 'high', 'alta', 'critica'].includes(s)) return 'badge badge-critical'
   if (['medium', 'media'].includes(s)) return 'badge badge-medium'
   return 'badge badge-low'
+}
+
+const getSeverityBadgeClass = (severity) => {
+  const s = severity.toLowerCase()
+  if (['critical', 'critica'].includes(s)) return 'badge-critical'
+  if (['high', 'alta'].includes(s)) return 'badge-high'
+  if (['medium', 'media'].includes(s)) return 'badge-medium'
+  return 'badge-low'
 }
 
 const isRecentlySeen = (lastSeenDate) => {
@@ -574,6 +726,7 @@ const timeAgo = (date) => {
 }
 
 onMounted(() => {
+  fetchConnections()
   fetchVulns()
 })
 </script>
@@ -710,69 +863,6 @@ th {
 
 .rotate-180 {
   transform: rotate(180deg);
-}
-
-.filter-tray {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.filter-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.filter-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.filter-item label {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--text-main);
-}
-
-.filter-input {
-  padding: 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background-color: var(--bg-input);
-  color: var(--text-main);
-  font-size: 0.9rem;
-}
-
-.filter-input:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-}
-
-.filter-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.btn-outline {
-  background-color: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-main);
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: all 0.2s ease;
-}
-
-.btn-outline:hover {
-  background-color: var(--bg-hover);
-  border-color: var(--text-muted);
 }
 
 .empty-state {
@@ -970,6 +1060,67 @@ th {
   color: #000;
 }
 
+.filter-toggle-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+  margin-bottom: 0.5rem;
+}
+
+.btn-filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.85rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.btn-filter-toggle:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--text-muted);
+  color: var(--text-main);
+}
+
+.btn-filter-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-clear-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.85rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.btn-clear-filters:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.btn-clear-filters svg {
+  width: 16px;
+  height: 16px;
+}
+
 .pagination-ellipsis {
   display: inline-flex;
   align-items: center;
@@ -978,5 +1129,184 @@ th {
   color: var(--text-muted);
   font-size: 0.8rem;
   font-weight: 600;
+}
+
+/* FILTER PANEL STYLES */
+.filter-panel { 
+  padding: 0; 
+  margin-bottom: 1.5rem; 
+  overflow: visible; 
+}
+
+.filter-row { 
+  display: grid; 
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); 
+  align-items: center; 
+}
+
+.f-group { 
+  display: flex; 
+  flex-direction: column; 
+  padding: 1rem 1.2rem; 
+  border-right: 1px solid var(--border); 
+}
+
+.f-group:last-child { 
+  border-right: none; 
+}
+
+.f-group label { 
+  font-size: 0.7rem; 
+  font-weight: 700; 
+  color: var(--text-muted); 
+  text-transform: uppercase; 
+  margin-bottom: 0.5rem; 
+}
+
+.filter-input, .dd-btn { 
+  width: 100%; 
+  padding: 0.55rem 0.8rem; 
+  border: 1px solid var(--border); 
+  background: var(--bg-dark); 
+  border-radius: var(--radius-sm); 
+  color: var(--text-main); 
+  cursor: pointer; 
+  font-size: 0.85rem;
+}
+
+.filter-input:disabled, .dd-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.filter-input-sm {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  background: var(--bg-dark);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  font-size: 0.8rem;
+}
+
+.range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.range-inputs span {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.popover-wrap { 
+  position: relative; 
+}
+
+.dd-btn { 
+  display: flex; 
+  justify-content: space-between; 
+}
+
+.dd-panel { 
+  position: absolute; 
+  top: calc(100% + 6px); 
+  left: 0; 
+  width: 280px; 
+  border: 1px solid var(--border); 
+  border-radius: var(--radius-md); 
+  background: var(--bg-panel); 
+  z-index: 20; 
+  overflow: hidden; 
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.dd-search { 
+  width: 100%; 
+  border: none; 
+  border-bottom: 1px solid var(--border); 
+  padding: 0.65rem 0.9rem; 
+  background: var(--bg-hover); 
+  color: var(--text-main); 
+}
+
+.dd-actions { 
+  display: flex; 
+  justify-content: space-between; 
+  padding: 0.5rem 0.9rem; 
+  border-bottom: 1px solid var(--border); 
+  font-size: 0.75rem; 
+  color: var(--primary); 
+}
+
+.dd-actions span { 
+  cursor: pointer; 
+}
+
+.dd-actions span:hover {
+  text-decoration: underline;
+}
+
+.dd-list { 
+  max-height: 220px; 
+  overflow-y: auto; 
+}
+
+.dd-item { 
+  display: flex; 
+  gap: 0.6rem; 
+  padding: 0.5rem 0.9rem; 
+  font-size: 0.82rem; 
+  cursor: pointer;
+  align-items: center;
+}
+
+.dd-item:hover {
+  background: var(--bg-hover);
+}
+
+.badge-mini {
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.badge-critical {
+  background: rgba(220, 38, 38, 0.15);
+  color: #dc2626;
+}
+
+.badge-high {
+  background: rgba(234, 88, 12, 0.15);
+  color: #ea580c;
+}
+
+.badge-medium {
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+}
+
+.badge-low {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+@media (max-width: 1400px) {
+  .filter-row { 
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); 
+  }
+}
+
+@media (max-width: 1100px) {
+  .filter-row { 
+    grid-template-columns: 1fr 1fr; 
+  }
+  .f-group { 
+    border-right: none; 
+    border-bottom: 1px solid var(--border); 
+  }
 }
 </style>
