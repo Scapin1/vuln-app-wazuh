@@ -1,19 +1,37 @@
 #!/bin/bash
-BUILD_ID=$1
-NETWORK="vuln-app-wazuh_app-network"
+set -euo pipefail
+
+BUILD_ID="${1:-}"
+if [ -z "$BUILD_ID" ]; then
+  echo "ERROR: Falta BUILD_ID. Uso: ./run_zap.sh <build_id>" >&2
+  exit 2
+fi
+
+# Red Docker donde viven los servicios (api/frontend). OJO: estos hostnames NO existen
+# desde el host runner; por eso las comprobaciones se hacen desde un contenedor en la red.
+NETWORK="${ZAP_NETWORK:-vuln-app-wazuh_app-network}"
+
 TARGET_API="http://api:8000/openapi.json"
 TARGET_FRONTEND="http://frontend:80"
+
+docker_curl() {
+  # curl dentro de la red Docker para poder resolver api/frontend.
+  docker run --rm --network="$NETWORK" curlimages/curl:8.12.1 "$@"
+}
 
 echo "--- Iniciando Escaneo Profundo DAST (Build $BUILD_ID) ---"
 
 echo "Esperando a que la API responda en http://api:8000/docs..."
-MAX_RETRIES=30
+MAX_RETRIES=90
 COUNT=0
 
 # Solución al bucle infinito
-until curl --output /dev/null --silent --head --fail http://api:8000/docs; do
+until docker_curl --output /dev/null --silent --head --fail http://api:8000/docs; do
     if [ ${COUNT} -eq ${MAX_RETRIES} ]; then
-        echo -e "\nERROR: La API no levantó después de 60 segundos. Abortando escaneo ZAP."
+        echo -e "\nERROR: La API no levantó después de $((MAX_RETRIES * 2)) segundos. Abortando escaneo ZAP."
+        echo "--- Debug (docker) ---"
+        docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' || true
+        docker logs --tail=200 api || true
         exit 1
     fi
     printf '.'
@@ -24,7 +42,7 @@ done
 echo -e "\n¡La API está lista!"
 
 echo "Obteniendo token de acceso para escaneo autenticado..."
-RESPONSE=$(curl -s -X POST http://api:8000/auth/login \
+RESPONSE=$(docker_curl -s -X POST http://api:8000/auth/login \
     -H "Content-Type: application/x-www-form-urlencoded" \
     -d "username=admin&password=admin")
 
