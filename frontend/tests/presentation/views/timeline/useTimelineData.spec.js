@@ -20,7 +20,9 @@ describe('useTimelineData', () => {
     // El hook calcula rangos usando `new Date()` (now). Congelamos el tiempo
     // para que los tests sean determinísticos tanto local como en CI.
     vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-03-08T12:00:00Z'))
+    // Importante: algunos tests esperan eventos hasta las 15:00 del 2026-03-08.
+    // Si el "now" queda antes, el rango (7d) termina antes y esos eventos quedan fuera.
+    vi.setSystemTime(new Date('2026-03-08T16:00:00Z'))
 
     mockVulnData = [
       {
