@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref } from 'vue'
 import useTimelineData from '@/presentation/views/timeline/useTimelineData'
 import vulnService from '@/application/services/vulnService'
@@ -16,6 +16,11 @@ describe('useTimelineData', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+
+    // El hook calcula rangos usando `new Date()` (now). Congelamos el tiempo
+    // para que los tests sean determinísticos tanto local como en CI.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-08T12:00:00Z'))
 
     mockVulnData = [
       {
@@ -52,6 +57,10 @@ describe('useTimelineData', () => {
     }
 
     timeline = useTimelineData(defaultProps)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   describe('build function', () => {
