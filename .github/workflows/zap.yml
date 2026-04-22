@@ -1,0 +1,52 @@
+name: DAST (OWASP ZAP)
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Todos los días 03:00 UTC
+    - cron: '0 3 * * *'
+
+concurrency:
+  group: zap
+  cancel-in-progress: true
+
+jobs:
+  zap:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    env:
+      # Necesario para que el nombre de red coincida con el script run_zap.sh:
+      # NETWORK="vuln-app-wazuh_app-network"
+      COMPOSE_PROJECT_NAME: vuln-app-wazuh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start stack (docker compose)
+        run: |
+          docker compose up -d --build
+
+      - name: Run ZAP scan
+        run: |
+          mkdir -p reports
+          chmod +x dev-tools/jenkins/scripts/run_zap.sh
+          ./dev-tools/jenkins/scripts/run_zap.sh "${{ github.run_number }}"
+
+      - name: Upload ZAP reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-reports-${{ github.run_number }}
+          path: reports/*.html
+          if-no-files-found: warn
+
+      - name: Tear down stack
+        if: always()
+        run: |
+          docker compose down -v
