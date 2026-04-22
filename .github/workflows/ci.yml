@@ -46,6 +46,8 @@ jobs:
       - name: Backend tests (pytest + coverage)
         working-directory: vuln-api
         env:
+          # Asegura que `import app` resuelva en CI.
+          PYTHONPATH: ${{ github.workspace }}/vuln-api
           # app/db.py requiere DATABASE_URL en import-time.
           DATABASE_URL: sqlite:///./ci.db
           # app/crypto.py requiere ENCRYPTION_KEY.
