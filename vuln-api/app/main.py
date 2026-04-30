@@ -73,7 +73,19 @@ app.add_middleware(
 )
 
 
-@app.post("/auth/login")
+@app.post(
+    "/auth/login",
+    responses={
+        400: {
+            "description": "Credenciales inválidas",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Usuario o contraseña incorrectos"}
+                }
+            },
+        }
+    },
+)
 def login(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Annotated[Session, Depends(get_db)],
@@ -109,7 +121,21 @@ def validate_strong_password(password: str) -> None:
             detail=f"La contraseña no es suficientemente robusta: {', '.join(errors)}",
         )
 
-@app.post("/auth/change-password")
+@app.post(
+    "/auth/change-password",
+    responses={
+        400: {
+            "description": "Error de validación de cambio de contraseña",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "La contraseña antigua es incorrecta"
+                    }
+                }
+            },
+        }
+    },
+)
 def change_password(
     request: ChangePasswordRequest,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -156,7 +182,21 @@ class NewUserRequest(BaseModel):
     password: str
 
 
-@app.post("/users")
+@app.post(
+    "/users",
+    responses={
+        400: {
+            "description": "Nombre de usuario ya existente",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "El nombre de usuario ya esta ocupado. Elige otro."
+                    }
+                }
+            },
+        }
+    },
+)
 def create_user(
     request: NewUserRequest,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -185,7 +225,27 @@ def list_users(
     return [{"id": u.id, "username": u.username} for u in users]
 
 
-@app.delete("/users/{user_id}")
+@app.delete(
+    "/users/{user_id}",
+    responses={
+        400: {
+            "description": "Operación no permitida",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "No puedes eliminarte a ti mismo"}
+                }
+            },
+        },
+        404: {
+            "description": "Usuario no encontrado",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Usuario no encontrado"}
+                }
+            },
+        },
+    },
+)
 def delete_user(
     user_id: int,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -224,7 +284,22 @@ def list_connections(
     ]
 
 
-@app.post("/wazuh-connections", status_code=201)
+@app.post(
+    "/wazuh-connections",
+    status_code=201,
+    responses={
+        400: {
+            "description": "Datos de conexión inválidos o duplicados",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "No se pudo establecer conexión con el indexador Wazuh"
+                    }
+                }
+            },
+        }
+    },
+)
 def create_connection(
     request: WazuhConnectionRequest,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -260,7 +335,19 @@ def create_connection(
     return {"message": "Conexión creada", "id": conn.id}
 
 
-@app.put("/wazuh-connections/{conn_id}")
+@app.put(
+    "/wazuh-connections/{conn_id}",
+    responses={
+        404: {
+            "description": "Conexión no encontrada",
+            "content": {
+                "application/json": {
+                    "example": {"detail": CONNECTION_NOT_FOUND}
+                }
+            },
+        }
+    },
+)
 def update_connection(
     conn_id: int,
     request: WazuhConnectionRequest,
@@ -280,7 +367,19 @@ def update_connection(
     return {"message": "Conexión actualizada"}
 
 
-@app.delete("/wazuh-connections/{conn_id}")
+@app.delete(
+    "/wazuh-connections/{conn_id}",
+    responses={
+        404: {
+            "description": "Conexión no encontrada",
+            "content": {
+                "application/json": {
+                    "example": {"detail": CONNECTION_NOT_FOUND}
+                }
+            },
+        }
+    },
+)
 def delete_connection(
     conn_id: int,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -294,7 +393,19 @@ def delete_connection(
     return {"message": "Conexión eliminada"}
 
 
-@app.post("/wazuh-connections/{conn_id}/test")
+@app.post(
+    "/wazuh-connections/{conn_id}/test",
+    responses={
+        404: {
+            "description": "Conexión no encontrada",
+            "content": {
+                "application/json": {
+                    "example": {"detail": CONNECTION_NOT_FOUND}
+                }
+            },
+        }
+    },
+)
 def test_wazuh_connection(
     conn_id: int,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -316,7 +427,27 @@ def test_wazuh_connection(
     return {"ok": ok, "message": "Conexión exitosa" if ok else "No se pudo conectar"}
 
 
-@app.post("/wazuh-connections/{conn_id}/sync")
+@app.post(
+    "/wazuh-connections/{conn_id}/sync",
+    responses={
+        400: {
+            "description": "Conexión inactiva",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "La conexión está inactiva"}
+                }
+            },
+        },
+        404: {
+            "description": "Conexión no encontrada",
+            "content": {
+                "application/json": {
+                    "example": {"detail": CONNECTION_NOT_FOUND}
+                }
+            },
+        },
+    },
+)
 def sync_connection(
     conn_id: int,
     db: Annotated[Session, Depends(get_db)],
