@@ -116,10 +116,7 @@ def validate_strong_password(password: str) -> None:
     if not re.search(r"[!@#$%^&*(),.?\":{}|<>_\-]", password):
         errors.append("al menos un carácter especial (!@#$%^&*...)")
     if errors:
-        raise HTTPException(
-            status_code=400,
-            detail=f"La contraseña no es suficientemente robusta: {', '.join(errors)}",
-        )
+        raise ValueError(f"La contraseña no es suficientemente robusta: {', '.join(errors)}")
 
 @app.post(
     "/auth/change-password",
@@ -129,7 +126,7 @@ def validate_strong_password(password: str) -> None:
             "content": {
                 "application/json": {
                     "example": {
-                        "detail": "La contraseña antigua es incorrecta"
+                        "detail": "La contraseña no es suficientemente robusta: mínimo 8 caracteres, al menos una letra mayúscula..."
                     }
                 }
             },
@@ -156,7 +153,10 @@ def change_password(
             detail="Las contraseñas nuevas no coinciden",
         )
 
-    validate_strong_password(request.new_password)
+    try:
+        validate_strong_password(request.new_password)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     current_user.password_hash = hash_password(request.new_password)
     current_user.is_active = True 
