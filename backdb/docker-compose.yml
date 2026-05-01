@@ -1,0 +1,40 @@
+services:
+  # Servicio de Base de Datos: TimescaleDB
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: vuln_timescaledb
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+      - LANG=C.UTF-8
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - vuln_network
+    restart: unless-stopped
+
+  # Servicio de Backend: FastAPI
+  backend:
+    build: .
+    container_name: vuln_ts_backend
+    env_file:
+      - .env
+    ports:
+      - "9090:8000"
+    depends_on:
+      - timescaledb
+    networks:
+      - vuln_network
+    restart: always
+
+networks:
+  vuln_network:
+    driver: bridge
+
+volumes:
+  timescaledb_data:
+    name: vuln_timescaledb_data
