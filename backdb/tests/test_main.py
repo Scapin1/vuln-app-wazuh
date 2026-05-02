@@ -64,7 +64,7 @@ app.dependency_overrides[get_current_user] = override_get_current_user
 @pytest.mark.asyncio
 async def test_read_root():
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         response = await ac.get("/")
     assert response.status_code == 200
     assert response.json() == {"message": "API de Evolución de Vulnerabilidades activa"}
@@ -79,7 +79,7 @@ async def test_login_error():
     app.dependency_overrides[get_db] = lambda: mock_db
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {"username": "error@test.cl", "password": "wrongpassword"}
         response = await ac.post("/auth/login", data=payload)
     assert response.status_code == 400 
@@ -96,7 +96,7 @@ async def test_create_manager_success():
     app.dependency_overrides[get_db] = lambda: mock_db
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {
             "nombre": "Wazuh Master",
             "api_url": "https://wazuh.test",
@@ -118,7 +118,7 @@ async def test_get_asset_history_not_found():
     app.dependency_overrides[get_db] = lambda: mock_db
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         response = await ac.get("/detections/asset-inexistente")
     assert response.status_code == 404
 
@@ -141,7 +141,7 @@ async def test_update_asset_success():
     app.dependency_overrides[get_db] = lambda: mock_db
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         response = await ac.patch(f"/assets/{fixed_id}", json={"hostname": "PC-Nuevo"})
     assert response.status_code == 200
 
@@ -155,7 +155,7 @@ async def test_validate_password_weak():
     app.dependency_overrides[get_current_user] = lambda: mock_user
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {
             "old_password": old_pass_val,
             "new_password": weak_pass_val, 
@@ -188,7 +188,7 @@ async def test_detection_evolution_logic():
     app.dependency_overrides[get_db] = lambda: mock_db
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {
             "asset_id": str(uuid.uuid4()), 
             "cve_id": "CVE-2024-TEST", 
@@ -205,7 +205,7 @@ async def test_crud_and_reads():
     user_pass_val = os.getenv("TEST_CREATE_USER_PASS", "SafeUserPass_2026!")
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         await ac.post("/users/", json={
             "user_email": "u@u.cl", 
             "user_name": "U", 
@@ -230,7 +230,7 @@ async def test_patch_updates_and_404():
     app.dependency_overrides[get_db] = lambda: mock_db
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         await ac.patch(f"/managers/{mock_obj.id}", json={"nombre": "Nuevo"})
         res_mock.scalar_one_or_none.return_value = None
         res = await ac.patch(f"/assets/{uuid.uuid4()}", json={"hostname": "X"})
@@ -246,7 +246,7 @@ async def test_auth_login_failures():
     app.dependency_overrides[get_db] = lambda: mock_db
     invalid_pass = os.getenv("TEST_INVALID_PASS", "invalid_password_sequence_2026")  
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {
             "username": "non_existent_user", 
             "password": invalid_pass
@@ -267,7 +267,7 @@ async def test_change_password_logic_branches():
     mock_user.user_password = hash_password(actual_key)
     app.dependency_overrides[get_current_user] = lambda: mock_user
 
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         # Caso A: Clave antigua incorrecta (Línea 86)
         # Enviamos 'wrong_key', por lo que rebotará aquí.
         await ac.post("/auth/change-password", json={
@@ -316,7 +316,7 @@ async def test_detection_evolution_existing_record():
     mock_db.refresh.side_effect = mock_refresh_side_effect
     app.dependency_overrides[get_db] = lambda: mock_db
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {"asset_id": str(uuid.uuid4()), "cve_id": "C1", "package_name": "x", "package_version": "1"}
         res = await ac.post("/detections/", json=payload)
     assert res.status_code == 200
@@ -332,7 +332,7 @@ async def test_catalog_patch_and_manager_404():
     mock_db.refresh.side_effect = mock_refresh_side_effect
     app.dependency_overrides[get_db] = lambda: mock_db
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         # Patch exitoso de Catálogo
         await ac.patch("/catalog/C-1", json={"severity": "Low"})
         # Caso 404 (Línea 249)
@@ -345,7 +345,7 @@ async def test_extra_coverage_posts():
     app.dependency_overrides[get_db] = override_get_db
     safe_pass = os.getenv("TEST_POST_USER_PASS", "Project_Pass_Safe_2026!")
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         await ac.post("/catalog/", json={
             "cve_id": "C-2", 
             "severity": "H", 
@@ -366,7 +366,7 @@ async def test_login_success_path():
     app.dependency_overrides[get_db] = override_get_db
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {
             "username": "admin@usach.cl",
             "password": auth_key
@@ -379,7 +379,7 @@ async def test_login_success_path():
 @pytest.mark.asyncio
 async def test_create_asset_success_logic():
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {
             "wazuh_agent_id": "A-001",
             "hostname": "PC-TEST",
@@ -404,7 +404,7 @@ async def test_update_catalog_success_path():
     app.dependency_overrides[get_db] = lambda: mock_db
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         # Esto ejecuta el commit y el refresh de la línea 292
         response = await ac.patch("/catalog/CVE-2026", json={"severity": "High"})
     assert response.status_code == 200
@@ -419,7 +419,7 @@ async def test_update_manager_not_found():
     app.dependency_overrides[get_db] = lambda: mock_db
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         response = await ac.patch(f"/managers/{uuid.uuid4()}", json={"nombre": "Nuevo"})
     assert response.status_code == 404
 
@@ -427,7 +427,7 @@ async def test_update_manager_not_found():
 async def test_login_wrong_password():
     app.dependency_overrides[get_db] = override_get_db
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         # Usamos el email del mock_user pero con clave errónea
         payload = {"username": "admin@usach.cl", "password": "password_incorrecto"}
         response = await ac.post("/auth/login", data=payload)
@@ -442,7 +442,7 @@ async def test_password_strength_full_errors():
     app.dependency_overrides[get_current_user] = lambda: mock_user
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {
             "old_password": current_key, 
             "new_password": short_key, 
@@ -456,7 +456,7 @@ async def test_password_strength_full_errors():
 @pytest.mark.asyncio
 async def test_create_asset_path_complete():
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {
             "wazuh_agent_id": "NEW-001",
             "hostname": "PC-COBERTURA",
@@ -477,7 +477,7 @@ async def test_update_manager_404_path():
     app.dependency_overrides[get_db] = lambda: mock_db
     
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         response = await ac.patch(f"/managers/{uuid.uuid4()}", json={"nombre": "X"})
     assert response.status_code == 404
 
@@ -494,7 +494,7 @@ async def test_update_catalog_success_final():
     app.dependency_overrides[get_db] = lambda: mock_db
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         response = await ac.patch("/catalog/CVE-2026", json={"severity": "High"})
     assert response.status_code == 200
 
@@ -512,7 +512,7 @@ async def test_change_password_success():
     app.dependency_overrides[get_current_user] = lambda: mock_user
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {
             "old_password": old_key_val,
             "new_password": new_key_val,
@@ -537,7 +537,7 @@ async def test_create_asset_full_coverage():
     app.dependency_overrides[get_db] = lambda: mock_db
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {
             "wazuh_agent_id": "AGT-100",
             "hostname": "PROD-SERVER",
@@ -561,7 +561,7 @@ async def test_get_asset_history_empty_trigger_404():
     app.dependency_overrides[get_db] = lambda: mock_db
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         response = await ac.get(f"/detections/{uuid.uuid4()}")
     
     assert response.status_code == 404
@@ -590,7 +590,7 @@ async def test_create_detection_new_record_path():
     app.dependency_overrides[get_db] = lambda: mock_db
     
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {
             "asset_id": str(uuid.uuid4()), 
             "cve_id": "CVE-2026-NEW", 
@@ -619,7 +619,7 @@ async def test_create_asset_direct_hit():
     app.dependency_overrides[get_db] = lambda: mock_db
     
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {
             "wazuh_agent_id": "101", 
             "hostname": "PC-COV", 
@@ -643,7 +643,7 @@ async def test_update_asset_not_found_trigger():
     app.dependency_overrides[get_db] = lambda: mock_db
     
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         res = await ac.patch(f"/assets/{uuid.uuid4()}", json={"hostname": "X"})
     assert res.status_code == 404
 
