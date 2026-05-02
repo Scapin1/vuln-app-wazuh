@@ -379,12 +379,13 @@ async def test_login_success_path():
 @pytest.mark.asyncio
 async def test_create_asset_success_logic():
     transport = ASGITransport(app=app)
+    test_ip = os.getenv("TEST_ASSET_IP", "127.0.0.1")
     async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {
             "wazuh_agent_id": "A-001",
             "hostname": "PC-TEST",
             "os_version": "Win11",
-            "ip_address": "192.168.1.1",
+            "ip_address": test_ip,
             "manager_id": str(uuid.uuid4())
         }
         response = await ac.post("/assets/", json=payload)
@@ -456,12 +457,13 @@ async def test_password_strength_full_errors():
 @pytest.mark.asyncio
 async def test_create_asset_path_complete():
     transport = ASGITransport(app=app)
+    test_ip = os.getenv("TEST_ASSET_IP", "10.0.0.1")
     async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {
             "wazuh_agent_id": "NEW-001",
             "hostname": "PC-COBERTURA",
             "os_version": "Linux",
-            "ip_address": "10.0.0.1",
+            "ip_address": test_ip,
             "manager_id": str(uuid.uuid4())
         }
         response = await ac.post("/assets/", json=payload)
@@ -537,12 +539,13 @@ async def test_create_asset_full_coverage():
     app.dependency_overrides[get_db] = lambda: mock_db
 
     transport = ASGITransport(app=app)
+    test_ip = os.getenv("TEST_ASSET_IP", "10.0.0.50")
     async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {
             "wazuh_agent_id": "AGT-100",
             "hostname": "PROD-SERVER",
             "os_version": "Debian 12",
-            "ip_address": "10.0.0.50",
+            "ip_address": test_ip,
             "manager_id": str(uuid.uuid4())
         }
         response = await ac.post("/assets/", json=payload)
@@ -607,32 +610,33 @@ async def test_create_detection_new_record_path():
 async def test_create_asset_direct_hit():
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
+    mock_ip_val = os.getenv("TEST_MOCK_IP", "1.1.1.1")
     
-    # Simulamos que la DB asigna un ID al refrescar
     def mock_refresh(obj):
         obj.id = uuid.uuid4()
-        # Si el schema exige ip_address como objeto o string, asegúrate aquí
         if hasattr(obj, 'ip_address') and obj.ip_address is None:
-            obj.ip_address = "1.1.1.1"
+            obj.ip_address = mock_ip_val
 
     mock_db.refresh.side_effect = mock_refresh
     app.dependency_overrides[get_db] = lambda: mock_db
     
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="https://test") as ac:
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
         payload = {
             "wazuh_agent_id": "101", 
             "hostname": "PC-COV", 
             "os_version": "Linux", 
-            "ip_address": "1.1.1.1", 
+            "ip_address": mock_ip_val,
             "manager_id": str(uuid.uuid4())
         }
         response = await ac.post("/assets/", json=payload)
     
     assert response.status_code == 200
     assert mock_db.commit.called
-    # Verificamos que el ID que inventó el mock llegó al JSON
-    assert "id" in response.json()
+
+    res_json = response.json()
+    assert "id" in res_json
+    assert res_json["ip_address"] == mock_ip_val
 
 @pytest.mark.asyncio
 async def test_update_asset_not_found_trigger():
