@@ -3,11 +3,11 @@ uvicorn[standard]
 sqlalchemy
 psycopg2-binary
 python-jose[cryptography]
-passlib[bcrypt]==1.7.4
-bcrypt==4.0.1
+bcrypt==4.1.2
 requests
 python-dotenv
 python-multipart
 pytest
 pytest-cov
 httpx
+apscheduler
