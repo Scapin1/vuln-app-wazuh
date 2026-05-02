@@ -457,7 +457,7 @@ async def test_password_strength_full_errors():
 @pytest.mark.asyncio
 async def test_create_asset_path_complete():
     transport = ASGITransport(app=app)
-    test_ip = os.getenv("TEST_ASSET_IP", "10.0.0.1")
+    test_ip = os.getenv("TEST_ASSET_IP", "127.0.0.1")
     async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {
             "wazuh_agent_id": "NEW-001",
@@ -539,7 +539,7 @@ async def test_create_asset_full_coverage():
     app.dependency_overrides[get_db] = lambda: mock_db
 
     transport = ASGITransport(app=app)
-    test_ip = os.getenv("TEST_ASSET_IP", "10.0.0.50")
+    test_ip = os.getenv("TEST_ASSET_IP", "127.0.0.1")
     async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {
             "wazuh_agent_id": "AGT-100",
@@ -610,7 +610,7 @@ async def test_create_detection_new_record_path():
 async def test_create_asset_direct_hit():
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
-    mock_ip_val = os.getenv("TEST_MOCK_IP", "1.1.1.1")
+    mock_ip_val = os.getenv("TEST_MOCK_IP", "127.0.0.1")
     
     def mock_refresh(obj):
         obj.id = uuid.uuid4()
@@ -621,7 +621,7 @@ async def test_create_asset_direct_hit():
     app.dependency_overrides[get_db] = lambda: mock_db
     
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="https://test") as ac:
         payload = {
             "wazuh_agent_id": "101", 
             "hostname": "PC-COV", 
