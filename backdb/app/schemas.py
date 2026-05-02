@@ -1,6 +1,6 @@
 # schemas.py
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, IPvAnyAddress
 from uuid import UUID
 from typing import Optional, List
 from datetime import datetime
@@ -84,7 +84,7 @@ class AssetCreate(BaseModel):
     wazuh_agent_id: str
     hostname: str
     os_version: Optional[str] = None
-    ip_address: Optional[str] = None
+    ip_address: IPvAnyAddress = None
     manager_id: UUID
 
 class AssetOut(AssetCreate):
