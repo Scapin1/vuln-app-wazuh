@@ -15,3 +15,5 @@ pytest
 pytest-asyncio
 pytest-cov
 httpx
+azure-keyvault-secrets
+azure-identity

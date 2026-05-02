@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, ConfigDict, EmailStr, IPvAnyAddress
 from uuid import UUID
-from typing import Optional, List
+from typing import Optional, List, Union
 from datetime import datetime
 from models import SeverityLevel, VulnStatus
 
@@ -84,7 +84,7 @@ class AssetCreate(BaseModel):
     wazuh_agent_id: str
     hostname: str
     os_version: Optional[str] = None
-    ip_address: IPvAnyAddress = None
+    ip_address: IPvAnyAddress
     manager_id: UUID
 
 class AssetOut(AssetCreate):
@@ -114,8 +114,8 @@ class DetectionOut(BaseModel):
     asset_id: UUID
     cve_id: str
     status: VulnStatus
-    package_name: Optional[str]
-    package_version: Optional[str]
+    package_name: Optional[str] = None
+    package_version: Optional[str] = None
     
     # Esto permite que Pydantic lea objetos de SQLAlchemy
     model_config = ConfigDict(from_attributes=True)

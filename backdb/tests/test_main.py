@@ -25,7 +25,7 @@ mock_user = User(
 # Aseguramos que el mock tenga un ID por si el esquema lo pide
 mock_user.user_id = 1 
 
-async def mock_refresh_side_effect(obj):
+def mock_refresh_side_effect(obj):
     if hasattr(obj, 'user_id') and getattr(obj, 'user_id', None) is None:
         obj.user_id = 1
     elif hasattr(obj, 'id') and getattr(obj, 'id', None) is None:
@@ -49,7 +49,7 @@ async def override_get_db():
     db.refresh.side_effect = mock_refresh_side_effect
     yield db
 
-async def override_get_current_user():
+def override_get_current_user():
     return mock_user
 
 app.dependency_overrides[get_db] = override_get_db
@@ -82,6 +82,15 @@ async def test_login_error():
 
 @pytest.mark.asyncio
 async def test_create_manager_success():
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock()
+    
+    def mock_refresh(obj):
+        obj.id = uuid.uuid4()
+    
+    mock_db.refresh.side_effect = mock_refresh
+    app.dependency_overrides[get_db] = lambda: mock_db
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         payload = {
@@ -90,7 +99,10 @@ async def test_create_manager_success():
             "api_key_vault_ref": "key-123"
         }
         response = await ac.post("/managers/", json=payload)
+    
     assert response.status_code == 200
+    assert response.json()["nombre"] == "Wazuh Master"
+    assert "id" in response.json()
 
 @pytest.mark.asyncio
 async def test_get_asset_history_not_found():
@@ -148,7 +160,7 @@ async def test_detection_evolution_logic():
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
     
-    async def mock_refresh_logic(obj):
+    def mock_refresh_logic(obj):
         obj.id = uuid.uuid4()
         obj.timestamp = fecha
         if hasattr(obj, 'first_seen_at') and obj.first_seen_at is None:
@@ -174,7 +186,6 @@ async def test_detection_evolution_logic():
 
 @pytest.mark.asyncio
 async def test_crud_and_reads():
-    """Cubre creaciones de usuarios, assets y lecturas GET"""
     app.dependency_overrides[get_db] = override_get_db
     
     transport = ASGITransport(app=app)
@@ -209,7 +220,6 @@ async def test_patch_updates_and_404():
 
 @pytest.mark.asyncio
 async def test_auth_login_failures():
-    """Cubre errores de login (Línea 69)"""
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
     mock_res = MagicMock()
@@ -224,7 +234,6 @@ async def test_auth_login_failures():
 
 @pytest.mark.asyncio
 async def test_change_password_logic_branches():
-    """Cubre todas las excepciones de password (Líneas 86, 89, 92, 98-104)"""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         # Caso: Clave antigua incorrecta (86)
@@ -239,7 +248,6 @@ async def test_change_password_logic_branches():
 
 @pytest.mark.asyncio
 async def test_detection_evolution_existing_record():
-    """Cubre la rama de vulnerabilidad que ya existía (Línea 130)"""
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
     fecha = datetime.now(timezone.utc)
@@ -259,7 +267,6 @@ async def test_detection_evolution_existing_record():
 
 @pytest.mark.asyncio
 async def test_catalog_patch_and_manager_404():
-    """Cubre actualización de catálogo (289-300) y error 404 (249)"""
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
     mock_c = VulnerabilityCatalog(cve_id="C-1", severity="H", description="D", cvss_score=5.0)
@@ -279,7 +286,6 @@ async def test_catalog_patch_and_manager_404():
 
 @pytest.mark.asyncio
 async def test_extra_coverage_posts():
-    """Cubre líneas de creación de Catálogo (199-207) y Usuarios (153)"""
     app.dependency_overrides[get_db] = override_get_db
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -288,7 +294,6 @@ async def test_extra_coverage_posts():
 
 @pytest.mark.asyncio
 async def test_login_success_path():
-    """Cubre líneas 54-55 (Retorno de token exitoso)"""
     # Aseguramos que el mock encuentre al usuario y la contraseña sea válida
     app.dependency_overrides[get_db] = override_get_db
     transport = ASGITransport(app=app)
@@ -301,7 +306,6 @@ async def test_login_success_path():
 
 @pytest.mark.asyncio
 async def test_create_asset_success_logic():
-    """Cubre líneas 199-207 (Cuerpo de create_asset)"""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         payload = {
@@ -317,7 +321,6 @@ async def test_create_asset_success_logic():
 
 @pytest.mark.asyncio
 async def test_update_catalog_success_path():
-    """Cubre la línea 292 (Final de update_catalog)"""
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
     mock_c = VulnerabilityCatalog(cve_id="CVE-2026", severity="Medium", description="D", cvss_score=5.0)
@@ -336,7 +339,6 @@ async def test_update_catalog_success_path():
 
 @pytest.mark.asyncio
 async def test_update_manager_not_found():
-    """Cubre la línea 249 (Error 404 en update_manager)"""
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
     res_mock = MagicMock()
@@ -351,7 +353,6 @@ async def test_update_manager_not_found():
 
 @pytest.mark.asyncio
 async def test_login_wrong_password():
-    """Cubre línea 69: Usuario existe pero la contraseña es incorrecta"""
     app.dependency_overrides[get_db] = override_get_db
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -362,7 +363,6 @@ async def test_login_wrong_password():
 
 @pytest.mark.asyncio
 async def test_password_strength_full_errors():
-    """Cubre líneas 98-104: Arreglado el error de aserción (robusta)"""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         payload = {"old_password": "old_password", "new_password": "A", "confirm_password": "A"}
@@ -373,7 +373,6 @@ async def test_password_strength_full_errors():
 
 @pytest.mark.asyncio
 async def test_create_asset_path_complete():
-    """Cubre líneas 199-207: Creación exitosa de Asset"""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         payload = {
@@ -388,7 +387,6 @@ async def test_create_asset_path_complete():
 
 @pytest.mark.asyncio
 async def test_update_manager_404_path():
-    """Cubre línea 249: Corregido el error de corrutina"""
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
     mock_result = MagicMock() # Debe ser MagicMock para que scalar_one_or_none sea síncrono
@@ -403,7 +401,6 @@ async def test_update_manager_404_path():
 
 @pytest.mark.asyncio
 async def test_update_catalog_success_final():
-    """Cubre línea 292: Corregido el error de corrutina"""
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
     mock_c = VulnerabilityCatalog(cve_id="CVE-2026", severity="Low", description="D", cvss_score=1.0)
@@ -421,7 +418,6 @@ async def test_update_catalog_success_final():
 
 @pytest.mark.asyncio
 async def test_change_password_success():
-    """Cubre líneas 93-97: Flujo exitoso de cambio de contraseña"""
     # 1. Mock de la base de datos
     mock_db = AsyncMock()
     mock_db.add = MagicMock() # Evita el warning de corrutina
@@ -446,11 +442,10 @@ async def test_change_password_success():
 
 @pytest.mark.asyncio
 async def test_create_asset_full_coverage():
-    """Cubre líneas 186-194: Creación de asset y persistencia"""
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
     # Importante: side_effect para simular refresh
-    async def mock_refresh(obj):
+    def mock_refresh(obj):
         obj.id = uuid.uuid4()
     mock_db.refresh.side_effect = mock_refresh
     
@@ -473,7 +468,6 @@ async def test_create_asset_full_coverage():
 
 @pytest.mark.asyncio
 async def test_get_asset_history_empty_trigger_404():
-    """Cubre línea 227: Lanzar 404 cuando no hay historial"""
     mock_db = AsyncMock()
     mock_res = MagicMock()
     # Forzamos una lista vacía explícita
@@ -490,12 +484,11 @@ async def test_get_asset_history_empty_trigger_404():
 
 @pytest.mark.asyncio
 async def test_create_detection_new_record_path():
-    """Cubre línea 113: Caso donde NO existe registro previo"""
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
     
     # Simula lo que haría la base de datos: asignar ID y Timestamp al "refrescar"
-    async def mock_refresh_logic(obj):
+    def mock_refresh_logic(obj):
         obj.id = uuid.uuid4()
         obj.timestamp = datetime.now(timezone.utc)
         # Si tu esquema pide otros campos obligatorios, asegúralos aquí
@@ -527,24 +520,37 @@ async def test_create_detection_new_record_path():
 
 @pytest.mark.asyncio
 async def test_create_asset_direct_hit():
-    """Cubre líneas 190-198: Asegura que el flujo de creación de Asset se ejecute completo"""
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
+    
+    # Simulamos que la DB asigna un ID al refrescar
+    def mock_refresh(obj):
+        obj.id = uuid.uuid4()
+        # Si el schema exige ip_address como objeto o string, asegúrate aquí
+        if hasattr(obj, 'ip_address') and obj.ip_address is None:
+            obj.ip_address = "1.1.1.1"
+
+    mock_db.refresh.side_effect = mock_refresh
     app.dependency_overrides[get_db] = lambda: mock_db
     
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         payload = {
-            "wazuh_agent_id": "101", "hostname": "PC-COV", 
-            "os_version": "Linux", "ip_address": "1.1.1.1", 
+            "wazuh_agent_id": "101", 
+            "hostname": "PC-COV", 
+            "os_version": "Linux", 
+            "ip_address": "1.1.1.1", 
             "manager_id": str(uuid.uuid4())
         }
-        await ac.post("/assets/", json=payload)
+        response = await ac.post("/assets/", json=payload)
+    
+    assert response.status_code == 200
     assert mock_db.commit.called
+    # Verificamos que el ID que inventó el mock llegó al JSON
+    assert "id" in response.json()
 
 @pytest.mark.asyncio
 async def test_update_asset_not_found_trigger():
-    """Cubre línea 266: Forzar el 404 en update_asset"""
     mock_db = AsyncMock()
     res_mock = MagicMock()
     res_mock.scalar_one_or_none.return_value = None # No existe
