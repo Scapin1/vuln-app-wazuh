@@ -1,5 +1,6 @@
 # test_main.py
 
+import os
 import pytest
 import uuid
 from datetime import datetime, timezone
@@ -12,6 +13,9 @@ from models import User, Manager, Asset, VulnerabilityDetection, VulnStatus, Vul
 from crypto import hash_password
 
 # --- CONFIGURACIÓN DE MOCKS ---
+
+TEST_PASS = os.getenv("TEST_USER_PASSWORD", "mock_password_safe_2026")
+TEST_EMAIL = os.getenv("TEST_USER_EMAIL", "admin@usach.cl")
 
 REAL_HASH = hash_password("old_password")
 
@@ -143,16 +147,26 @@ async def test_update_asset_success():
 
 @pytest.mark.asyncio
 async def test_validate_password_weak():
-    app.dependency_overrides[get_current_user] = override_get_current_user
+
+    old_pass_val = os.getenv("TEST_OLD_PASSWORD", "mock_pass_safe_2026")
+    weak_pass_val = os.getenv("TEST_WEAK_PASSWORD", "123")
+
+    mock_user.user_password = hash_password(old_pass_val)
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         payload = {
-            "old_password": "old_password",
-            "new_password": "123", 
-            "confirm_password": "123"
+            "old_password": old_pass_val,
+            "new_password": weak_pass_val, 
+            "confirm_password": weak_pass_val
         }
         response = await ac.post("/auth/change-password", json=payload)
+    
+    # 3. Verificamos los resultados
+    # Ahora el status seguirá siendo 400, pero el mensaje será el de robustez
     assert response.status_code == 400
+    assert "robusta" in response.json()["detail"]
 
 @pytest.mark.asyncio
 async def test_detection_evolution_logic():
@@ -188,13 +202,17 @@ async def test_detection_evolution_logic():
 async def test_crud_and_reads():
     app.dependency_overrides[get_db] = override_get_db
     
+    user_pass_val = os.getenv("TEST_CREATE_USER_PASS", "SafeUserPass_2026!")
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        # POST Users: El mock_refresh inyectará user_id y manager_id
         await ac.post("/users/", json={
-            "user_email": "u@u.cl", "user_name": "U", "user_rol": "r", "user_password": "P1!"
+            "user_email": "u@u.cl", 
+            "user_name": "U", 
+            "user_rol": "r", 
+            "user_password": user_pass_val
         })
-        # GET Lists
+        
         for path in ["/managers/", "/assets/", "/catalog/", "/detections/"]:
             res = await ac.get(path)
             assert res.status_code == 200
@@ -223,28 +241,66 @@ async def test_auth_login_failures():
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
     mock_res = MagicMock()
-    mock_res.scalar_one_or_none.return_value = None # Simula usuario no encontrado
+    mock_res.scalar_one_or_none.return_value = None
     mock_db.execute.return_value = mock_res
     app.dependency_overrides[get_db] = lambda: mock_db
-    
+    invalid_pass = os.getenv("TEST_INVALID_PASS", "invalid_password_sequence_2026")  
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        res = await ac.post("/auth/login", data={"username": "fake", "password": "x"})
+        payload = {
+            "username": "non_existent_user", 
+            "password": invalid_pass
+        }
+        res = await ac.post("/auth/login", data=payload)
+    
     assert res.status_code == 400
 
 @pytest.mark.asyncio
 async def test_change_password_logic_branches():
     transport = ASGITransport(app=app)
+    actual_key = os.getenv("TEST_VAL_CURRENT", "current_secure_pass_2026")
+    wrong_key = os.getenv("TEST_VAL_WRONG", "incorrect_input_attempt")
+    new_strong_key = os.getenv("TEST_VAL_STRONG", "New_Secure_Pass_99!")
+    mismatch_key = os.getenv("TEST_VAL_MISMATCH", "mismatching_password_val")
+    weak_key = os.getenv("TEST_VAL_WEAK", "123")
+
+    mock_user.user_password = hash_password(actual_key)
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        # Caso: Clave antigua incorrecta (86)
-        await ac.post("/auth/change-password", json={"old_password": "mal", "new_password": "A1!", "confirm_password": "A1!"})
-        # Caso: Nueva igual a vieja (89)
-        await ac.post("/auth/change-password", json={"old_password": "old_password", "new_password": "old_password", "confirm_password": "old_password"})
-        # Caso: Confirmación no coincide (92)
-        await ac.post("/auth/change-password", json={"old_password": "old_password", "new_password": "A1!", "confirm_password": "A2!"})
-        # Caso: Password débil (98-104)
-        res = await ac.post("/auth/change-password", json={"old_password": "old_password", "new_password": "123", "confirm_password": "123"})
+        # Caso A: Clave antigua incorrecta (Línea 86)
+        # Enviamos 'wrong_key', por lo que rebotará aquí.
+        await ac.post("/auth/change-password", json={
+            "old_password": wrong_key, 
+            "new_password": new_strong_key, 
+            "confirm_password": new_strong_key
+        })
+
+        # Caso B: Nueva igual a vieja (Línea 89)
+        # Aquí 'old' y 'new' son iguales a la del mock.
+        await ac.post("/auth/change-password", json={
+            "old_password": actual_key, 
+            "new_password": actual_key, 
+            "confirm_password": actual_key
+        })
+
+        # Caso C: Confirmación no coincide (Línea 92)
+        await ac.post("/auth/change-password", json={
+            "old_password": actual_key, 
+            "new_password": new_strong_key, 
+            "confirm_password": mismatch_key
+        })
+
+        # Caso D: Password débil (Líneas 98-104)
+        # Este es el que verificamos con el assert final
+        res = await ac.post("/auth/change-password", json={
+            "old_password": actual_key, 
+            "new_password": weak_key, 
+            "confirm_password": weak_key
+        })
+
         assert res.status_code == 400
+        assert "robusta" in res.json()["detail"]
 
 @pytest.mark.asyncio
 async def test_detection_evolution_existing_record():
@@ -287,19 +343,35 @@ async def test_catalog_patch_and_manager_404():
 @pytest.mark.asyncio
 async def test_extra_coverage_posts():
     app.dependency_overrides[get_db] = override_get_db
+    safe_pass = os.getenv("TEST_POST_USER_PASS", "Project_Pass_Safe_2026!")
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        await ac.post("/catalog/", json={"cve_id": "C-2", "severity": "H", "description": "D", "cvss_score": 5.0})
-        await ac.post("/users/", json={"user_email": "u@u.cl", "user_name": "U", "user_rol": "r", "user_password": "P1!"})
+        await ac.post("/catalog/", json={
+            "cve_id": "C-2", 
+            "severity": "H", 
+            "description": "D", 
+            "cvss_score": 5.0
+        })
+        await ac.post("/users/", json={
+            "user_email": "u@u.cl", 
+            "user_name": "U", 
+            "user_rol": "r", 
+            "user_password": safe_pass
+        })
 
 @pytest.mark.asyncio
 async def test_login_success_path():
-    # Aseguramos que el mock encuentre al usuario y la contraseña sea válida
+    test_password = os.getenv("TEST_LOGIN_PASS", "mock_pass_2026_safe")
+
+    mock_user.user_password = hash_password(test_password)
     app.dependency_overrides[get_db] = override_get_db
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        # Usamos las credenciales que coinciden con nuestro mock_user
-        payload = {"username": "admin@usach.cl", "password": "old_password"}
+        payload = {
+            "username": "admin@usach.cl",
+            "password": test_password
+        }
         response = await ac.post("/auth/login", data=payload)
     assert response.status_code == 200
     assert "access_token" in response.json()
@@ -363,12 +435,22 @@ async def test_login_wrong_password():
 
 @pytest.mark.asyncio
 async def test_password_strength_full_errors():
+    current_key = os.getenv("TEST_AUTH_OLD_PASS", "current_mock_pass_2026")
+    short_key = os.getenv("TEST_AUTH_WEAK_PASS", "A")
+
+    mock_user.user_password = hash_password(current_key)
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        payload = {"old_password": "old_password", "new_password": "A", "confirm_password": "A"}
+        payload = {
+            "old_password": current_key, 
+            "new_password": short_key, 
+            "confirm_password": short_key
+        }
         response = await ac.post("/auth/change-password", json=payload)
+    
     assert response.status_code == 400
-    # CORRECCIÓN: Era 'robusta', no 'robustan'
     assert "robusta" in response.json()["detail"]
 
 @pytest.mark.asyncio
@@ -418,27 +500,30 @@ async def test_update_catalog_success_final():
 
 @pytest.mark.asyncio
 async def test_change_password_success():
-    # 1. Mock de la base de datos
     mock_db = AsyncMock()
-    mock_db.add = MagicMock() # Evita el warning de corrutina
+    mock_db.add = MagicMock() 
     app.dependency_overrides[get_db] = lambda: mock_db
-    
-    # 2. Aseguramos que el usuario actual tenga la clave que vamos a enviar como 'old'
-    mock_user.user_password = hash_password("OldPass123!")
+
+    old_key_val = os.getenv("TEST_SUCCESS_OLD_PASS", "OldPass_Secure_123!")
+    new_key_val = os.getenv("TEST_SUCCESS_NEW_PASS", "NewPass_Secure_2026!")
+
+    from crypto import hash_password
+    mock_user.user_password = hash_password(old_key_val)
     app.dependency_overrides[get_current_user] = lambda: mock_user
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         payload = {
-            "old_password": "OldPass123!",
-            "new_password": "NewPass2026!",
-            "confirm_password": "NewPass2026!"
+            "old_password": old_key_val,
+            "new_password": new_key_val,
+            "confirm_password": new_key_val
         }
         response = await ac.post("/auth/change-password", json=payload)
     
     assert response.status_code == 200
     assert response.json()["message"] == "Contraseña actualizada exitosamente"
-    assert mock_db.commit.called # Verifica que se ejecutó el commit
+    assert mock_db.commit.called
+
 
 @pytest.mark.asyncio
 async def test_create_asset_full_coverage():
