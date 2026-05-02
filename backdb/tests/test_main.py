@@ -361,18 +361,18 @@ async def test_extra_coverage_posts():
 
 @pytest.mark.asyncio
 async def test_login_success_path():
-    test_password = os.getenv("TEST_LOGIN_PASS", "mock_pass_2026_safe")
-
-    mock_user.user_password = hash_password(test_password)
+    auth_key = os.getenv("TEST_AUTH_VAL", "dummy_val_2026_safe")
+    mock_user.user_password = hash_password(auth_key)
     app.dependency_overrides[get_db] = override_get_db
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         payload = {
             "username": "admin@usach.cl",
-            "password": test_password
+            "password": auth_key
         }
         response = await ac.post("/auth/login", data=payload)
+    
     assert response.status_code == 200
     assert "access_token" in response.json()
 
