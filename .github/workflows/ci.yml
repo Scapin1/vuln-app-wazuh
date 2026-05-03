@@ -62,6 +62,25 @@ jobs:
           npm ci
           npm run test:coverage
 
+      - name: BackDB tests (pytest + coverage)
+        if: ${{ hashFiles('backdb/app/requirements.txt') != '' }}
+        working-directory: backdb
+        env:
+          # backdb/app/database.py requiere DATABASE_URL en import-time.
+          DATABASE_URL: sqlite+aiosqlite:///./ci.db
+          # backdb/app/crypto.py requiere ENCRYPTION_KEY en import-time.
+          # Clave Fernet dummy para CI (NO usar en prod).
+          ENCRYPTION_KEY: MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=
+          # backdb/app/auth.py requiere SECRET_KEY.
+          SECRET_KEY: ci-dummy-secret
+          ALGORITHM: HS256
+          ACCESS_TOKEN_EXPIRE_MINUTES: 30
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r app/requirements.txt
+          pip install aiosqlite
+          PYTHONPATH=${{ github.workspace }}/backdb/app pytest tests --cov=./app --cov-report=xml:coverage.xml
+
       - name: Validate Sonar configuration
         env:
           SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
