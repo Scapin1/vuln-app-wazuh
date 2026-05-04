@@ -2,17 +2,15 @@
 import contextlib
 import os
 import logging
-from typing import Annotated
 
-from fastapi import FastAPI, Depends, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy import text
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from .db import Base, engine, get_db, SessionLocal
+from .db import engine, get_db, SessionLocal
 from .models import Manager, Asset, VulnerabilityCatalog, VulnerabilityDetection, SeverityEnum, StatusEnum
 from .wazuh_client import fetch_all_vulns
 from .crypto import decrypt
@@ -20,14 +18,6 @@ from .crypto import decrypt
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-Base.metadata.create_all(bind=engine)
-try:
-    with engine.begin() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"))
-        conn.execute(text("SELECT create_hypertable('vulnerability_detections', 'timestamp', if_not_exists => TRUE);"))
-        logger.info("TimescaleDB y Hypertable inicializadas correctamente.")
-except Exception as e:
-    logger.warning(f"Aviso de TimescaleDB: {e}")
 
 
 @contextlib.asynccontextmanager

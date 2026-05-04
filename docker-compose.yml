@@ -1,32 +1,11 @@
 services:
-  db-api:
-    image: timescale/timescaledb:latest-pg15
-    container_name: db-api
-    restart: unless-stopped
-    env_file:
-      - .env
-    volumes:
-      - postgres_api_data:/var/lib/postgresql/data
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   api:
     build: ./vuln-api
     container_name: api
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db-api:5432/${POSTGRES_DB}
-    depends_on:
-      db-api:
-        condition: service_healthy
+      DATABASE_URL: ${DATABASE_URL}
     ports:
       - "8000:8000"
-    networks:
-      - app-network
     restart: unless-stopped
     env_file:
       - .env
@@ -35,10 +14,3 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-volumes:
-  postgres_api_data:
-
-networks:
-  app-network:
-    driver: bridge
