@@ -10,7 +10,7 @@ from sqlalchemy import (
     Enum,
     Boolean,
 )
-from sqlalchemy.dialects.postgresql import UUID, INET
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .db import Base
@@ -50,7 +50,7 @@ class Asset(Base):
     wazuh_agent_id = Column(String(255), nullable=False, index=True)
     hostname = Column(String(255))
     os_version = Column(String(255))
-    ip_address = Column(INET) # Tipo nativo de Postgres para IPs
+    ip_address = Column(String(45))  # IPv4/IPv6 compatible con SQLite para tests
     
     manager_id = Column(UUID(as_uuid=True), ForeignKey("managers.id"), nullable=False)
     manager = relationship("Manager", back_populates="assets")
