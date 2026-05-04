@@ -50,7 +50,8 @@ def test_status_endpoint(client):
 
 # --- Sync Endpoint ---
 
-def test_sync_endpoint_returns_200(client):
+@patch("app.main.run_sync_job")
+def test_sync_endpoint_returns_200(mock_job, client):
     res = client.post("/api/sync")
     assert res.status_code == 200
     assert "Sincronización" in res.json()["message"]
