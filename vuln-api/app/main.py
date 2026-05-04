@@ -223,7 +223,7 @@ def sync_manager(db: Session, manager: Manager):
 # --- Endpoints ---
 
 @app.post("/sync", summary="Gatilla la extracción manualmente")
-def trigger_sync(background_tasks: Annotated[BackgroundTasks, Depends()]):
+def trigger_sync(background_tasks: BackgroundTasks):
     """
     Endpoint para gatillar la sincronización de manera manual.
     Se ejecuta en background para no bloquear la respuesta HTTP.
