@@ -1,19 +1,21 @@
 # app/main.py
 import contextlib
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
+import os
+import logging
+from typing import Annotated
+
+from fastapi import FastAPI, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import text
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-import logging
 
 from .db import Base, engine, get_db, SessionLocal
 from .models import Manager, Asset, VulnerabilityCatalog, VulnerabilityDetection, SeverityEnum, StatusEnum
-from .wazuh_client import fetch_all_vulns, test_connection
-from .crypto import encrypt, decrypt
-
-from sqlalchemy import text
+from .wazuh_client import fetch_all_vulns
+from .crypto import decrypt
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -27,11 +29,10 @@ try:
 except Exception as e:
     logger.warning(f"Aviso de TimescaleDB: {e}")
 
+
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Inicializar Scheduler al arranque
     scheduler = BackgroundScheduler()
-    # Ejecutar todos los días a las 3 AM
     scheduler.add_job(
         run_sync_job,
         trigger=CronTrigger(hour=3, minute=0),
@@ -44,19 +45,22 @@ async def lifespan(app: FastAPI):
     yield
     scheduler.shutdown()
 
+
 app = FastAPI(title="Vulnerability Middleware", root_path="/api", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[os.getenv("CORS_ORIGINS", "*").split(",")],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
+# --- Sync Job ---
+
 def run_sync_job():
-    """Función de extracción invocada por el Scheduler"""
+    """Función de extracción invocada por el Scheduler."""
     logger.info("Iniciando sincronización masiva programada...")
     db = SessionLocal()
     try:
@@ -70,115 +74,107 @@ def run_sync_job():
         db.close()
 
 
-def sync_manager(db: Session, manager: Manager):
-    """Sincroniza todas las vulnerabilidades de un Manager usando Bulk Upsert"""
-    logger.info(f"Obteniendo datos de Wazuh Indexer para el manager {manager.nombre}...")
-    
-    # 1. Extraer todos los datos (Usa Scroll API de Opensearch)
-    pwd = decrypt(manager.wazuh_password) if manager.wazuh_password else ""
-    raw_vulns = fetch_all_vulns(manager.api_url, manager.wazuh_user, pwd)
-    
-    if not raw_vulns:
-        logger.info(f"No se encontraron vulnerabilidades para {manager.nombre}.")
-        return 0
-        
-    logger.info(f"Recibidos {len(raw_vulns)} registros. Procesando batch upserts...")
-    
+# --- Sync Logic (refactored to reduce cognitive complexity) ---
+
+def _parse_severity(vuln: dict) -> SeverityEnum:
+    """Mapea el string de severidad de Wazuh al Enum."""
+    severity_str = vuln.get("severity", "Untriaged").capitalize()
+    return getattr(SeverityEnum, severity_str, SeverityEnum.Untriaged)
+
+
+def _parse_score(vuln: dict):
+    """Extrae y valida el score CVSS."""
+    score = (vuln.get("score") or {}).get("base")
+    if score is None:
+        return None
+    try:
+        return float(score)
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_raw_vulns(raw_vulns: list, manager_id):
+    """Parsea el payload de Wazuh en diccionarios de assets, catálogo y detecciones."""
     assets_data = {}
     catalog_data = {}
     detections_data = []
 
-    # 2. Parsear el JSON gigante a diccionarios
     for v in raw_vulns:
         agent = v.get("agent", {})
         osinfo = (v.get("host") or {}).get("os") or {}
         pkg = v.get("package", {})
         vuln = v.get("vulnerability", {})
-        
+
         cve_id = vuln.get("id")
         if not cve_id:
             continue
-            
+
         agent_id = agent.get("id")
-        
-        # Preparar Asset
+
         if agent_id and agent_id not in assets_data:
             assets_data[agent_id] = {
                 "wazuh_agent_id": agent_id,
                 "hostname": agent.get("name"),
                 "os_version": osinfo.get("version"),
-                "ip_address": agent.get("ip") if agent.get("ip") else None,
-                "manager_id": manager.id
+                "ip_address": agent.get("ip") or None,
+                "manager_id": manager_id,
             }
-            
-        # Preparar CVE en el Catálogo
+
         if cve_id not in catalog_data:
-            severity_str = vuln.get("severity", "Untriaged").capitalize()
-            # Mapeo seguro a Enum
-            severity_val = getattr(SeverityEnum, severity_str, SeverityEnum.Untriaged)
-            
-            score = (vuln.get("score") or {}).get("base")
-            if score is not None:
-                try:
-                    score = float(score)
-                except ValueError:
-                    score = None
-            
             catalog_data[cve_id] = {
                 "cve_id": cve_id,
-                "severity": severity_val,
+                "severity": _parse_severity(vuln),
                 "description": vuln.get("description"),
-                "cvss_score": score
+                "cvss_score": _parse_score(vuln),
             }
-            
-        # Preparar Detección (Se insertará luego de resolver el ID del Asset de Postgres)
+
         detections_data.append({
-            "wazuh_agent_id": agent_id, # Temporal
+            "wazuh_agent_id": agent_id,
             "cve_id": cve_id,
             "status": StatusEnum.Detected,
             "package_name": pkg.get("name"),
-            "package_version": pkg.get("version")
+            "package_version": pkg.get("version"),
         })
 
-    # 3. Bulk Upsert de VulnerabilityCatalog
-    if catalog_data:
-        stmt = insert(VulnerabilityCatalog).values(list(catalog_data.values()))
-        stmt = stmt.on_conflict_do_update(
-            index_elements=['cve_id'],
-            set_={
-                'severity': stmt.excluded.severity,
-                'description': stmt.excluded.description,
-                'cvss_score': stmt.excluded.cvss_score
-            }
-        )
-        db.execute(stmt)
-        
-    # 4. Bulk Upsert de Assets
-    asset_pg_ids = {} # Mapeo wazuh_agent_id -> UUID de postgres
-    if assets_data:
-        stmt = insert(Asset).values(list(assets_data.values()))
-        stmt = stmt.on_conflict_do_update(
-            # Nota: Necesitamos que wazuh_agent_id + manager_id sea unico para on_conflict si se define indice,
-            # pero como no tenemos un constraint unique en models, buscaremos los IDs para no fallar.
-            # Lo haremos de manera más segura consultando primero o asumiendo IDs si no hay constraint.
-            constraint='assets_pkey', # Esto no funcionará sin UUID, hacemos insert simple si no existe
-            set_={'hostname': stmt.excluded.hostname}
-        )
-        # Como id es UUID autogenerado, mejor insertamos los faltantes y leemos.
-        for ag_id, a_data in assets_data.items():
-            db_asset = db.query(Asset).filter_by(manager_id=manager.id, wazuh_agent_id=ag_id).first()
-            if not db_asset:
-                db_asset = Asset(**a_data)
-                db.add(db_asset)
-                db.flush()
-            else:
-                # Update info
-                db_asset.hostname = a_data["hostname"]
-                db_asset.os_version = a_data["os_version"]
-                db.flush()
-            asset_pg_ids[ag_id] = db_asset.id
+    return assets_data, catalog_data, detections_data
 
-    # 5. Insertar Detecciones masivas
+
+def _upsert_catalog(db: Session, catalog_data: dict):
+    """Bulk upsert de CVEs en el catálogo."""
+    if not catalog_data:
+        return
+    stmt = insert(VulnerabilityCatalog).values(list(catalog_data.values()))
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["cve_id"],
+        set_={
+            "severity": stmt.excluded.severity,
+            "description": stmt.excluded.description,
+            "cvss_score": stmt.excluded.cvss_score,
+        },
+    )
+    db.execute(stmt)
+
+
+def _upsert_assets(db: Session, assets_data: dict, manager_id):
+    """Upsert de assets y retorna mapeo wazuh_agent_id -> UUID de postgres."""
+    asset_pg_ids = {}
+    for ag_id, a_data in assets_data.items():
+        db_asset = db.query(Asset).filter_by(
+            manager_id=manager_id, wazuh_agent_id=ag_id
+        ).first()
+        if db_asset:
+            db_asset.hostname = a_data["hostname"]
+            db_asset.os_version = a_data["os_version"]
+        else:
+            db_asset = Asset(**a_data)
+            db.add(db_asset)
+        db.flush()
+        asset_pg_ids[ag_id] = db_asset.id
+    return asset_pg_ids
+
+
+def _insert_detections(db: Session, detections_data: list, asset_pg_ids: dict):
+    """Inserta detecciones masivas ignorando duplicados."""
     final_detections = []
     for d in detections_data:
         pg_asset_id = asset_pg_ids.get(d["wazuh_agent_id"])
@@ -189,25 +185,47 @@ def sync_manager(db: Session, manager: Manager):
             "cve_id": d["cve_id"],
             "status": d["status"],
             "package_name": d["package_name"],
-            "package_version": d["package_version"]
+            "package_version": d["package_version"],
         })
-        
+
     if final_detections:
         stmt = insert(VulnerabilityDetection).values(final_detections)
         stmt = stmt.on_conflict_do_nothing()
         db.execute(stmt)
 
-    db.commit()
-    logger.info(f"Sincronización masiva de {manager.nombre} completada. {len(final_detections)} detecciones guardadas.")
     return len(final_detections)
+
+
+def sync_manager(db: Session, manager: Manager):
+    """Sincroniza todas las vulnerabilidades de un Manager."""
+    logger.info(f"Obteniendo datos de Wazuh Indexer para el manager {manager.nombre}...")
+
+    pwd = decrypt(manager.wazuh_password) if manager.wazuh_password else ""
+    raw_vulns = fetch_all_vulns(manager.api_url, manager.wazuh_user, pwd)
+
+    if not raw_vulns:
+        logger.info(f"No se encontraron vulnerabilidades para {manager.nombre}.")
+        return 0
+
+    logger.info(f"Recibidos {len(raw_vulns)} registros. Procesando batch upserts...")
+
+    assets_data, catalog_data, detections_data = _parse_raw_vulns(raw_vulns, manager.id)
+
+    _upsert_catalog(db, catalog_data)
+    asset_pg_ids = _upsert_assets(db, assets_data, manager.id)
+    count = _insert_detections(db, detections_data, asset_pg_ids)
+
+    db.commit()
+    logger.info(f"Sincronización de {manager.nombre} completada. {count} detecciones.")
+    return count
 
 
 # --- Endpoints ---
 
 @app.post("/sync", summary="Gatilla la extracción manualmente")
-def trigger_sync(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def trigger_sync(background_tasks: Annotated[BackgroundTasks, Depends()]):
     """
-    Endpoint para gatillar la sincronización de manera manual. 
+    Endpoint para gatillar la sincronización de manera manual.
     Se ejecuta en background para no bloquear la respuesta HTTP.
     """
     background_tasks.add_task(run_sync_job)
