@@ -61,7 +61,7 @@ class Asset(Base):
 class VulnerabilityCatalog(Base):
     __tablename__ = "vulnerability_catalog"
     
-    cve_id = Column(String(50), primary_key=True)
+    cve_id = Column(Text, primary_key=True)
     severity = Column(Enum(SeverityEnum), nullable=True)
     description = Column(Text)
     cvss_score = Column(Numeric(3, 1))
@@ -75,12 +75,12 @@ class VulnerabilityDetection(Base):
     # Hypertable abstracta: PK compuesta por timestamp, asset_id, cve_id
     timestamp = Column(DateTime(timezone=True), primary_key=True, default=func.now())
     asset_id = Column(UUID(as_uuid=True), ForeignKey("assets.id"), primary_key=True)
-    cve_id = Column(String(50), ForeignKey("vulnerability_catalog.cve_id"), primary_key=True)
+    cve_id = Column(Text, ForeignKey("vulnerability_catalog.cve_id"), primary_key=True)
     
     first_seen_at = Column(DateTime(timezone=True), default=func.now())
     status = Column(Enum(StatusEnum), default=StatusEnum.Detected)
-    package_name = Column(String(255))
-    package_version = Column(String(255))
+    package_name = Column(Text)
+    package_version = Column(Text)
     
     asset = relationship("Asset", back_populates="detections")
     vulnerability = relationship("VulnerabilityCatalog", back_populates="detections")

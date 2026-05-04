@@ -2,11 +2,9 @@ fastapi
 uvicorn[standard]
 sqlalchemy
 psycopg2-binary
-python-jose[cryptography]
-bcrypt==4.1.2
+cryptography
 requests
 python-dotenv
-python-multipart
 pytest
 pytest-cov
 httpx
