@@ -193,8 +193,9 @@ def sync_manager(db: Session, manager: Manager):
         })
         
     if final_detections:
-        # En una hypertable o tabla histórica real, solemos insertar sin on_conflict
-        db.execute(insert(VulnerabilityDetection).values(final_detections))
+        stmt = insert(VulnerabilityDetection).values(final_detections)
+        stmt = stmt.on_conflict_do_nothing()
+        db.execute(stmt)
 
     db.commit()
     logger.info(f"Sincronización masiva de {manager.nombre} completada. {len(final_detections)} detecciones guardadas.")
