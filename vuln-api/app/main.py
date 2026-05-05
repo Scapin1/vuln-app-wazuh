@@ -73,9 +73,22 @@ app.add_middleware(
 )
 
 
-@app.post("/auth/login")
+@app.post(
+    "/auth/login",
+    responses={
+        400: {
+            "description": "Credenciales inválidas",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Usuario o contraseña incorrectos"}
+                }
+            },
+        }
+    },
+)
 def login(
-    form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    db: Annotated[Session, Depends(get_db)],
 ):
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
@@ -103,16 +116,27 @@ def validate_strong_password(password: str) -> None:
     if not re.search(r"[!@#$%^&*(),.?\":{}|<>_\-]", password):
         errors.append("al menos un carácter especial (!@#$%^&*...)")
     if errors:
-        raise HTTPException(
-            status_code=400,
-            detail=f"La contraseña no es suficientemente robusta: {', '.join(errors)}",
-        )
+        raise ValueError(f"La contraseña no es suficientemente robusta: {', '.join(errors)}")
 
-@app.post("/auth/change-password")
+@app.post(
+    "/auth/change-password",
+    responses={
+        400: {
+            "description": "Error de validación de cambio de contraseña",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "La contraseña no es suficientemente robusta: mínimo 8 caracteres, al menos una letra mayúscula..."
+                    }
+                }
+            },
+        }
+    },
+)
 def change_password(
     request: ChangePasswordRequest,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Session = Depends(get_db),
+    db: Annotated[Session, Depends(get_db)],
 ):
     if not verify_password(request.old_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail="La contraseña antigua es incorrecta")
@@ -129,7 +153,10 @@ def change_password(
             detail="Las contraseñas nuevas no coinciden",
         )
 
-    validate_strong_password(request.new_password)
+    try:
+        validate_strong_password(request.new_password)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     current_user.password_hash = hash_password(request.new_password)
     current_user.is_active = True 
@@ -142,7 +169,7 @@ def change_password(
 
 
 @app.get("/users/me")
-def get_user_me(current_user: User = Depends(get_current_user)):
+def get_user_me(current_user: Annotated[User, Depends(get_current_user)]):
     return {
         "id": current_user.id,
         "username": current_user.username,
@@ -155,11 +182,25 @@ class NewUserRequest(BaseModel):
     password: str
 
 
-@app.post("/users")
+@app.post(
+    "/users",
+    responses={
+        400: {
+            "description": "Nombre de usuario ya existente",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "El nombre de usuario ya esta ocupado. Elige otro."
+                    }
+                }
+            },
+        }
+    },
+)
 def create_user(
     request: NewUserRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     existing = db.query(User).filter(User.username == request.username).first()
     if existing:
@@ -177,17 +218,38 @@ def create_user(
 
 @app.get("/users")
 def list_users(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     users = db.query(User).all()
     return [{"id": u.id, "username": u.username} for u in users]
 
 
-@app.delete("/users/{user_id}")
+@app.delete(
+    "/users/{user_id}",
+    responses={
+        400: {
+            "description": "Operación no permitida",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "No puedes eliminarte a ti mismo"}
+                }
+            },
+        },
+        404: {
+            "description": "Usuario no encontrado",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Usuario no encontrado"}
+                }
+            },
+        },
+    },
+)
 def delete_user(
     user_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     if current_user.id == user_id:
         raise HTTPException(status_code=400, detail="No puedes eliminarte a ti mismo")
@@ -203,7 +265,8 @@ def delete_user(
 
 @app.get("/wazuh-connections")
 def list_connections(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     conns = db.query(WazuhConnection).all()
     return [
@@ -221,11 +284,26 @@ def list_connections(
     ]
 
 
-@app.post("/wazuh-connections", status_code=201)
+@app.post(
+    "/wazuh-connections",
+    status_code=201,
+    responses={
+        400: {
+            "description": "Datos de conexión inválidos o duplicados",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "No se pudo establecer conexión con el indexador Wazuh"
+                    }
+                }
+            },
+        }
+    },
+)
 def create_connection(
     request: WazuhConnectionRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     # verify unique name
     if db.query(WazuhConnection).filter(WazuhConnection.name == request.name).first():
@@ -257,12 +335,24 @@ def create_connection(
     return {"message": "Conexión creada", "id": conn.id}
 
 
-@app.put("/wazuh-connections/{conn_id}")
+@app.put(
+    "/wazuh-connections/{conn_id}",
+    responses={
+        404: {
+            "description": "Conexión no encontrada",
+            "content": {
+                "application/json": {
+                    "example": {"detail": CONNECTION_NOT_FOUND}
+                }
+            },
+        }
+    },
+)
 def update_connection(
     conn_id: int,
     request: WazuhConnectionRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     conn = db.query(WazuhConnection).filter(WazuhConnection.id == conn_id).first()
     if not conn:
@@ -277,11 +367,23 @@ def update_connection(
     return {"message": "Conexión actualizada"}
 
 
-@app.delete("/wazuh-connections/{conn_id}")
+@app.delete(
+    "/wazuh-connections/{conn_id}",
+    responses={
+        404: {
+            "description": "Conexión no encontrada",
+            "content": {
+                "application/json": {
+                    "example": {"detail": CONNECTION_NOT_FOUND}
+                }
+            },
+        }
+    },
+)
 def delete_connection(
     conn_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     conn = db.query(WazuhConnection).filter(WazuhConnection.id == conn_id).first()
     if not conn:
@@ -291,11 +393,23 @@ def delete_connection(
     return {"message": "Conexión eliminada"}
 
 
-@app.post("/wazuh-connections/{conn_id}/test")
+@app.post(
+    "/wazuh-connections/{conn_id}/test",
+    responses={
+        404: {
+            "description": "Conexión no encontrada",
+            "content": {
+                "application/json": {
+                    "example": {"detail": CONNECTION_NOT_FOUND}
+                }
+            },
+        }
+    },
+)
 def test_wazuh_connection(
     conn_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
 ):
     conn = db.query(WazuhConnection).filter(WazuhConnection.id == conn_id).first()
     if not conn:
@@ -313,11 +427,31 @@ def test_wazuh_connection(
     return {"ok": ok, "message": "Conexión exitosa" if ok else "No se pudo conectar"}
 
 
-@app.post("/wazuh-connections/{conn_id}/sync")
+@app.post(
+    "/wazuh-connections/{conn_id}/sync",
+    responses={
+        400: {
+            "description": "Conexión inactiva",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "La conexión está inactiva"}
+                }
+            },
+        },
+        404: {
+            "description": "Conexión no encontrada",
+            "content": {
+                "application/json": {
+                    "example": {"detail": CONNECTION_NOT_FOUND}
+                }
+            },
+        },
+    },
+)
 def sync_connection(
     conn_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     conn = db.query(WazuhConnection).filter(WazuhConnection.id == conn_id).first()
     if not conn:
@@ -439,7 +573,8 @@ def _resolve_missing_vulns(db, active_vuln_dict, seen_vuln_ids):
 
 @app.post("/vulns/sync-all")
 def sync_all_connections(
-    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     conns = db.query(WazuhConnection).filter(WazuhConnection.is_active == True).all()
     results = []
@@ -465,10 +600,10 @@ def sync_all_connections(
 
 @app.get("/vulns")
 def list_vulns(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
     limit: Optional[int] = None,
     connection_id: int = None,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     query = db.query(WazuhVulnerability)
     
