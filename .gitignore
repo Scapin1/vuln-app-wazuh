@@ -8,3 +8,13 @@ frontend/coverage/
 frontend/node_modules/
 certbot/*
 .idea/
+
+# Testing
+backdb/.pytest_cache/
+backdb/.coverage
+htmlcov/
+.cov*
+
+# Python
+*.py[cod]
+*$py.class
