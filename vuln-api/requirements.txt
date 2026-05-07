@@ -1,7 +1,7 @@
 fastapi
 uvicorn[standard]
-sqlalchemy
-psycopg2-binary
+sqlalchemy>=2.0.0
+#psycopg2-binary
 python-jose[cryptography]
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
@@ -11,3 +11,9 @@ python-multipart
 pytest
 pytest-cov
 httpx
+# Driver asíncrono principal
+asyncpg
+# Driver síncrono (opcional, para scripts de migración o inspección)
+psycopg[binary]
+# Validación de emails en schemas
+pydantic[email]
