@@ -3,15 +3,10 @@ services:
     image: timescale/timescaledb:latest-pg15
     container_name: db-api
     restart: unless-stopped
-    environment:
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_DB=${DB_NAME}
-      - LANG=C.UTF-8
-    ports:
-      - "${DB_PORT}:5432"    
     env_file:
       - .env
+    ports:
+      - "${DB_PORT}:5432"
     volumes:
       - timescaledb_data:/var/lib/postgresql/data
       - ./vuln-api/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -27,7 +22,7 @@ services:
     build: ./vuln-api
     container_name: api
     environment:
-      DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db-api:5432/${DB_NAME}
+      DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db-api:${DB_PORT}/${DB_NAME}
     depends_on:
       db-api:
         condition: service_healthy
@@ -36,8 +31,6 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    ports:
-      - "9090:8000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
       interval: 10s
