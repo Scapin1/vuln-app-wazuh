@@ -184,8 +184,8 @@ async def create_connection(
     if existing:
         raise HTTPException(status_code=400, detail="Ya existe una conexión con ese nombre")
 
-    # test_connection debe ser async (usando httpx)
-    ok = await test_connection(request.indexer_url, request.wazuh_user, request.wazuh_password)
+    # test_connection es sync, no hace falta await
+    ok = test_connection(request.indexer_url, request.wazuh_user, request.wazuh_password)
     if not ok:
         raise HTTPException(status_code=400, detail="No se pudo establecer conexión con Wazuh")
 
@@ -288,7 +288,7 @@ async def sync_connection(
         raise HTTPException(status_code=400, detail="La conexión está inactiva")
 
     # fetch_all_vulns DEBE ser async (usando httpx)
-    raw_vulns = await fetch_all_vulns(conn.indexer_url, conn.wazuh_user, decrypt(conn.wazuh_password))
+    raw_vulns = fetch_all_vulns(conn.indexer_url, conn.wazuh_user, decrypt(conn.wazuh_password))
 
     count = await process_wazuh_vulnerabilities(db, conn.id, raw_vulns)
     await db.commit()
@@ -404,7 +404,7 @@ async def sync_all_connections(
         try:
             # IMPORTANTE: fetch_all_vulns debe ser una función 'async def' 
             # que use httpx.AsyncClient() internamente.
-            raw_vulns = await fetch_all_vulns(
+            raw_vulns = fetch_all_vulns(
                 conn.indexer_url,
                 conn.wazuh_user,
                 decrypt(conn.wazuh_password),
