@@ -1,9 +1,12 @@
 # tests/test_database.py
-
+import os
+import sys
+os.environ["DATABASE_URL"] = "postgresql+asyncpg://user:pass@localhost/testdb"
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db, Base
+
 
 @pytest.mark.asyncio
 async def test_get_db_yields_session():
