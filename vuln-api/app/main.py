@@ -32,6 +32,7 @@ from .schemas import (
     VulnStatus, ManagerUpdate, AssetUpdate, CatalogUpdate,
 ) 
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
 
 
 CONNECTION_NOT_FOUND = "Conexión no encontrada"
@@ -178,7 +179,6 @@ async def create_connection(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    # Verificar nombre único
     query = select(WazuhConnection).where(WazuhConnection.name == request.name)
     existing = (await db.execute(query)).scalar_one_or_none()
     if existing:
@@ -288,7 +288,7 @@ async def sync_connection(
         raise HTTPException(status_code=400, detail="La conexión está inactiva")
 
     # fetch_all_vulns DEBE ser async (usando httpx)
-    raw_vulns = fetch_all_vulns(conn.indexer_url, conn.wazuh_user, decrypt(conn.wazuh_password))
+    raw_vulns = await fetch_all_vulns(conn.indexer_url, conn.wazuh_user, decrypt(conn.wazuh_password))
 
     count = await process_wazuh_vulnerabilities(db, conn.id, raw_vulns)
     await db.commit()
@@ -296,43 +296,54 @@ async def sync_connection(
     return {"synced": count, "connection": conn.name}
 
 async def process_wazuh_vulnerabilities(db: AsyncSession, conn_id: int, raw_vulns: list) -> int:
+
+    print(f"DEBUG: Recibidas {len(raw_vulns)} vulnerabilidades de la conexión {conn_id}")
+    if raw_vulns:
+        print(f"DEBUG: Ejemplo de primer registro: {raw_vulns[0]}") # Esto te dirá si es 'os' u 'osinfo'
+
     count = 0
     seen_vuln_ids = set()
 
-    # Carga masiva de vulnerabilidades activas para evitar N selects
+    # 1. Carga masiva: Traemos TODO lo que ya tenemos para esta conexión
     result = await db.execute(
-        select(WazuhVulnerability).where(WazuhVulnerability.connection_id == conn_id, WazuhVulnerability.status == "ACTIVE")
+        select(WazuhVulnerability).where(WazuhVulnerability.connection_id == conn_id)
     )
-    active_vuln_dict = {v.id: v for v in result.scalars().all()}
+    all_vulns = result.scalars().all()
+    
+    # Creamos un mapa/indice en memoria para búsquedas instantáneas (O(1))
+    # La clave es una tupla con los campos que definen "unicidad"
+    lookup_map = {
+        (v.agent_id, v.package_name, v.package_version, v.cve_id): v 
+        for v in all_vulns
+    }
 
     for v in raw_vulns:
         agent = v.get("agent", {})
         pkg = v.get("package", {})
         vuln = v.get("vulnerability", {})
+        osinfo = agent.get("os", {}) # Cambiado de "osinfo" a "os" (verificar según tu fetch)
 
-        if not vuln.get("id"): continue
+        cve_id = vuln.get("id")
+        if not cve_id: continue
 
-        # Buscar si ya existe (Async)
-        query = select(WazuhVulnerability).filter_by(
-            connection_id=conn_id,
-            agent_id=agent.get("id"),
-            package_name=pkg.get("name"),
-            package_version=pkg.get("version"),
-            cve_id=vuln.get("id"),
-        )
-        existing_res = await db.execute(query)
-        existing = existing_res.scalar_one_or_none()
+        # 2. Búsqueda en memoria (SIN CONSULTAR LA DB)
+        key = (str(agent.get("id")), pkg.get("name"), pkg.get("version"), cve_id)
+        existing = lookup_map.get(key)
 
         if existing:
             seen_vuln_ids.add(existing.id)
             await _handle_existing_vuln_async(db, existing, vuln)
         else:
-            new_vuln = await _create_new_vuln_async(db, conn_id, agent, pkg, vuln)
+            new_vuln = await _create_new_vuln_async(db, conn_id, agent, pkg, vuln, osinfo)
             seen_vuln_ids.add(new_vuln.id)
 
         count += 1
 
-    await _resolve_missing_vulns_async(db, active_vuln_dict, seen_vuln_ids)
+    # 3. Marcar como resueltas las que ya no están en el reporte de Wazuh
+    # Filtramos solo las que eran ACTIVE y no están en seen_vuln_ids
+    active_in_db = {v.id: v for v in all_vulns if v.status == "ACTIVE"}
+    await _resolve_missing_vulns_async(db, active_in_db, seen_vuln_ids)
+    
     return count
 
 async def _handle_existing_vuln_async(db: AsyncSession, existing: WazuhVulnerability, vuln: dict):
@@ -347,28 +358,47 @@ async def _handle_existing_vuln_async(db: AsyncSession, existing: WazuhVulnerabi
     existing.score_base = (vuln.get("score") or {}).get("base")
     existing.last_seen = func.now()
 
-async def _create_new_vuln_async(db: AsyncSession, conn_id: int, agent: dict, pkg: dict, vuln: dict):
+def parse_wazuh_date(date_str):
+    if not date_str or date_str == "not defined":
+        return None
+    try:
+        return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+    except Exception:
+        return None    
+
+async def _create_new_vuln_async(db: AsyncSession, conn_id: int, agent: dict, pkg: dict, vuln: dict, osinfo: dict):
     new_vuln = WazuhVulnerability(
         connection_id=conn_id,
         status="ACTIVE",
         agent_id=agent.get("id"),
         agent_name=agent.get("name"),
+        os_full=osinfo.get("full"),
+        os_platform=osinfo.get("platform"),
+        os_version=osinfo.get("version"),
         package_name=pkg.get("name"),
         package_version=pkg.get("version"),
+        package_type=pkg.get("type"),
+        package_arch=pkg.get("architecture"),
         cve_id=vuln.get("id"),
         severity=vuln.get("severity"),
         score_base=(vuln.get("score") or {}).get("base"),
+        score_version=(vuln.get("score") or {}).get("version"),
+        detected_at=parse_wazuh_date(vuln.get("detected_at")),
+        published_at=parse_wazuh_date(vuln.get("published_at")),
+        description=vuln.get("description"),
+        reference=vuln.get("reference"),
+        scanner_vendor=(vuln.get("scanner") or {}).get("vendor"),
     )
     db.add(new_vuln)
-    await db.flush() # Flush para obtener el ID antes de insertar el historial
-    db.add(VulnerabilityHistory(vulnerability_id=new_vuln.id, action="DETECTED"))
+    await db.flush() 
+    db.add(VulnerabilityHistory(vulnerability_id=new_vuln.id, action="DETECTED", details="Vulnerabilidad identificada por primera vez"))
     return new_vuln
 
 async def _resolve_missing_vulns_async(db: AsyncSession, active_dict: dict, seen_ids: set):
     for v_id, db_vuln in active_dict.items():
         if v_id not in seen_ids:
             db_vuln.status = "RESOLVED"
-            db.add(VulnerabilityHistory(vulnerability_id=v_id, action="RESOLVED"))
+            await db.add(VulnerabilityHistory(vulnerability_id=v_id, action="RESOLVED"))
 
 @app.get("/vulns", tags=["Read"])
 async def list_vulns(
@@ -401,23 +431,25 @@ async def sync_all_connections(
     results = []
 
     for conn in conns:
+        conn_id = conn.id
+        conn_name = conn.name
+        conn_url = conn.indexer_url
+        conn_user = conn.wazuh_user
+        conn_pass = decrypt(conn.wazuh_password)
+        
         try:
             # IMPORTANTE: fetch_all_vulns debe ser una función 'async def' 
             # que use httpx.AsyncClient() internamente.
-            raw_vulns = fetch_all_vulns(
-                conn.indexer_url,
-                conn.wazuh_user,
-                decrypt(conn.wazuh_password),
+            raw_vulns = await fetch_all_vulns(conn_url, conn_user, conn_pass
             )
 
-            # Llamamos a la lógica de procesamiento que ya definimos como async
-            count = await process_wazuh_vulnerabilities(db, conn.id, raw_vulns)
+            count = await process_wazuh_vulnerabilities(db, conn_id, raw_vulns)
             
             # Commit parcial por cada conexión exitosa
             await db.commit()
 
             results.append({
-                "connection": conn.name, 
+                "connection": conn_name, 
                 "synced": count, 
                 "ok": True
             })
@@ -425,11 +457,15 @@ async def sync_all_connections(
         except Exception as e:
             # Si una falla, hacemos rollback de esa conexión específica y seguimos con la otra
             await db.rollback()
+            print(f"!!! ERROR SINCRONIZANDO {conn_name}: {str(e)}") 
+            import traceback
+            traceback.print_exc()
             results.append({
-                "connection": conn.name, 
+                "connection": conn_name, 
                 "ok": False, 
                 "error": str(e)
             })
+            continue
 
     return results
 

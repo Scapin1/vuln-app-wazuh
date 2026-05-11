@@ -17,3 +17,8 @@ asyncpg
 psycopg[binary]
 # Validación de emails en schemas
 pydantic[email]
+PyJWT
+azure-keyvault-secrets
+azure-identity
+pytest-asyncio
+email-validator

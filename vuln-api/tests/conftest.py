@@ -1,3 +1,4 @@
+"""
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -19,7 +20,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 @pytest.fixture(scope="function")
 def db_session():
-    """Crea una sesión de base de datos limpia para cada test"""
+    #Crea una sesión de base de datos limpia para cada test
     # Crear todas las tablas
     Base.metadata.create_all(bind=engine)
     
@@ -38,7 +39,7 @@ def db_session():
 
 @pytest.fixture(scope="function")
 def client(db_session):
-    """Crea un cliente de prueba de FastAPI con la DB de prueba"""
+    #Crea un cliente de prueba de FastAPI con la DB de prueba
     # Sobrescribir la dependencia get_db para usar nuestra DB de prueba
     def override_get_db():
         try:
@@ -55,3 +56,4 @@ def client(db_session):
     
     # Limpiar los overrides después del test
     app.dependency_overrides.clear()
+    """

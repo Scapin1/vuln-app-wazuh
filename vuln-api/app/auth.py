@@ -34,13 +34,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def authenticate_user(db: Session, username: str, password: str):
-    user = db.query(User).filter(User.username == username).first()
-    if not user:
+async def authenticate_user(db: AsyncSession, username: str, password: str):
+    result = await db.execute(select(User).where(User.user_email == username))
+    user = result.scalar_one_or_none()
+    
+    if not user or user.user_delete:
         return None
-    if not verify_password(password, user.password_hash):
-        return None
-    if not user.is_active:
+    if not verify_password(password, user.user_password):
         return None
     return user
 
