@@ -9,7 +9,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from app.main import app
 from app.db import get_db
 from app.auth import get_current_user, hash_password
-from app.models import User, Manager, Asset, VulnerabilityDetection, VulnStatus, VulnerabilityCatalog
+from app.models import User, Manager, Asset, VulnerabilityDetection, VulnStatus, VulnerabilityCatalog, WazuhConnection, WazuhVulnerability
+from uuid import uuid4
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # --- CONFIGURACIÓN DE MOCKS ---
 
@@ -25,8 +27,31 @@ mock_user = User(
     user_status=True,
     user_delete=False
 )
-# Aseguramos que el mock tenga un ID por si el esquema lo pide
 mock_user.user_id = 1 
+
+@pytest.fixture
+def mock_wazuh_raw_data():
+    return [
+        {
+            "agent": {"id": "001", "name": "linux-agent", "os": {"full": "Ubuntu 22.04", "platform": "ubuntu", "version": "22.04"}},
+            "package": {"name": "openssl", "version": "1.1.1", "type": "deb", "architecture": "amd64"},
+            "vulnerability": {
+                "id": "CVE-2026-TEST-NEW",
+                "severity": "High",
+                "score": {"base": 8.5},
+                "detected_at": "2026-05-10T10:00:00Z"
+            }
+        },
+        {
+            "agent": {"id": "001", "name": "linux-agent", "os": {"full": "Ubuntu 22.04"}},
+            "package": {"name": "bash", "version": "5.0", "type": "deb"},
+            "vulnerability": {
+                "id": "CVE-2026-TEST-EXISTING",
+                "severity": "Critical",
+                "score": {"base": 9.8}
+            }
+        }
+    ]
 
 def mock_refresh_side_effect(obj):
     if hasattr(obj, 'user_id') and getattr(obj, 'user_id', None) is None:
@@ -57,6 +82,52 @@ def override_get_current_user():
 
 app.dependency_overrides[get_db] = override_get_db
 app.dependency_overrides[get_current_user] = override_get_current_user
+
+
+@pytest.mark.asyncio
+async def test_sync_process_complete_flow():
+    mock_db = AsyncMock(spec=AsyncSession)
+    mock_db.add = AsyncMock(return_value=None)
+    mock_db.commit = AsyncMock(return_value=None)
+    mock_db.execute = AsyncMock()
+    mock_db.get = AsyncMock()
+
+    mock_conn = WazuhConnection(
+        id=1, name="Lab", is_active=True, 
+        indexer_url="http://wazuh", wazuh_user="admin", wazuh_password="hash"
+    )
+    mock_db.get.return_value = mock_conn
+
+    existing_active = WazuhVulnerability(
+        id=10, agent_id="001", cve_id="CVE-OLD", status="ACTIVE", package_name="bash"
+    )
+    
+    mock_result = MagicMock()
+    mock_result.scalars.return_value.all.return_value = [existing_active]
+    mock_db.execute.return_value = mock_result
+
+    mock_raw_wazuh = [{
+        "agent": {"id": "001", "name": "agent-1", "os": {"full": "Ubuntu"}},
+        "package": {"name": "bash", "version": "5.0"},
+        "vulnerability": {"id": "CVE-OLD", "severity": "High", "score": {"base": 7.5}}
+    }]
+
+    app.dependency_overrides[get_db] = lambda: mock_db
+    
+    with patch("app.main.fetch_all_vulns", new_callable=AsyncMock) as mock_fetch, \
+         patch("app.main.decrypt", return_value="plain"), \
+         patch("os.getenv", return_value="una_clave_maestra_muy_larga_de_mas_de_32_bytes"):
+        
+        mock_fetch.return_value = mock_raw_wazuh
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            response = await ac.post("/wazuh-connections/1/sync")
+
+    assert response.status_code == 200
+    assert response.json()["synced"] == 1
+    assert mock_db.commit.called
+
 
 # --- TESTS DE ENDPOINTS ---
 
