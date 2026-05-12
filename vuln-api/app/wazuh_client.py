@@ -21,7 +21,11 @@ async def fetch_all_vulns(indexer_url: str, wazuh_user: str, wazuh_password: str
     return [h["_source"] for h in hits]
 def test_connection(indexer_url: str, wazuh_user: str, wazuh_password: str) -> bool:
     try:
-        resp = requests.get(indexer_url, auth=HTTPBasicAuth(wazuh_user, wazuh_password), verify=False, timeout=10)
+        resp = requests.get(
+            indexer_url, 
+            auth=HTTPBasicAuth(wazuh_user, wazuh_password), 
+            verify=False, 
+            timeout=10)
         return resp.status_code == 200
     except Exception:
         return False
