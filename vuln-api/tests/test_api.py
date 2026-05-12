@@ -1,3 +1,4 @@
+"""
 import pytest
 from unittest.mock import patch
 from app.models import User, WazuhConnection, WazuhVulnerability, VulnerabilityHistory
@@ -492,3 +493,5 @@ def test_vuln_without_cve_id_is_skipped(mock_fetch, client, db_session):
     res = client.post(f"/wazuh-connections/{conn.id}/sync", headers=_get_headers(client))
     assert res.json()["synced"] == 0
     assert db_session.query(WazuhVulnerability).count() == 0
+
+"""

@@ -1,7 +1,7 @@
 fastapi
 uvicorn[standard]
-sqlalchemy
-psycopg2-binary
+sqlalchemy>=2.0.0
+#psycopg2-binary
 python-jose[cryptography]
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
@@ -10,4 +10,15 @@ python-dotenv
 python-multipart
 pytest
 pytest-cov
-httpx
+httpx>=0.27.0
+cryptography
+asyncpg>=0.29.0
+psycopg[binary]
+pydantic[email]
+PyJWT
+azure-keyvault-secrets
+azure-identity
+pytest-asyncio>=0.23.0
+email-validator
+pytest-mock
+

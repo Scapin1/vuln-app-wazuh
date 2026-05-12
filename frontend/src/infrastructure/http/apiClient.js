@@ -1,12 +1,14 @@
 import axios from 'axios';
 import setupAuthInterceptor from './interceptors/authInterceptor';
 
+
+
 const apiClient = axios.create({
     baseURL: import.meta.env.VITE_API_URL,
 });
 
 setupAuthInterceptor(apiClient);
-
+/*
 const MOCK_DELAY = 500;
 
 const mockData = {
@@ -58,5 +60,6 @@ const mockData = {
         is_default_password: false // Falso para que puedas explorar el panel sin que te obligue a cambiar la password
     }
 }
-
+*/
 export default apiClient;
+
