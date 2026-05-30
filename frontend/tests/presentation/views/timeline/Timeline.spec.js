@@ -4,7 +4,7 @@ import Timeline from '@/presentation/views/Timeline.vue'
 import wazuhService from '@/application/services/wazuhService'
 import vulnService from '@/application/services/vulnService'
 import TimelineFilters from '@/presentation/views/timeline/components/TimelineFilters.vue'
-import TimelineDetailModal from '@/presentation/views/timeline/components/TimelineDetailModal.vue'
+// Note: TimelineDetailModal.vue exists but is no longer rendered directly in Timeline.vue
 
 // Mock services
 vi.mock('@/application/services/wazuhService', () => ({
@@ -91,22 +91,6 @@ describe('Timeline.vue', () => {
     expect(wrapper.vm.selectedVulns).toEqual([])
   })
 
-  it('opens detail modal when slot data is set', async () => {
-    const wrapper = mount(Timeline)
-    await flushPromises()
-
-    wrapper.vm.selectedEvent = {
-      startMs: 1234567890,
-      cardLabel: '08/03 2026',
-      details: []
-    }
-    wrapper.vm.modalOpen = true
-    await wrapper.vm.$nextTick()
-
-    expect(wrapper.vm.modalOpen).toBe(true)
-    expect(wrapper.vm.selectedEvent).toBeTruthy()
-  })
-
   it('handles connection load error gracefully', async () => {
     wazuhService.getConnections.mockRejectedValueOnce(new Error('Network error'))
 
@@ -125,7 +109,6 @@ describe('Timeline.vue', () => {
     expect(wrapper.vm.selectedAgents).toEqual([])
     expect(wrapper.vm.selectedVulns).toEqual([])
     expect(wrapper.vm.period).toBe('30d')
-    expect(wrapper.vm.modalOpen).toBe(false)
   })
 
   it('has correct period options', () => {
@@ -198,35 +181,6 @@ describe('Timeline.vue', () => {
     expect(wrapper.vm.hasBuilt).toBe(false)
   })
 
-  it('provides openModal method for canvas interaction', () => {
-    const wrapper = mount(Timeline)
-    const slot = { cardLabel: 'test', details: [] }
-
-    wrapper.vm.openModal(slot)
-
-    expect(wrapper.vm.modalOpen).toBe(true)
-    expect(wrapper.vm.selectedEvent).toEqual(slot)
-  })
-
-  it('computes yearLabel correctly with data', async () => {
-    vulnService.getVulns.mockResolvedValueOnce({
-      data: [
-        { agent_name: 'Agent 1', cve_id: 'CVE-001', first_seen: '2025-01-01T00:00:00Z' },
-        { agent_name: 'Agent 1', cve_id: 'CVE-002', first_seen: '2026-01-01T00:00:00Z' }
-      ]
-    })
-
-    const wrapper = mount(Timeline)
-    await flushPromises()
-
-    wrapper.vm.selectedConnection = '1'
-    wrapper.vm.period = 'all'
-    await wrapper.vm.buildTimeline()
-    await flushPromises()
-
-    expect(wrapper.vm.yearLabel).toBeTruthy()
-  })
-
   it('updates period via setPeriod method', () => {
     const wrapper = mount(Timeline)
     wrapper.vm.setPeriod('7d')
@@ -261,13 +215,4 @@ describe('Timeline.vue', () => {
     expect(wrapper.vm.customDate).toBe('2026-05-05')
   })
 
-  it('closes modal when detail modal emits close', async () => {
-    const wrapper = mount(Timeline)
-    wrapper.vm.modalOpen = true
-
-    const modal = wrapper.findComponent(TimelineDetailModal)
-    await modal.vm.$emit('close')
-
-    expect(wrapper.vm.modalOpen).toBe(false)
-  })
 })
