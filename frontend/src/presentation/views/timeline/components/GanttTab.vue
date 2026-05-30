@@ -324,7 +324,7 @@ const timeLabels = computed(() => {
     const effectiveEnd = end > minEnd ? end : minEnd
     while (current <= effectiveEnd) {
       labels.push({ label: current.getFullYear().toString(), date: new Date(current) })
-      current.setFullYear(current.getFullYear() + 1)
+      current = new Date(current.getFullYear() + 1, 0, 1)
     }
   } else if (unit === 'month') {
     current = new Date(start.getFullYear(), start.getMonth(), 1)
@@ -334,7 +334,7 @@ const timeLabels = computed(() => {
         ? current.toLocaleString('es', { month: 'short', year: '2-digit' })
         : current.toLocaleString('es', { month: 'short' })
       labels.push({ label, date: new Date(current) })
-      current.setMonth(current.getMonth() + 1)
+      current = new Date(current.getFullYear(), current.getMonth() + 1, 1)
     }
     // Add one extra month column to ensure active bars aren't cut off
     const label = spansMultipleYears
@@ -349,7 +349,7 @@ const timeLabels = computed(() => {
         ? current.toLocaleString('es', { day: '2-digit', month: 'short', year: '2-digit' })
         : current.toLocaleString('es', { day: '2-digit', month: 'short' })
       labels.push({ label, date: new Date(current) })
-      current.setDate(current.getDate() + 1)
+      current = new Date(current.getFullYear(), current.getMonth(), current.getDate() + 1)
     }
     const label = spansMultipleYears
       ? current.toLocaleString('es', { day: '2-digit', month: 'short', year: '2-digit' })
