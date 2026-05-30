@@ -363,7 +363,7 @@ const timeLabels = computed(() => {
         ? current.toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
         : current.toLocaleString('es', { hour: '2-digit', minute: '2-digit', hour12: false })
       labels.push({ label, date: new Date(current) })
-      current.setHours(current.getHours() + 1)
+      current = new Date(current.getFullYear(), current.getMonth(), current.getDate(), current.getHours() + 1, 0, 0)
     }
     const label = spansMultipleDays
       ? current.toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
