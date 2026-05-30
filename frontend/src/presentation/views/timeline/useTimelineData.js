@@ -227,8 +227,8 @@ export default function useTimelineData({
     if (!hasBuilt.value || !rangeStartMs.value || !rangeEndMs.value) return []
 
     const slots = []
-    const slotMs = activeZoom.value.slotHours * HOUR_MS
-    const isDayGranularity = activeZoom.value.slotHours >= 24
+    const slotMs = (activeZoom?.value?.slotHours ?? 24) * HOUR_MS
+    const isDayGranularity = (activeZoom?.value?.slotHours ?? 24) >= 24
     const baseStartMs = isDayGranularity ? startOfLocalDay(rangeStartMs.value) : rangeStartMs.value
     const totalSlotCount = Math.max(1, Math.ceil((rangeEndMs.value - baseStartMs + 1) / slotMs))
 
@@ -241,7 +241,7 @@ export default function useTimelineData({
       // Solo crear slot si hay eventos reales (detecciones o resoluciones)
       if (painted) {
         const snapshot = snapshotAt(endMs)
-        slots.push(createSlot(startMs, endMs, summary, snapshot, activeZoom.value.slotHours))
+        slots.push(createSlot(startMs, endMs, summary, snapshot, (activeZoom?.value?.slotHours ?? 24)))
       }
     }
 
@@ -347,6 +347,52 @@ export default function useTimelineData({
     }
   }
 
+  const areaData = computed(() => {
+    if (!hasBuilt.value || !rangeStartMs.value || !rangeEndMs.value) return []
+    
+    const data = []
+    const slotMs = (activeZoom?.value?.slotHours ?? 24) * HOUR_MS
+    const isDayGranularity = (activeZoom?.value?.slotHours ?? 24) >= 24
+    const baseStartMs = isDayGranularity ? startOfLocalDay(rangeStartMs.value) : rangeStartMs.value
+    
+    for (let ms = baseStartMs; ms <= rangeEndMs.value; ms += slotMs) {
+      const snap = snapshotAt(ms)
+      data.push({
+        date: new Date(ms),
+        pending: snap.pending,
+        resolved: snap.resolved,
+        total: snap.total
+      })
+    }
+    return data
+  })
+
+  const ganttData = computed(() => {
+    if (!hasBuilt.value || !filteredVulnsData.value.length) return []
+    
+    return filteredVulnsData.value.map(v => {
+      const start = new Date(v.first_seen)
+      const history = v.historySorted || []
+      const resolvedEvent = history.find(h => h.action === 'RESOLVED')
+      const reopenedEvent = history.find(h => h.action === 'REOPENED')
+      const end = resolvedEvent ? new Date(resolvedEvent.timestamp) : new Date()
+      const status = reopenedEvent ? 'REOPENED' : (resolvedEvent ? 'RESOLVED' : 'PENDING')
+      
+      return {
+        cve_id: v.cve_id,
+        severity: v.severity || 'MEDIUM',
+        description: v.description || '',
+        start,
+        end,
+        status,
+        agents: v.agents || 0,
+        first_seen: v.first_seen,
+        resolved_at: resolvedEvent?.timestamp || null,
+        reopened_at: reopenedEvent?.timestamp || null
+      }
+    }).sort((a, b) => a.start - b.start)
+  })
+
   return {
     loading,
     hasBuilt,
@@ -357,6 +403,9 @@ export default function useTimelineData({
     warningMessage,
     build,
     fetchConnectionVulns,
-    snapshotAt
+    snapshotAt,
+    filteredVulnsData,
+    areaData,
+    ganttData
   }
 }

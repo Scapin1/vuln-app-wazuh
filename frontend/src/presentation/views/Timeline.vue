@@ -36,37 +36,33 @@
       :latest-snap="latestSnap"
     />
 
-    <TimelineCanvas
-      v-if="hasBuilt && visibleSlots.length > 0"
-      :all-slots="allSlots"
-      :visible-slots="visibleSlots"
-      :painted-count="paintedCount"
-      :year-label="yearLabel"
-      :active-zoom="activeZoom"
-      :can-move-left="canMoveLeft"
-      :can-move-right="canMoveRight"
-      :can-zoom-in="canZoomIn"
-      :can-zoom-out="canZoomOut"
-      @move-left="moveLeft"
-      @move-right="moveRight"
-      @zoom-in="zoomIn"
-      @zoom-out="zoomOut"
-      @open-slot="openModal"
-    />
-
-    <div v-else class="card empty-card">
-      <div v-if="loading" class="empty-center"><p>Escaneando historial...</p></div>
-      <div v-else class="empty-center">
-        <h3>Sin datos para mostrar</h3>
-        <p>Selecciona filtros y presiona "Generar Vista".</p>
-      </div>
+    <div class="view-mode-selector">
+      <button 
+        class="tab-btn" 
+        :class="{ active: viewMode === 'aggregated' }" 
+        @click="viewMode = 'aggregated'"
+      >
+        Agrupado
+      </button>
+      <button 
+        class="tab-btn" 
+        :class="{ active: viewMode === 'per-cve' }" 
+        @click="viewMode = 'per-cve'"
+      >
+        Por CVE
+      </button>
     </div>
 
-    <TimelineDetailModal
-      :show="modalOpen"
-      :event-data="selectedEvent"
-      @close="modalOpen = false"
-    />
+    <AreaChartTab v-if="viewMode === 'aggregated' && hasBuilt" :area-data="areaData" />
+    <GanttTab v-else-if="viewMode === 'per-cve' && hasBuilt" :gantt-data="ganttData" />
+
+    <div v-else-if="loading" class="card empty-card">
+      <p>Escaneando historial...</p>
+    </div>
+    <div v-else class="card empty-card">
+      <h3>Sin datos para mostrar</h3>
+      <p>Selecciona filtros y presiona "Generar Vista".</p>
+    </div>
   </div>
 </template>
 
@@ -74,10 +70,8 @@
 import { computed, onMounted, ref } from 'vue'
 import wazuhService from '../../application/services/wazuhService'
 import useTimelineData from './timeline/useTimelineData'
-import useTimelineNavigation from './timeline/useTimelineNavigation'
-import { fmtYear } from './timeline/timelineFormatters'
-import TimelineCanvas from './timeline/components/TimelineCanvas.vue'
-import TimelineDetailModal from './timeline/components/TimelineDetailModal.vue'
+import AreaChartTab from './timeline/components/AreaChartTab.vue'
+import GanttTab from './timeline/components/GanttTab.vue'
 import TimelineFilters from './timeline/components/TimelineFilters.vue'
 import TimelineKpiStrip from './timeline/components/TimelineKpiStrip.vue'
 
@@ -98,65 +92,32 @@ const selectedVulns = ref([])
 const period = ref('30d')
 const customDate = ref(new Date().toISOString().split('T')[0])
 const errorBanner = ref('')
-
-const modalOpen = ref(false)
-const selectedEvent = ref(null)
+const viewMode = ref('aggregated')
 
 const getConnectionName = () => {
   const found = connections.value.find(conn => String(conn.id) === String(selectedConnection.value))
   return found?.name || ''
 }
 
-let allSlotsRef = null
-const navigation = useTimelineNavigation(() => (allSlotsRef ? allSlotsRef.value.length : 0))
-
 const {
   loading,
   hasBuilt,
-  allSlots,
   paintedCount,
   latestSnap,
   errorMessage,
   warningMessage,
   build,
-  fetchConnectionVulns
+  fetchConnectionVulns,
+  filteredVulnsData,
+  areaData,
+  ganttData
 } = useTimelineData({
   selectedConnection,
   selectedAgents,
   selectedVulns,
   period,
   customDate,
-  activeZoom: navigation.activeZoom,
   getConnectionName
-})
-
-allSlotsRef = allSlots
-
-const {
-  activeZoom,
-  visibleCount,
-  viewStartIndex,
-  canMoveLeft,
-  canMoveRight,
-  canZoomIn,
-  canZoomOut,
-  setZoomLevel,
-  zoomIn,
-  zoomOut,
-  moveLeft,
-  moveRight,
-  jumpToEnd
-} = navigation
-
-const visibleSlots = computed(() =>
-  allSlots.value.slice(viewStartIndex.value, viewStartIndex.value + visibleCount.value)
-)
-
-const yearLabel = computed(() => {
-  if (!visibleSlots.value.length) return ''
-  const start = fmtYear(visibleSlots.value[0].startMs)
-  const end = fmtYear(visibleSlots.value[visibleSlots.value.length - 1].startMs)
-  return start === end ? start : `${start} - ${end}`
 })
 
 const setPeriod = value => {
@@ -193,17 +154,10 @@ const onConnectionChange = async () => {
 const buildTimeline = async () => {
   errorBanner.value = ''
   try {
-    const { initialZoom } = await build()
-    setZoomLevel(initialZoom)
-    jumpToEnd()
+    await build()
   } catch (error) {
     console.error(error)
   }
-}
-
-const openModal = slot => {
-  selectedEvent.value = slot
-  modalOpen.value = true
 }
 
 onMounted(async () => {
@@ -257,5 +211,38 @@ const statusWarning = computed(() => warningMessage.value)
 
 .empty-center p {
   color: var(--text-muted);
+}
+
+.view-mode-selector {
+  display: flex;
+  gap: 0.5rem;
+  background: var(--card-bg);
+  padding: 0.3rem;
+  border-radius: var(--radius-md);
+  width: fit-content;
+  border: 1px solid var(--border);
+}
+
+.tab-btn {
+  padding: 0.4rem 1rem;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab-btn.active {
+  background: var(--primary-bg);
+  color: var(--primary);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.tab-btn:hover:not(.active) {
+  color: var(--text);
+  background: rgba(255,255,255,0.05);
 }
 </style>
