@@ -6,15 +6,14 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import set_key, find_dotenv
 from httpx import request
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from datetime import datetime, timezone
 from uuid import UUID
-from typing import List, Annotated, Optional
+from typing import List, Annotated, Optional, Dict, Set, Any, Tuple
 from pydantic import BaseModel
 from sqlalchemy.sql import func
-from sqlalchemy import select, insert, update, delete
+from sqlalchemy import select, insert, update, delete, text
 from .db import Base, engine, get_db
-from .models import User, WazuhVulnerability, WazuhConnection
 from .auth import (
     authenticate_user,
     create_access_token,
@@ -22,18 +21,17 @@ from .auth import (
     hash_password,
     verify_password,
 )
-from .models import User, WazuhVulnerability, WazuhConnection, VulnerabilityHistory
 from .wazuh_client import fetch_all_vulns, test_connection
 from .crypto import encrypt, decrypt
-from .models import Manager, Asset, VulnerabilityCatalog, VulnerabilityDetection
+from .models import Asset, VulnerabilityCatalog, VulnerabilityDetection, User, WazuhConnection
 from .schemas import (
-    UserCreate, UserOut, ManagerCreate, ManagerOut, AssetCreate, AssetOut, 
+    UserCreate, UserOut, AssetCreate, AssetOut, 
     CatalogCreate, CatalogOut, DetectionCreate, DetectionOut, 
-    VulnStatus, ManagerUpdate, AssetUpdate, CatalogUpdate,
+    VulnStatus, AssetUpdate, CatalogUpdate,
 ) 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from datetime import datetime
-
 
 CONNECTION_NOT_FOUND = "Conexión no encontrada"
 
@@ -287,8 +285,11 @@ async def sync_connection(
     if not conn.is_active:
         raise HTTPException(status_code=400, detail="La conexión está inactiva")
 
-    # fetch_all_vulns DEBE ser async (usando httpx)
-    raw_vulns = await fetch_all_vulns(conn.indexer_url, conn.wazuh_user, decrypt(conn.wazuh_password))
+    raw_vulns = await fetch_all_vulns(
+        conn.indexer_url, 
+        conn.wazuh_user, 
+        decrypt(conn.wazuh_password)
+    )
 
     count = await process_wazuh_vulnerabilities(db, conn.id, raw_vulns)
     await db.commit()
@@ -296,109 +297,131 @@ async def sync_connection(
     return {"synced": count, "connection": conn.name}
 
 async def process_wazuh_vulnerabilities(db: AsyncSession, conn_id: int, raw_vulns: list) -> int:
+    if not raw_vulns:
+        return 0
 
-    print(f"DEBUG: Recibidas {len(raw_vulns)} vulnerabilidades de la conexión {conn_id}")
-    if raw_vulns:
-        print(f"DEBUG: Ejemplo de primer registro: {raw_vulns[0]}") # Esto te dirá si es 'os' u 'osinfo'
-
-    count = 0
-    seen_vuln_ids = set()
-
-    # 1. Carga masiva: Traemos TODO lo que ya tenemos para esta conexión
-    result = await db.execute(
-        select(WazuhVulnerability).where(WazuhVulnerability.connection_id == conn_id)
-    )
-    all_vulns = result.scalars().all()
-    
-    # Creamos un mapa/indice en memoria para búsquedas instantáneas (O(1))
-    # La clave es una tupla con los campos que definen "unicidad"
-    lookup_map = {
-        (v.agent_id, v.package_name, v.package_version, v.cve_id): v 
-        for v in all_vulns
-    }
+    assets_data: Dict[str, dict] = {}
+    catalog_data: Dict[str, dict] = {}
 
     for v in raw_vulns:
         agent = v.get("agent", {})
-        pkg = v.get("package", {})
         vuln = v.get("vulnerability", {})
-        osinfo = agent.get("os", {}) # Cambiado de "osinfo" a "os" (verificar según tu fetch)
 
+        agent_id = str(agent.get("id"))
         cve_id = vuln.get("id")
-        if not cve_id: continue
 
-        # 2. Búsqueda en memoria (SIN CONSULTAR LA DB)
-        key = (str(agent.get("id")), pkg.get("name"), pkg.get("version"), cve_id)
-        existing = lookup_map.get(key)
+        if not agent_id or not cve_id: 
+            continue
 
-        if existing:
-            seen_vuln_ids.add(existing.id)
-            await _handle_existing_vuln_async(db, existing, vuln)
-        else:
-            new_vuln = await _create_new_vuln_async(db, conn_id, agent, pkg, vuln, osinfo)
-            seen_vuln_ids.add(new_vuln.id)
+        if agent_id not in assets_data:
+            assets_data[agent_id] = {
+                "wazuh_agent_id": agent_id,
+                "hostname": agent.get("name", "Unknown"),
+                "os_version": agent.get("os", {}).get("full"),
+                "wazuh_connection_id": conn_id  # Enlazado directamente al ID de WazuhConnection
+            }
 
-        count += 1
+        if cve_id not in catalog_data:
+            catalog_data[cve_id] = {
+                "cve_id": cve_id,
+                "severity": vuln.get("severity", "Unknown"),
+                "description": vuln.get("description"),
+                "cvss_score": (vuln.get("score") or {}).get("base")
+            }
 
-    # 3. Marcar como resueltas las que ya no están en el reporte de Wazuh
-    # Filtramos solo las que eran ACTIVE y no están en seen_vuln_ids
-    active_in_db = {v.id: v for v in all_vulns if v.status == "ACTIVE"}
-    await _resolve_missing_vulns_async(db, active_in_db, seen_vuln_ids)
+    if catalog_data:
+        stmt_catalog = pg_insert(VulnerabilityCatalog).values(list(catalog_data.values()))
+        stmt_catalog = stmt_catalog.on_conflict_do_nothing(index_elements=['cve_id'])
+        await db.execute(stmt_catalog)
+
+    if assets_data:
+        stmt_assets = pg_insert(Asset).values(list(assets_data.values()))
+        stmt_assets = stmt_assets.on_conflict_do_nothing(index_elements=['wazuh_agent_id'])
+        await db.execute(stmt_assets)
+
+    agent_wazuh_ids = list(assets_data.keys())
+    result_assets = await db.execute(
+        select(Asset.asset_id, Asset.wazuh_agent_id).where(Asset.wazuh_agent_id.in_(agent_wazuh_ids))
+    )
+    asset_map = {row.wazuh_agent_id: row.asset_id for row in result_assets.all()}
+
+    if not asset_map:
+        return 0
+
+    query_last_state = """
+        SELECT DISTINCT ON (d.asset_id, d.cve_id)
+            d.asset_id, d.cve_id, d.status
+        FROM vulnerability_detections d
+        JOIN assets a ON d.asset_id = a.asset_id
+        WHERE a.wazuh_connection_id = :conn_id
+        ORDER BY d.asset_id, d.cve_id, d.timestamp DESC
+    """
     
-    return count
+    result_state = await db.execute(
+        text(query_last_state), 
+        {"conn_id": conn_id}
+    )
+    
+    current_state: Dict[Tuple[UUID, str], VulnStatus] = {
+        (row.asset_id, row.cve_id): row.status for row in result_state.fetchall()
+    }
 
-async def _handle_existing_vuln_async(db: AsyncSession, existing: WazuhVulnerability, vuln: dict):
-    if existing.status == "RESOLVED":
-        existing.status = "ACTIVE"
-        db.add(VulnerabilityHistory(vulnerability_id=existing.id, action="REOPENED"))
+    detections_to_insert: List[Dict[str, Any]] = []
+    seen_in_payload: Set[Tuple[UUID, str]] = set()
+    current_timestamp = datetime.now(timezone.utc)
 
-    if existing.severity != vuln.get("severity"):
-        db.add(VulnerabilityHistory(vulnerability_id=existing.id, action="SEVERITY_CHANGED"))
-        existing.severity = vuln.get("severity")
+    for v in raw_vulns:
+        agent_id = str(v.get("agent", {}).get("id"))
+        cve_id = v.get("vulnerability", {}).get("id")
+        pkg = v.get("package", {})
 
-    existing.score_base = (vuln.get("score") or {}).get("base")
-    existing.last_seen = func.now()
+        asset_uuid = asset_map.get(agent_id)
+        if not asset_uuid or not cve_id:
+            continue
 
-def parse_wazuh_date(date_str):
+        pair_key = (asset_uuid, cve_id)
+        seen_in_payload.add(pair_key)
+        last_status = current_state.get(pair_key)
+
+        if last_status != VulnStatus.Detected:
+            detected_at_str = v.get("vulnerability", {}).get("detected_at")
+            first_seen = parse_wazuh_date(detected_at_str) if detected_at_str else current_timestamp
+
+            detections_to_insert.append({
+                "timestamp": current_timestamp,
+                "asset_id": asset_uuid,
+                "cve_id": cve_id,
+                "status": VulnStatus.Detected,
+                "first_seen_at": first_seen,
+                "package_name": pkg.get("name"),
+                "package_version": pkg.get("version")
+            })
+
+    for (asset_uuid, cve_id), status in current_state.items():
+        if status == VulnStatus.Detected and (asset_uuid, cve_id) not in seen_in_payload:
+            detections_to_insert.append({
+                "timestamp": current_timestamp,
+                "asset_id": asset_uuid,
+                "cve_id": cve_id,
+                "status": VulnStatus.Resolved,
+                "first_seen_at": current_timestamp, 
+                "package_name": None,
+                "package_version": None
+            })
+
+    if detections_to_insert:
+        await db.execute(pg_insert(VulnerabilityDetection).values(detections_to_insert))
+
+    return len(detections_to_insert)
+
+def parse_wazuh_date(date_str: str):
     if not date_str or date_str == "not defined":
         return None
     try:
         return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
     except Exception:
-        return None    
+        return None
 
-async def _create_new_vuln_async(db: AsyncSession, conn_id: int, agent: dict, pkg: dict, vuln: dict, osinfo: dict):
-    new_vuln = WazuhVulnerability(
-        connection_id=conn_id,
-        status="ACTIVE",
-        agent_id=agent.get("id"),
-        agent_name=agent.get("name"),
-        os_full=osinfo.get("full"),
-        os_platform=osinfo.get("platform"),
-        os_version=osinfo.get("version"),
-        package_name=pkg.get("name"),
-        package_version=pkg.get("version"),
-        package_type=pkg.get("type"),
-        package_arch=pkg.get("architecture"),
-        cve_id=vuln.get("id"),
-        severity=vuln.get("severity"),
-        score_base=(vuln.get("score") or {}).get("base"),
-        score_version=(vuln.get("score") or {}).get("version"),
-        detected_at=parse_wazuh_date(vuln.get("detected_at")),
-        published_at=parse_wazuh_date(vuln.get("published_at")),
-        description=vuln.get("description"),
-        reference=vuln.get("reference"),
-        scanner_vendor=(vuln.get("scanner") or {}).get("vendor"),
-    )
-    db.add(new_vuln)
-    await db.flush() 
-    db.add(VulnerabilityHistory(vulnerability_id=new_vuln.id, action="DETECTED", details="Vulnerabilidad identificada por primera vez"))
-    return new_vuln
-
-async def _resolve_missing_vulns_async(db: AsyncSession, active_dict: dict, seen_ids: set):
-    for v_id, db_vuln in active_dict.items():
-        if v_id not in seen_ids:
-            db_vuln.status = "RESOLVED"
-            await db.add(VulnerabilityHistory(vulnerability_id=v_id, action="RESOLVED"))
 
 @app.get("/vulns", tags=["Read"])
 async def list_vulns(
@@ -407,23 +430,43 @@ async def list_vulns(
     limit: Optional[int] = 100,
     connection_id: Optional[int] = None,
 ):
-    query = select(WazuhVulnerability)
+    # 1. Consultamos la hipertabla y cargamos los datos relacionados de Asset y Catálogo
+    query = select(VulnerabilityDetection).options(
+        joinedload(VulnerabilityDetection.asset),
+        joinedload(VulnerabilityDetection.catalog_entry)
+    )
     if connection_id:
-        query = query.where(WazuhVulnerability.connection_id == connection_id)
+        query = query.join(Asset).where(Asset.wazuh_connection_id == connection_id)
     
-    query = query.limit(limit).order_by(WazuhVulnerability.last_seen.desc())
+    query = query.order_by(VulnerabilityDetection.timestamp.desc()).limit(limit)
     result = await db.execute(query)
     vulns = result.scalars().all()
 
-    # Formateo de respuesta (usando lazy loading o selectinload si es necesario)
-    return vulns
+    return [
+        {
+            "id": f"{v.asset_id}-{v.cve_id}", # Se crea un pseudo-ID string para que React/Vue no fallen en el key mapping
+            "connection_id": v.asset.wazuh_connection_id if v.asset else None,
+            "status": v.status.value if hasattr(v.status, 'value') else v.status,
+            "agent_id": v.asset.wazuh_agent_id if v.asset else None,
+            "agent_name": v.asset.hostname if v.asset else None,
+            "os_full": v.asset.os_version if v.asset else None,
+            "package_name": v.package_name,
+            "package_version": v.package_version,
+            "cve_id": v.cve_id,
+            "severity": v.catalog_entry.severity if v.catalog_entry else None,
+            "score_base": float(v.catalog_entry.cvss_score) if v.catalog_entry and v.catalog_entry.cvss_score else None,
+            "description": v.catalog_entry.description if v.catalog_entry else None,
+            "first_seen": v.first_seen_at,
+            "last_seen": v.timestamp
+        }
+        for v in vulns
+    ]
 
 @app.post("/vulns/sync-all", tags=["Sync"])
 async def sync_all_connections(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
-    # Buscamos todas las conexiones activas
     query = select(WazuhConnection).where(WazuhConnection.is_active == True)
     result = await db.execute(query)
     conns = result.scalars().all()
@@ -431,37 +474,25 @@ async def sync_all_connections(
     results = []
 
     for conn in conns:
-        conn_id = conn.id
-        conn_name = conn.name
-        conn_url = conn.indexer_url
-        conn_user = conn.wazuh_user
-        conn_pass = decrypt(conn.wazuh_password)
-        
         try:
-            # IMPORTANTE: fetch_all_vulns debe ser una función 'async def' 
-            # que use httpx.AsyncClient() internamente.
-            raw_vulns = await fetch_all_vulns(conn_url, conn_user, conn_pass
+            raw_vulns = await fetch_all_vulns(
+                conn.indexer_url, 
+                conn.wazuh_user, 
+                decrypt(conn.wazuh_password)
             )
-
-            count = await process_wazuh_vulnerabilities(db, conn_id, raw_vulns)
-            
-            # Commit parcial por cada conexión exitosa
+            count = await process_wazuh_vulnerabilities(db, conn.id, raw_vulns)
             await db.commit()
 
             results.append({
-                "connection": conn_name, 
+                "connection": conn.name, 
                 "synced": count, 
                 "ok": True
             })
             
         except Exception as e:
-            # Si una falla, hacemos rollback de esa conexión específica y seguimos con la otra
             await db.rollback()
-            print(f"!!! ERROR SINCRONIZANDO {conn_name}: {str(e)}") 
-            import traceback
-            traceback.print_exc()
             results.append({
-                "connection": conn_name, 
+                "connection": conn.name, 
                 "ok": False, 
                 "error": str(e)
             })
@@ -497,16 +528,6 @@ async def create_user(
     await db.commit()
     return {"message": "Usuario creado"}
 
-@app.post("/managers/", response_model=ManagerOut, tags=["Create"])
-async def create_manager(
-    data: ManagerCreate, 
-    db: Annotated[AsyncSession, Depends(get_db)]
-):
-    nuevo_manager = Manager(**data.model_dump())
-    db.add(nuevo_manager)
-    await db.commit()
-    await db.refresh(nuevo_manager)
-    return nuevo_manager
 
 @app.post("/assets/", response_model=AssetOut, tags=["Create"])
 async def create_asset(
@@ -567,10 +588,6 @@ async def create_detection(
 # 2. READ
 # ==========================================================
 
-@app.get("/managers/", response_model=List[ManagerOut], tags=["Read"])
-async def get_managers(db: Annotated[AsyncSession, Depends(get_db)]):
-    result = await db.execute(select(Manager))
-    return result.scalars().all()
 
 @app.get("/assets/", response_model=List[AssetOut], tags=["Read"])
 async def get_assets(db: Annotated[AsyncSession, Depends(get_db)]):
@@ -608,25 +625,6 @@ async def get_asset_history(
 # 3. UPDATE
 # ==========================================================
 
-@app.patch("/managers/{manager_id}", response_model=ManagerOut, tags=["Update"])
-async def update_manager(
-    manager_id: UUID, 
-    data: ManagerUpdate, 
-    db: Annotated[AsyncSession, Depends(get_db)]
-):
-    result = await db.execute(select(Manager).where(Manager.manager_id == manager_id))
-    db_manager = result.scalar_one_or_none()
-    
-    if not db_manager:
-        raise HTTPException(status_code=404, detail="Manager no encontrado")  
-    
-    update_data = data.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(db_manager, key, value)
-        
-    await db.commit()
-    await db.refresh(db_manager)
-    return db_manager
 
 @app.patch("/assets/{asset_id}", response_model=AssetOut, tags=["Update"])
 async def update_asset(

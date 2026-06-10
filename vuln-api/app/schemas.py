@@ -16,7 +16,6 @@ class UserCreate(UserBase):
     user_name: str
     user_rol: str
     user_password: str
-    # Eliminamos manager_id de aquí porque la relación es M:N (intermedia)
 
 class UserOut(UserBase):
     user_id: int
@@ -24,31 +23,13 @@ class UserOut(UserBase):
     user_delete: bool
     model_config = ConfigDict(from_attributes=True)
 
-# --- MANAGER SCHEMAS ---
-class ManagerBase(BaseModel):
-    nombre: str
-    api_url: str
-    api_key_vault_ref: Optional[str] = None
-
-class ManagerCreate(ManagerBase):
-    pass
-
-class ManagerOut(ManagerBase):
-    manager_id: UUID # Coincide con models.py
-    model_config = ConfigDict(from_attributes=True)
-
-class ManagerUpdate(BaseModel):
-    nombre: Optional[str] = None
-    api_url: Optional[str] = None
-    api_key_vault_ref: Optional[str] = None
-
 # --- ASSET SCHEMAS ---
 class AssetBase(BaseModel):
     wazuh_agent_id: str
     hostname: str
     os_version: Optional[str] = None
     ip_address: Optional[IPvAnyAddress] = None
-    manager_id: UUID
+    wazuh_connection_id: UUID
 
 class AssetCreate(AssetBase):
     pass
@@ -61,7 +42,7 @@ class AssetUpdate(BaseModel):
     hostname: Optional[str] = None
     os_version: Optional[str] = None
     ip_address: Optional[IPvAnyAddress] = None
-    manager_id: Optional[UUID] = None
+    wazuh_connection_id: Optional[UUID] = None
 
 # --- CATALOG SCHEMAS ---
 class CatalogCreate(BaseModel):

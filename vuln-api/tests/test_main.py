@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from app.main import app
 from app.db import get_db
 from app.auth import get_current_user, hash_password
-from app.models import User, Manager, Asset, VulnerabilityDetection, VulnStatus, VulnerabilityCatalog, WazuhConnection, WazuhVulnerability
+from app.models import User, Asset, VulnerabilityDetection, VulnStatus, VulnerabilityCatalog, WazuhConnection
 from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -58,8 +58,6 @@ def mock_refresh_side_effect(obj):
         obj.user_id = 1
     elif hasattr(obj, 'id') and getattr(obj, 'id', None) is None:
         obj.id = uuid.uuid4()
-    if not hasattr(obj, 'manager_id') or getattr(obj, 'manager_id', None) is None:
-        obj.manager_id = uuid.uuid4()
     if hasattr(obj, 'timestamp') and getattr(obj, 'timestamp', None) is None:
         obj.timestamp = datetime.now(timezone.utc)
     if hasattr(obj, 'cve_id') and getattr(obj, 'cve_id', None) is None:
@@ -89,22 +87,33 @@ async def test_sync_process_complete_flow():
     mock_db = AsyncMock(spec=AsyncSession)
     mock_db.add = AsyncMock(return_value=None)
     mock_db.commit = AsyncMock(return_value=None)
-    mock_db.execute = AsyncMock()
-    mock_db.get = AsyncMock()
-
+    
     mock_conn = WazuhConnection(
         id=1, name="Lab", is_active=True, 
         indexer_url="http://wazuh", wazuh_user="admin", wazuh_password="hash"
     )
     mock_db.get.return_value = mock_conn
 
-    existing_active = WazuhVulnerability(
-        id=10, agent_id="001", cve_id="CVE-OLD", status="ACTIVE", package_name="bash"
-    )
-    
-    mock_result = MagicMock()
-    mock_result.scalars.return_value.all.return_value = [existing_active]
-    mock_db.execute.return_value = mock_result
+    # Simulamos el mapeo de agentes a assets en la base de datos
+    class MockRow:
+        def __init__(self, wazuh_agent_id, asset_id):
+            self.wazuh_agent_id = wazuh_agent_id
+            self.asset_id = asset_id
+
+    mock_result_assets = MagicMock()
+    mock_result_assets.all.return_value = [MockRow("001", uuid.uuid4())]
+
+    mock_result_state = MagicMock()
+    mock_result_state.fetchall.return_value = []
+
+    # Mockeamos las 5 llamadas secuenciales a db.execute de process_wazuh_vulnerabilities
+    mock_db.execute.side_effect = [
+        MagicMock(),         # 1. UPSERT Catalog
+        MagicMock(),         # 2. UPSERT Assets
+        mock_result_assets,  # 3. SELECT Asset mapping
+        mock_result_state,   # 4. SELECT Last State
+        MagicMock()          # 5. INSERT Detections
+    ]
 
     mock_raw_wazuh = [{
         "agent": {"id": "001", "name": "agent-1", "os": {"full": "Ubuntu"}},
@@ -115,8 +124,7 @@ async def test_sync_process_complete_flow():
     app.dependency_overrides[get_db] = lambda: mock_db
     
     with patch("app.main.fetch_all_vulns", new_callable=AsyncMock) as mock_fetch, \
-         patch("app.main.decrypt", return_value="plain"), \
-         patch("os.getenv", return_value="una_clave_maestra_muy_larga_de_mas_de_32_bytes"):
+         patch("app.main.decrypt", return_value="plain"):
         
         mock_fetch.return_value = mock_raw_wazuh
 
@@ -346,8 +354,7 @@ async def test_validate_password_weak():
         }
         response = await ac.post("/auth/change-password", json=payload)
     
-    # 3. Verificamos los resultados
-    # Ahora el status seguirá siendo 400, pero el mensaje será el de robustez
+    # Verificamos los resultados
     assert response.status_code == 400
     assert "robusta" in response.json()["detail"]
 
@@ -367,7 +374,7 @@ async def test_crud_and_reads():
             "user_password": user_pass_val
         })
         
-        for path in ["/managers/", "/assets/", "/catalog/", "/detections/"]:
+        for path in ["/assets/", "/catalog/", "/detections/"]:
             res = await ac.get(path)
             assert res.status_code == 200
 
@@ -404,31 +411,28 @@ async def test_change_password_logic_branches():
     app.dependency_overrides[get_current_user] = lambda: mock_user
 
     async with AsyncClient(transport=transport, base_url="https://test") as ac:
-        # Caso A: Clave antigua incorrecta (Línea 86)
-        # Enviamos 'wrong_key', por lo que rebotará aquí.
+        # Caso A: Clave antigua incorrecta 
         await ac.post("/auth/change-password", json={
             "old_password": wrong_key, 
             "new_password": new_strong_key, 
             "confirm_password": new_strong_key
         })
 
-        # Caso B: Nueva igual a vieja (Línea 89)
-        # Aquí 'old' y 'new' son iguales a la del mock.
+        # Caso B: Nueva igual a vieja 
         await ac.post("/auth/change-password", json={
             "old_password": actual_key, 
             "new_password": actual_key, 
             "confirm_password": actual_key
         })
 
-        # Caso C: Confirmación no coincide (Línea 92)
+        # Caso C: Confirmación no coincide 
         await ac.post("/auth/change-password", json={
             "old_password": actual_key, 
             "new_password": new_strong_key, 
             "confirm_password": mismatch_key
         })
 
-        # Caso D: Password débil (Líneas 98-104)
-        # Este es el que verificamos con el assert final
+        # Caso D: Password débil 
         res = await ac.post("/auth/change-password", json={
             "old_password": actual_key, 
             "new_password": weak_key, 
@@ -438,22 +442,6 @@ async def test_change_password_logic_branches():
         assert res.status_code == 400
         assert "robusta" in res.json()["detail"]
 
-@pytest.mark.asyncio
-async def test_catalog_patch_and_manager_404():
-    mock_db = AsyncMock()
-    mock_db.add = MagicMock()
-    mock_c = VulnerabilityCatalog(cve_id="C-1", severity="H", description="D", cvss_score=5.0)
-    res_mock = MagicMock()
-    res_mock.scalar_one_or_none.return_value = mock_c
-    mock_db.execute.return_value = res_mock
-    mock_db.refresh.side_effect = mock_refresh_side_effect
-    app.dependency_overrides[get_db] = lambda: mock_db
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="https://test") as ac:
-        await ac.patch("/catalog/C-1", json={"severity": "Low"})
-        res_mock.scalar_one_or_none.return_value = None
-        res = await ac.patch(f"/managers/{uuid.uuid4()}", json={"nombre": "X"})
-    assert res.status_code == 404
 
 @pytest.mark.asyncio
 async def test_extra_coverage_posts():
@@ -506,30 +494,14 @@ async def test_update_catalog_success_path():
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="https://test") as ac:
-        # Esto ejecuta el commit y el refresh de la línea 292
         response = await ac.patch("/catalog/CVE-2026", json={"severity": "High"})
     assert response.status_code == 200
-
-@pytest.mark.asyncio
-async def test_update_manager_not_found():
-    mock_db = AsyncMock()
-    mock_db.add = MagicMock()
-    res_mock = MagicMock()
-    res_mock.scalar_one_or_none.return_value = None # No lo encuentra
-    mock_db.execute.return_value = res_mock
-    app.dependency_overrides[get_db] = lambda: mock_db
-
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="https://test") as ac:
-        response = await ac.patch(f"/managers/{uuid.uuid4()}", json={"nombre": "Nuevo"})
-    assert response.status_code == 404
 
 @pytest.mark.asyncio
 async def test_login_wrong_password():
     app.dependency_overrides[get_db] = override_get_db
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="https://test") as ac:
-        # Usamos el email del mock_user pero con clave errónea
         payload = {"username": "admin@usach.cl", "password": "password_incorrecto"}
         response = await ac.post("/auth/login", data=payload)
     assert response.status_code == 400
@@ -554,19 +526,6 @@ async def test_password_strength_full_errors():
     assert response.status_code == 400
     assert "robusta" in response.json()["detail"]
 
-@pytest.mark.asyncio
-async def test_update_manager_404_path():
-    mock_db = AsyncMock()
-    mock_db.add = MagicMock()
-    mock_result = MagicMock() # Debe ser MagicMock para que scalar_one_or_none sea síncrono
-    mock_result.scalar_one_or_none.return_value = None
-    mock_db.execute.return_value = mock_result
-    app.dependency_overrides[get_db] = lambda: mock_db
-    
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="https://test") as ac:
-        response = await ac.patch(f"/managers/{uuid.uuid4()}", json={"nombre": "X"})
-    assert response.status_code == 404
 
 @pytest.mark.asyncio
 async def test_update_catalog_success_final():
@@ -574,7 +533,7 @@ async def test_update_catalog_success_final():
     mock_db.add = MagicMock()
     mock_c = VulnerabilityCatalog(cve_id="CVE-2026", severity="Low", description="D", cvss_score=1.0)
     
-    mock_result = MagicMock() # Sincrónico
+    mock_result = MagicMock()
     mock_result.scalar_one_or_none.return_value = mock_c
     mock_db.execute.return_value = mock_result
     mock_db.refresh.side_effect = mock_refresh_side_effect
@@ -589,7 +548,7 @@ async def test_update_catalog_success_final():
 async def test_update_asset_not_found_trigger():
     mock_db = AsyncMock()
     res_mock = MagicMock()
-    res_mock.scalar_one_or_none.return_value = None # No existe
+    res_mock.scalar_one_or_none.return_value = None 
     mock_db.execute.return_value = res_mock
     app.dependency_overrides[get_db] = lambda: mock_db
     
@@ -597,6 +556,78 @@ async def test_update_asset_not_found_trigger():
     async with AsyncClient(transport=transport, base_url="https://test") as ac:
         res = await ac.patch(f"/assets/{uuid.uuid4()}", json={"hostname": "X"})
     assert res.status_code == 404
+
+@pytest.mark.asyncio
+async def test_sync_process_batching_logic(mock_wazuh_raw_data):
+    """
+    Verifica que la función process_wazuh_vulnerabilities ejecute 
+    correctamente los 5 comandos SQL masivos (batch) en el orden esperado.
+    """
+    mock_db = AsyncMock(spec=AsyncSession)
+    mock_db.commit = AsyncMock()
+
+    # 1. Mockeamos la conexión activa
+    mock_conn = WazuhConnection(
+        id=1, name="Batch Lab", is_active=True, 
+        indexer_url="http://wazuh.local", wazuh_user="admin", wazuh_password="hash"
+    )
+    mock_db.get.return_value = mock_conn
+
+    # 2. Mock de la resolución de IDs para la hipertabla
+    class MapRow:
+        def __init__(self):
+            self.wazuh_agent_id = "001"
+            self.asset_id = uuid.uuid4()
+            
+    map_row = MapRow()
+
+    # 3. Mock del estado previo de la base de datos (SELECT inicial masivo)
+    class StateRow:
+        def __init__(self):
+            self.asset_id = map_row.asset_id
+            self.cve_id = "CVE-2026-TEST-EXISTING"
+            self.status = VulnStatus.Resolved  # Forzamos re-detección
+
+    mock_result_catalog = MagicMock()
+    mock_result_assets = MagicMock()
+    
+    mock_result_map = MagicMock()
+    mock_result_map.all.return_value = [map_row]
+    
+    mock_result_state = MagicMock()
+    mock_result_state.fetchall.return_value = [StateRow()]
+
+    mock_result_insert = MagicMock()
+
+    # Preparamos las 5 ejecuciones secuenciales exactas que hace main.py
+    mock_db.execute.side_effect = [
+        mock_result_catalog,  # 1. UPSERT masivo a VulnerabilityCatalog
+        mock_result_assets,   # 2. UPSERT masivo a Assets
+        mock_result_map,      # 3. SELECT de mapeos de Asset IDs
+        mock_result_state,    # 4. SELECT del Last State en TimescaleDB
+        mock_result_insert    # 5. INSERT masivo a VulnerabilityDetection
+    ]
+
+    app.dependency_overrides[get_db] = lambda: mock_db
+    
+    with patch("app.main.fetch_all_vulns", new_callable=AsyncMock) as mock_fetch, \
+         patch("app.main.decrypt", return_value="plain_pass"):
+        
+        # Inyectamos el fixture que simula la respuesta de la API de Wazuh (1 nuevo, 1 existente redetectado)
+        mock_fetch.return_value = mock_wazuh_raw_data
+        
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            response = await ac.post("/wazuh-connections/1/sync")
+            
+    # --- Verificaciones del Loteo ---
+    assert response.status_code == 200
+    # Debería reportar 2 procesados en la misma inserción masiva
+    assert response.json()["synced"] == 2 
+    
+    # Confirmamos que se hicieron exactamente 5 llamadas masivas a la base de datos
+    assert mock_db.execute.call_count == 5
+    assert mock_db.commit.called
 
 def teardown_module(module):
     app.dependency_overrides.clear()
