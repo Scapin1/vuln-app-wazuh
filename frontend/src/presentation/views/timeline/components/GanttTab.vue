@@ -4,7 +4,8 @@
       <h3 class="gantt-title">Seguimiento de CVEs Criticos</h3>
       <div class="gantt-controls">
         <div class="search-date">
-          <input type="datetime-local" v-model="searchDate" class="date-input" />
+          <label for="ganttSearchDate" style="font-size: 11px; color: #64748b; font-weight: 600;">Buscar fecha:</label>
+          <input id="ganttSearchDate" type="datetime-local" v-model="searchDate" class="date-input" />
           <button class="search-btn" @click="scrollToDate">Ir</button>
         </div>
         <div class="zoom-controls">
