@@ -17,6 +17,7 @@ from sqlalchemy import (
     UniqueConstraint,
     ForeignKey,
     Table,
+    BigInteger
 )
 from sqlalchemy.dialects.postgresql import UUID, INET
 from sqlalchemy.orm import relationship
@@ -59,7 +60,7 @@ class Asset(Base):
     hostname = Column(String(255), nullable=False)
     os_version = Column(String(255))
     ip_address = Column(INET)
-    wazuh_connection_id = Column(UUID(as_uuid=True), ForeignKey("wazuh_connections.id"), nullable=False)
+    wazuh_connection_id = Column(BigInteger, ForeignKey("wazuh_connections.id"), nullable=False)
     
     wazuh_connection = relationship("WazuhConnection", back_populates="assets")
     detections = relationship("VulnerabilityDetection", back_populates="asset")

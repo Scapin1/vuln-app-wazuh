@@ -473,17 +473,24 @@ async def sync_all_connections(
     results = []
 
     for conn in conns:
+        conn_id = conn.id
+        conn_name = conn.name
+        conn_indexer_url = conn.indexer_url
+        conn_wazuh_user = conn.wazuh_user
+        wazuh_password_plain = decrypt(conn.wazuh_password)
+
         try:
             raw_vulns = await fetch_all_vulns(
-                conn.indexer_url, 
-                conn.wazuh_user, 
-                decrypt(conn.wazuh_password)
+                conn_indexer_url, 
+                conn_wazuh_user, 
+                wazuh_password_plain
             )
-            count = await process_wazuh_vulnerabilities(db, conn.id, raw_vulns)
+            
+            count = await process_wazuh_vulnerabilities(db, conn_id, raw_vulns)
             await db.commit()
 
             results.append({
-                "connection": conn.name, 
+                "connection": conn_name,
                 "synced": count, 
                 "ok": True
             })
@@ -491,7 +498,7 @@ async def sync_all_connections(
         except Exception as e:
             await db.rollback()
             results.append({
-                "connection": conn.name, 
+                "connection": conn_name,
                 "ok": False, 
                 "error": str(e)
             })
