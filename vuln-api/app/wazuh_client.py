@@ -8,7 +8,7 @@ VULN_INDEX = "wazuh-states-vulnerabilities-*/_search"
 
 async def fetch_all_vulns(indexer_url: str, wazuh_user: str, wazuh_password: str):
     url = f"{indexer_url}/{VULN_INDEX}"
-    body = {"size": 99999, "_source": True}
+    body = {"size": 10000, "_source": True}
     credentials = f"{wazuh_user}:{wazuh_password}"
     encoded_credentials = base64.b64encode(credentials.encode("utf-8")).decode("utf-8")
     headers = {

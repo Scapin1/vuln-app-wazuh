@@ -182,7 +182,6 @@ async def create_connection(
     if existing:
         raise HTTPException(status_code=400, detail="Ya existe una conexión con ese nombre")
 
-    # test_connection es sync, no hace falta await
     ok = test_connection(request.indexer_url, request.wazuh_user, request.wazuh_password)
     if not ok:
         raise HTTPException(status_code=400, detail="No se pudo establecer conexión con Wazuh")
@@ -231,7 +230,7 @@ async def test_existing_wazuh_connection(
     if not conn:
         raise HTTPException(status_code=404, detail="Conexión no encontrada")
 
-    ok = await test_connection(conn.indexer_url, conn.wazuh_user, decrypt(conn.wazuh_password))
+    ok = test_connection(conn.indexer_url, conn.wazuh_user, decrypt(conn.wazuh_password))
 
     conn.tested = True
     conn.last_tested_at = func.now()
@@ -602,7 +601,12 @@ async def get_catalog(db: Annotated[AsyncSession, Depends(get_db)]):
 @app.get("/detections/", response_model=List[DetectionOut], tags=["Read"])
 async def get_all_detections(db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(
-        select(VulnerabilityDetection).order_by(VulnerabilityDetection.timestamp.desc())
+        select(VulnerabilityDetection)
+        .options(
+            joinedload(VulnerabilityDetection.asset),
+            joinedload(VulnerabilityDetection.catalog_entry)
+        )
+        .order_by(VulnerabilityDetection.timestamp.desc())
     )
     return result.scalars().all()
 
@@ -611,9 +615,15 @@ async def get_asset_history(
     asset_id: UUID, 
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    query = select(VulnerabilityDetection).where(
-        VulnerabilityDetection.asset_id == asset_id
-    ).order_by(VulnerabilityDetection.timestamp.desc()) 
+    query = (
+        select(VulnerabilityDetection)
+        .where(VulnerabilityDetection.asset_id == asset_id)
+        .options(
+            joinedload(VulnerabilityDetection.asset),
+            joinedload(VulnerabilityDetection.catalog_entry)
+        )
+        .order_by(VulnerabilityDetection.timestamp.desc()) 
+    ) 
     
     result = await db.execute(query)
     history = result.scalars().all() 

@@ -85,7 +85,7 @@ CREATE TABLE assets (
     hostname VARCHAR(255) NOT NULL,
     os_version VARCHAR(255),
     ip_address INET,
-    wazuh_connection_id SERIAL REFERENCES wazuh_connections(id) ON DELETE RESTRICT
+    wazuh_connection_id BIGINT REFERENCES wazuh_connections(id) ON DELETE RESTRICT
 );
 
 -- Tabla para registrar interacciones de los usuarios con la API 
@@ -132,7 +132,7 @@ RETURNS TRIGGER AS $$
 DECLARE
     last_status Vuln_status;
 BEGIN
-    SELECT vuln_status INTO last_status
+    SELECT NEW.status INTO last_status
     FROM vulnerability_detections
     WHERE asset_id = NEW.asset_id 
         AND cve_id = NEW.cve_id
@@ -141,11 +141,11 @@ BEGIN
     LIMIT 1;
 
     IF last_status IS NULL THEN
-        NEW.vuln_status := 'Detected';
+        NEW.status := 'Detected';
     ELSIF last_status = 'Resolved' THEN
-        NEW.vuln_status := 'Re-emerged';
+        NEW.status := 'Re-emerged';
     ELSE
-        NEW.vuln_status := 'Detected';
+        NEW.status := 'Detected';
     END IF;
     RETURN NEW;
 END;
