@@ -247,10 +247,9 @@ async def test_test_existing_connection_flow():
     app.dependency_overrides[get_db] = lambda: mock_db
     
     with patch("app.main.decrypt", return_value="plain"), \
-         patch("app.main.test_connection", new_callable=AsyncMock) as mock_test:
-        
+         patch("app.main.test_connection") as mock_test: 
         mock_test.return_value = True
-        
+
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             response = await ac.post("/wazuh-connections/1/test")
