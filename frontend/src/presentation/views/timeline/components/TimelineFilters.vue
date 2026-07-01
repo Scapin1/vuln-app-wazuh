@@ -9,13 +9,13 @@
         </select>
       </div>
 
-      <div class="f-group popover-wrap" v-click-outside="() => (dropdowns.agents = false)">
+      <div class="f-group popover-wrap" v-click-outside="() => (activeDropdown = '')">
         <label>Equipos / Agentes</label>
-        <button class="filter-input dd-btn" @click="dropdowns.agents = !dropdowns.agents">
-          <span>{{ selectedAgentsModel.length ? selectedAgentsModel.length + ' sel.' : 'Todos' }}</span>
+        <button class="filter-input dd-btn" @click="activeDropdown = activeDropdown === 'agents' ? '' : 'agents'">
+          <span :class="selectedAgentsModel.length ? 'sel-badge' : ''">{{ selectedAgentsModel.length ? selectedAgentsModel.length + ' sel.' : 'Todos' }}</span>
           <span>▼</span>
         </button>
-        <div v-if="dropdowns.agents" class="dd-panel fade-in">
+        <div v-if="activeDropdown === 'agents'" class="dd-panel fade-in">
           <input type="text" v-model="search.agent" placeholder="Buscar agente..." class="dd-search">
           <div class="dd-actions">
             <span @click="selectedAgentsModel = [...agentOptions]">Todos</span>
@@ -29,13 +29,13 @@
         </div>
       </div>
 
-      <div class="f-group popover-wrap" v-click-outside="() => (dropdowns.vulns = false)">
+      <div class="f-group popover-wrap" v-click-outside="() => (activeDropdown = '')">
         <label>Vulnerabilidad</label>
-        <button class="filter-input dd-btn" @click="dropdowns.vulns = !dropdowns.vulns">
-          <span>{{ selectedVulnsModel.length ? selectedVulnsModel.length + ' sel.' : 'Todas' }}</span>
+        <button class="filter-input dd-btn" @click="activeDropdown = activeDropdown === 'vulns' ? '' : 'vulns'">
+          <span :class="selectedVulnsModel.length ? 'sel-badge' : ''">{{ selectedVulnsModel.length ? selectedVulnsModel.length + ' sel.' : 'Todas' }}</span>
           <span>▼</span>
         </button>
-        <div v-if="dropdowns.vulns" class="dd-panel fade-in">
+        <div v-if="activeDropdown === 'vulns'" class="dd-panel fade-in">
           <input type="text" v-model="search.vuln" placeholder="Buscar CVE..." class="dd-search">
           <div class="dd-actions">
             <span @click="selectedVulnsModel = [...vulnOptions]">Todas</span>
@@ -79,7 +79,7 @@
 </template>
 
 <script setup>
-import { computed, reactive } from 'vue'
+import { computed, reactive, ref } from 'vue'
 
 const props = defineProps({
   connections: { type: Array, required: true },
@@ -125,7 +125,7 @@ const customDateModel = computed({
 })
 
 const search = reactive({ agent: '', vuln: '' })
-const dropdowns = reactive({ agents: false, vulns: false })
+const activeDropdown = ref('')
 
 const filteredAgents = computed(() =>
   props.agentOptions.filter(agent => agent.toLowerCase().includes(search.agent.toLowerCase()))
@@ -138,7 +138,7 @@ const filteredVulns = computed(() =>
 
 <style scoped>
 .filter-panel { padding: 0; margin-bottom: 1.5rem; overflow: visible; }
-.filter-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr auto; align-items: stretch; }
+.filter-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); align-items: stretch; }
 .f-group { display: flex; flex-direction: column; padding: 1rem 1.2rem; border-right: 1px solid var(--border); }
 .f-group:last-child { border-right: none; }
 .f-group label { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem; }
@@ -146,17 +146,19 @@ const filteredVulns = computed(() =>
 .f-action { justify-content: end; background: var(--bg-hover); }
 .popover-wrap { position: relative; }
 .dd-btn { display: flex; justify-content: space-between; }
-.dd-panel { position: absolute; top: calc(100% + 6px); left: 0; width: 280px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-panel); z-index: 20; overflow: hidden; }
+.dd-panel { position: absolute; top: calc(100% + 6px); left: 0; width: 280px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-panel); z-index: 20; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
 .dd-search { width: 100%; border: none; border-bottom: 1px solid var(--border); padding: 0.65rem 0.9rem; background: var(--bg-hover); color: var(--text-main); }
 .dd-actions { display: flex; justify-content: space-between; padding: 0.5rem 0.9rem; border-bottom: 1px solid var(--border); font-size: 0.75rem; color: var(--primary); }
 .dd-actions span { cursor: pointer; }
 .dd-list { max-height: 220px; overflow-y: auto; }
 .dd-item { display: flex; gap: 0.6rem; padding: 0.4rem 0.9rem; font-size: 0.82rem; }
+.dd-item:hover { background: var(--bg-hover); }
 .chip-row { display: flex; flex-wrap: wrap; gap: 0.35rem; }
-.chip { padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-dark); font-size: 0.72rem; font-weight: 700; color: var(--text-muted); cursor: pointer; }
+.chip { padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-dark); font-size: 0.72rem; font-weight: 700; color: var(--text-muted); cursor: pointer; }
 .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.sel-badge { background: var(--primary-bg); color: var(--primary); border-radius: 999px; padding: 0.1rem 0.45rem; font-size: 0.72rem; font-weight: 700; }
 
-@media (max-width: 1100px) {
+@media (max-width: 1400px) {
   .filter-row { grid-template-columns: 1fr 1fr; }
   .f-group { border-right: none; border-bottom: 1px solid var(--border); }
 }

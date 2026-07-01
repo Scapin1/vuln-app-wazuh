@@ -21,6 +21,16 @@
       {{ error }}
     </div>
 
+    <!-- Charts Row -->
+    <div v-if="!loading && vulns.length > 0" class="charts-row">
+      <div class="chart-col">
+        <SeverityChart :data="severityDistribution" />
+      </div>
+      <div class="chart-col">
+        <StatusChart :data="statusDistribution" />
+      </div>
+    </div>
+
     <!-- Filter Toggle Bar (minimalista) -->
     <div v-if="!loading && vulns.length > 0" class="filter-toggle-bar">
       <button class="btn-filter-toggle" @click="showFilters = !showFilters">
@@ -353,6 +363,8 @@
 import { ref, onMounted, computed, watch, reactive } from 'vue'
 import vulnService from '../../application/services/vulnService'
 import wazuhService from '../../application/services/wazuhService'
+import SeverityChart from './dashboard/components/SeverityChart.vue'
+import StatusChart from './dashboard/components/StatusChart.vue'
 
 const vulns = ref([])
 const loading = ref(true)
@@ -512,6 +524,23 @@ const paginatedVulns = computed(() => {
   const start = (currentPage.value - 1) * itemsPerPage
   const end = start + itemsPerPage
   return sortedVulns.value.slice(start, end)
+})
+
+const severityDistribution = computed(() => {
+  const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
+  filteredVulns.value.forEach(v => {
+    const sev = (v.severity || 'LOW').toUpperCase()
+    if (counts[sev] !== undefined) counts[sev]++
+  })
+  return counts
+})
+
+const statusDistribution = computed(() => {
+  const counts = { Detected: 0, Resolved: 0, 'Re-emerged': 0 }
+  vulns.value.forEach(v => {
+    if (v.status && counts[v.status] !== undefined) counts[v.status]++
+  })
+  return counts
 })
 
 const visiblePages = computed(() => {
@@ -1128,6 +1157,24 @@ th {
   color: var(--text-muted);
   font-size: 0.8rem;
   font-weight: 600;
+}
+
+/* CHARTS ROW */
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.chart-col {
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .charts-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* FILTER PANEL STYLES */

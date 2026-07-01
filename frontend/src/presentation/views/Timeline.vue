@@ -39,22 +39,22 @@
     <div class="view-mode-selector">
       <button 
         class="tab-btn" 
-        :class="{ active: viewMode === 'aggregated' }" 
-        @click="viewMode = 'aggregated'"
-      >
-        Agrupado
-      </button>
-      <button 
-        class="tab-btn" 
         :class="{ active: viewMode === 'per-cve' }" 
         @click="viewMode = 'per-cve'"
       >
         Por CVE
       </button>
+      <button 
+        class="tab-btn" 
+        :class="{ active: viewMode === 'aggregated' }" 
+        @click="viewMode = 'aggregated'"
+      >
+        Agrupado
+      </button>
     </div>
 
-    <AreaChartTab v-if="viewMode === 'aggregated' && hasBuilt" :area-data="areaData" />
-    <GanttTab v-else-if="viewMode === 'per-cve' && hasBuilt" :gantt-data="ganttData" />
+    <GanttTab v-if="viewMode === 'per-cve' && hasBuilt" :gantt-data="ganttData" />
+    <AreaChartTab v-else-if="viewMode === 'aggregated' && hasBuilt" :area-data="areaData" />
 
     <div v-else-if="loading" class="card empty-card">
       <p>Escaneando historial...</p>
@@ -92,7 +92,7 @@ const selectedVulns = ref([])
 const period = ref('30d')
 const customDate = ref(new Date().toISOString().split('T')[0])
 const errorBanner = ref('')
-const viewMode = ref('aggregated')
+const viewMode = ref('per-cve')
 
 const getConnectionName = () => {
   const found = connections.value.find(conn => String(conn.id) === String(selectedConnection.value))

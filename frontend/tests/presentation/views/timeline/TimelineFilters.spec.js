@@ -276,6 +276,68 @@ describe('TimelineFilters.vue', () => {
     expect(wrapper.vm.filteredVulns).toEqual(['CVE-2023-002'])
   })
 
+  it('accordion — opening agents closes vulns', async () => {
+    const wrapper = mount(TimelineFilters, {
+      props: {
+        ...defaultProps,
+        selectedConnection: '1'
+      }
+    })
+
+    const ddButtons = wrapper.findAll('.dd-btn')
+
+    // Open vulns dropdown first
+    await ddButtons[1].trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.findAll('.dd-panel')).toHaveLength(1)
+
+    // Now open agents — should close vulns
+    await ddButtons[0].trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.findAll('.dd-panel')).toHaveLength(1)
+  })
+
+  it('accordion — opening vulns closes agents', async () => {
+    const wrapper = mount(TimelineFilters, {
+      props: {
+        ...defaultProps,
+        selectedConnection: '1'
+      }
+    })
+
+    const ddButtons = wrapper.findAll('.dd-btn')
+
+    // Open agents dropdown first
+    await ddButtons[0].trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.findAll('.dd-panel')).toHaveLength(1)
+
+    // Now open vulns — should close agents
+    await ddButtons[1].trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.findAll('.dd-panel')).toHaveLength(1)
+  })
+
+  it('click outside closes active dropdown', async () => {
+    const wrapper = mount(TimelineFilters, {
+      props: {
+        ...defaultProps,
+        selectedConnection: '1'
+      }
+    })
+
+    // Open agents dropdown
+    const ddButtons = wrapper.findAll('.dd-btn')
+    await ddButtons[0].trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.findAll('.dd-panel')).toHaveLength(1)
+
+    // Click outside the dropdown
+    document.body.click()
+    await wrapper.vm.$nextTick()
+    expect(wrapper.findAll('.dd-panel')).toHaveLength(0)
+  })
+
   it('updates custom date when input changes', async () => {
     const wrapper = mount(TimelineFilters, {
       props: {

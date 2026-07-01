@@ -1018,4 +1018,99 @@ describe('Dashboard.vue', () => {
             expect(wrapper.vm.dropdowns.severity).toBe(false)
         })
     })
+
+    describe('Severity chart integration', () => {
+        it('computes severityDistribution from filteredVulns', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [
+                { severity: 'critical', status: 'Detected', agent_name: 'A1', cve_id: 'C-1', package_name: 'p1' },
+                { severity: 'low', status: 'Resolved', agent_name: 'A2', cve_id: 'C-2', package_name: 'p2' },
+                { severity: 'critical', status: 'Detected', agent_name: 'A3', cve_id: 'C-3', package_name: 'p3' }
+            ]})
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            expect(wrapper.vm.severityDistribution).toEqual({
+                CRITICAL: 2,
+                HIGH: 0,
+                MEDIUM: 0,
+                LOW: 1
+            })
+        })
+
+        it('updates severityDistribution when filters change', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [
+                { severity: 'critical', status: 'Detected', agent_name: 'A1', cve_id: 'C-1', package_name: 'p1' },
+                { severity: 'low', status: 'Resolved', agent_name: 'A2', cve_id: 'C-2', package_name: 'p2' },
+                { severity: 'critical', status: 'Detected', agent_name: 'A3', cve_id: 'C-3', package_name: 'p3' }
+            ]})
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            // Before filter: 2 critical + 1 low
+            expect(wrapper.vm.severityDistribution.CRITICAL).toBe(2)
+
+            // Filter to only CRITICAL
+            wrapper.vm.selectedSeverities = ['CRITICAL']
+            await wrapper.vm.$nextTick()
+
+            expect(wrapper.vm.severityDistribution).toEqual({
+                CRITICAL: 2,
+                HIGH: 0,
+                MEDIUM: 0,
+                LOW: 0
+            })
+        })
+
+        it('computes statusDistribution from full vulns (unfiltered)', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [
+                { severity: 'critical', status: 'Detected', agent_name: 'A1', cve_id: 'C-1', package_name: 'p1' },
+                { severity: 'low', status: 'Resolved', agent_name: 'A2', cve_id: 'C-2', package_name: 'p2' },
+                { severity: 'medium', status: 'Re-emerged', agent_name: 'A3', cve_id: 'C-3', package_name: 'p3' }
+            ]})
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            expect(wrapper.vm.statusDistribution).toEqual({
+                Detected: 1,
+                Resolved: 1,
+                'Re-emerged': 1
+            })
+        })
+
+        it('statusDistribution stays on full data even when filters are active', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [
+                { severity: 'critical', status: 'Detected', agent_name: 'A1', cve_id: 'C-1', package_name: 'p1' },
+                { severity: 'low', status: 'Resolved', agent_name: 'A2', cve_id: 'C-2', package_name: 'p2' },
+                { severity: 'critical', status: 'Detected', agent_name: 'A3', cve_id: 'C-3', package_name: 'p3' }
+            ]})
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            // Apply a filter that would exclude some vulns
+            wrapper.vm.selectedSeverities = ['CRITICAL']
+            await wrapper.vm.$nextTick()
+
+            // filteredVulns should be only 2 (CRITICAL only), but statusDistribution
+            // stays based on all 3 items (unfiltered) — proving it uses vulns not filteredVulns
+            expect(wrapper.vm.filteredVulns.length).toBe(2)
+            expect(wrapper.vm.statusDistribution).toEqual({
+                Detected: 2,
+                Resolved: 1,
+                'Re-emerged': 0
+            })
+        })
+
+        it('renders chart cards in the template', async () => {
+            vulnService.getVulns.mockResolvedValueOnce({ data: [
+                { severity: 'critical', status: 'Detected', agent_name: 'A1', cve_id: 'C-1', package_name: 'p1' },
+                { severity: 'low', status: 'Resolved', agent_name: 'A2', cve_id: 'C-2', package_name: 'p2' }
+            ]})
+            const wrapper = mount(Dashboard)
+            await flushPromises()
+
+            // The chart cards should appear somewhere in the rendered template
+            expect(wrapper.text()).toContain('Vulnerabilidades por Severidad')
+            expect(wrapper.text()).toContain('Estado de Vulnerabilidades')
+        })
+    })
 })

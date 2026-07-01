@@ -196,6 +196,11 @@ describe('Timeline.vue', () => {
     expect(wrapper.text()).toContain('Custom Error')
   })
 
+  it('default viewMode is per-cve', () => {
+    const wrapper = mount(Timeline)
+    expect(wrapper.vm.viewMode).toBe('per-cve')
+  })
+
   it('updates state when filters emit updates', async () => {
     const wrapper = mount(Timeline)
     await flushPromises()

@@ -1,6 +1,35 @@
 import { config } from '@vue/test-utils'
 import clickOutside from '@/presentation/directives/clickOutside'
 
+// Polyfill canvas 2D context for Chart.js in jsdom test environment
+if (typeof HTMLCanvasElement !== 'undefined' &&
+    typeof HTMLCanvasElement.prototype.getContext !== 'function') {
+  HTMLCanvasElement.prototype.getContext = function mockGetContext() {
+    return {
+      canvas: this,
+      clearRect: () => {},
+      fillRect: () => {},
+      fillText: () => {},
+      beginPath: () => {},
+      arc: () => {},
+      fill: () => {},
+      stroke: () => {},
+      moveTo: () => {},
+      lineTo: () => {},
+      closePath: () => {},
+      translate: () => {},
+      scale: () => {},
+      rotate: () => {},
+      drawImage: () => {},
+      createLinearGradient: () => ({ addColorStop: () => {} }),
+      createRadialGradient: () => ({ addColorStop: () => {} }),
+      measureText: () => ({ width: 0 }),
+      restore: () => {},
+      save: () => {},
+    }
+  }
+}
+
 config.global.directives = {
     'click-outside': clickOutside
 }
