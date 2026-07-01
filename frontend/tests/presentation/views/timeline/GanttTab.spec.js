@@ -13,7 +13,7 @@ describe('GanttTab.vue', () => {
       const wrapper = emptyWrapper()
 
       expect(wrapper.find('.gantt-card').exists()).toBe(true)
-      expect(wrapper.text()).toContain('Seguimiento de CVEs Criticos')
+      expect(wrapper.text()).toContain('Seguimiento de CVEs')
     })
 
     it('renders CVE headers from DEMO_DATA', () => {
@@ -477,8 +477,108 @@ describe('GanttTab.vue', () => {
       expect(page1.length).toBeLessThanOrEqual(20)
 
       // All items should be from the start
-      const firstId = page1[0].cve_id
-      expect(firstId.length).toBeGreaterThan(0)
+      const firstId = page1[0]?.cve_id
+      expect(firstId).toBeTruthy()
+    })
+  })
+
+  describe('Phase 1: CSS cleanup — title label style', () => {
+    it('uses CSS class instead of inline style on searchDate label', () => {
+      const wrapper = emptyWrapper()
+      const label = wrapper.find('label[for="ganttSearchDate"]')
+      expect(label.exists()).toBe(true)
+      expect(label.attributes('style')).toBeFalsy()
+    })
+  })
+
+  describe('Phase 2: DEMO data gating', () => {
+    it('hides DEMO data when real ganttData is provided', () => {
+      const realData = [
+        {
+          cve_id: 'CVE-REAL-001',
+          severity: 'HIGH',
+          description: 'Real vulnerability - test only',
+          start: new Date('2026-01-01'),
+          end: new Date('2026-06-01'),
+          status: 'PENDING',
+          agents: 0,
+          first_seen: '2026-01-01T00:00:00Z',
+          resolved_at: null,
+          reopened_at: null
+        }
+      ]
+      const wrapper = mount(GanttTab, {
+        props: { ganttData: realData }
+      })
+
+      // DEMO descriptions contain '(DEMO)' — must NOT appear
+      expect(wrapper.text()).not.toContain('DEMO')
+      // Real CVE must be rendered
+      expect(wrapper.text()).toContain('CVE-REAL-001')
+    })
+  })
+
+  describe('Phase 4: Loading state', () => {
+    it('shows loading state when ganttData is null', () => {
+      const wrapper = mount(GanttTab, {
+        props: { ganttData: null }
+      })
+
+      expect(wrapper.text()).toContain('Cargando')
+      // Chart internals should not render
+      expect(wrapper.find('.gantt-controls').exists()).toBe(false)
+      expect(wrapper.find('.gantt-body').exists()).toBe(false)
+    })
+  })
+
+  describe('Phase 4: Empty state fallback', () => {
+    it('shows DEMO data as empty-state fallback when ganttData is empty', () => {
+      const wrapper = emptyWrapper()
+
+      // DEMO data should appear as the visual fallback
+      expect(wrapper.text()).toContain('CVE-2026-0001')
+      // Chart should render normally with DEMO data
+      expect(wrapper.find('.gantt-body').exists()).toBe(true)
+      expect(wrapper.findAll('.gantt-bar').length).toBeGreaterThan(0)
+    })
+  })
+
+  describe('Phase 4: Title update', () => {
+    it('shows title without "Criticos"', () => {
+      const wrapper = emptyWrapper()
+      expect(wrapper.text()).toContain('Seguimiento de CVEs')
+      expect(wrapper.text()).not.toContain('Criticos')
+    })
+  })
+
+  describe('Phase 3: Pagination fix', () => {
+    it('computes totalPages from grouped CVE rows not flat segments', () => {
+      const wrapper = emptyWrapper()
+      const groupCount = wrapper.vm.groupedByCve.length
+      const expectedPages = Math.max(1, Math.ceil(groupCount / 20))
+      expect(wrapper.vm.totalPages).toBe(expectedPages)
+    })
+  })
+
+  describe('Phase 5: Lane positioning (bar Y offset correctness)', () => {
+    it('assigns different lanes to overlapping segments of the same agent', () => {
+      const wrapper = emptyWrapper()
+      const groups = wrapper.vm.groupedByCve
+
+      groups.forEach(group => {
+        group.agents.forEach(agent => {
+          for (let i = 0; i < agent.segments.length; i++) {
+            for (let j = i + 1; j < agent.segments.length; j++) {
+              const a = agent.segments[i]
+              const b = agent.segments[j]
+              // If segments overlap in time, they must be in different lanes
+              if (a.start < b.end && b.start < a.end) {
+                expect(a.lane).not.toBe(b.lane)
+              }
+            }
+          }
+        })
+      })
     })
   })
 })

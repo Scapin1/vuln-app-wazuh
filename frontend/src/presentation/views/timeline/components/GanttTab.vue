@@ -1,10 +1,20 @@
 <template>
   <div class="card gantt-card">
+    <div v-if="ganttData === null" class="gantt-loading-state">
+      <div class="gantt-spinner"></div>
+      <p>Cargando datos de vulnerabilidades...</p>
+    </div>
+
+    <div v-else-if="!displaySegments.length" class="gantt-empty-state">
+      <p>No hay datos de vulnerabilidades para mostrar</p>
+    </div>
+
+    <template v-else>
     <div class="gantt-header">
-      <h3 class="gantt-title">Seguimiento de CVEs Criticos</h3>
+      <h3 class="gantt-title">Seguimiento de CVEs</h3>
       <div class="gantt-controls">
         <div class="search-date">
-          <label for="ganttSearchDate" style="font-size: 11px; color: #64748b; font-weight: 600;">Buscar fecha:</label>
+          <label for="ganttSearchDate" class="search-date-label">Buscar fecha:</label>
           <input id="ganttSearchDate" type="datetime-local" v-model="searchDate" class="date-input" />
           <button class="search-btn" @click="scrollToDate">Ir</button>
         </div>
@@ -33,7 +43,7 @@
       </div>
 
       <div class="gantt-body">
-        <template v-for="cveGroup in groupedByCve" :key="cveGroup.cve_id">
+        <template v-for="cveGroup in paginatedData" :key="cveGroup.cve_id">
           <!-- CVE header row -->
           <div class="cve-header-row">
             <div class="cve-header-sidebar">
@@ -83,6 +93,7 @@
       <span class="page-info">Pagina {{ currentPage }} de {{ totalPages }} ({{ totalAgentRows }} filas)</span>
       <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">Siguiente</button>
     </div>
+    </template>
   </div>
 </template>
 
@@ -91,7 +102,7 @@ import { ref, computed, watch } from 'vue'
 import * as d3 from 'd3'
 
 const props = defineProps({
-  ganttData: { type: Array, required: true }
+  ganttData: { type: Array, default: () => null }
 })
 
 const ITEMS_PER_PAGE = 20
@@ -176,13 +187,32 @@ const displaySegments = computed(() => {
     }
   ]
 
-  const allData = [...DEMO_DATA, ...props.ganttData]
+  const useDemo = !props.ganttData || !props.ganttData.length
+  const allData = useDemo ? DEMO_DATA : props.ganttData
   if (!allData || allData.length === 0) return []
 
   const segments = []
   const now = new Date()
 
   allData.forEach(v => {
+    // Real data shape (no history[]): use fields as a direct segment
+    if (!v.history) {
+      segments.push({
+        cve_id: v.cve_id, severity: v.severity, description: v.description,
+        agent_name: v.agent_name || v.cve_id, agent_id: v.agent_id || v.cve_id,
+        start: v.start instanceof Date ? v.start : toLocalDate(v.start),
+        end: v.end instanceof Date ? v.end : toLocalDate(v.end),
+        status: v.status || 'PENDING',
+        agents: v.agents || 0,
+        first_seen: v.first_seen,
+        resolved_at: v.resolved_at || null,
+        reopened_at: v.reopened_at || null,
+        reopenCount: 0
+      })
+      return
+    }
+
+    // DEMO shape (has history[]): decompose into segments
     const history = (v.history || [])
       .filter(h => h.action === 'RESOLVED' || h.action === 'REOPENED')
       .sort((a, b) => toLocalDate(a.timestamp) - toLocalDate(b.timestamp))
@@ -256,15 +286,15 @@ const displaySegments = computed(() => {
   return merged
 })
 
-const totalPages = computed(() => Math.ceil(displaySegments.value.length / ITEMS_PER_PAGE))
+const totalPages = computed(() => Math.max(1, Math.ceil(groupedByCve.value.length / ITEMS_PER_PAGE)))
 
 const totalAgentRows = computed(() => {
-  return groupedByCve.value.reduce((sum, cve) => sum + cve.agents.length, 0)
+  return paginatedData.value.reduce((sum, cve) => sum + cve.agents.length, 0)
 })
 
 const paginatedData = computed(() => {
   const start = (currentPage.value - 1) * ITEMS_PER_PAGE
-  return displaySegments.value.slice(start, start + ITEMS_PER_PAGE)
+  return groupedByCve.value.slice(start, start + ITEMS_PER_PAGE)
 })
 
 watch(() => props.ganttData, () => {
@@ -421,7 +451,7 @@ const groupedByCve = computed(() => {
 
   // Deduplicate input segments by CVE + agent + status + start time
   const seen = new Set()
-  const uniqueSegments = paginatedData.value.filter(seg => {
+  const uniqueSegments = displaySegments.value.filter(seg => {
     const key = `${seg.cve_id}|${seg.agent_name || ''}|${seg.status}|${seg.start.getTime()}`
     if (seen.has(key)) return false
     seen.add(key)
@@ -568,134 +598,40 @@ const formatDate = (d) => {
   width: 200px;
 }
 
-.gantt-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-}
-
-.search-date {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.date-input {
-  padding: 4px 6px;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  font-size: 11px;
-  background: white;
-  color: #334155;
-  outline: none;
-  width: 200px;
-}
-
-.gantt-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-}
-
-.search-date {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.date-input {
-  padding: 4px 6px;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  font-size: 11px;
-  background: white;
-  color: #334155;
-  outline: none;
-  width: 200px;
-}
-
-.gantt-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-}
-
-.search-date {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.date-input {
-  padding: 4px 6px;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  font-size: 11px;
-  background: white;
-  color: #334155;
-  outline: none;
-  width: 200px;
-}
-
-.gantt-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-}
-
-.search-date {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.date-input {
-  padding: 4px 6px;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  font-size: 11px;
-  background: white;
-  color: #334155;
-  outline: none;
-  width: 200px;
-}
-
-.gantt-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-}
-
-.search-date {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.date-input {
-  padding: 4px 6px;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  font-size: 11px;
-  background: white;
-  color: #334155;
-  outline: none;
-  width: 200px;
-}
-
 .date-input:focus {
   border-color: #3d6a00;
   box-shadow: 0 0 0 2px rgba(61, 106, 0, 0.15);
+}
+
+.search-date-label {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.gantt-loading-state,
+.gantt-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  color: #64748b;
+  font-size: 0.9rem;
+  gap: 1rem;
+}
+
+.gantt-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #3d6a00;
+  border-radius: 50%;
+  animation: gantt-spin 0.8s linear infinite;
+}
+
+@keyframes gantt-spin {
+  to { transform: rotate(360deg); }
 }
 
 .search-btn {
@@ -934,21 +870,6 @@ const formatDate = (d) => {
   z-index: 0;
 }
 
-.gantt-bar {
-  position: absolute;
-  top: 0;
-  height: 20px;
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  font-size: 9px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
 .bar-label {
   opacity: 0;
   transition: opacity 0.15s ease;
@@ -1053,9 +974,10 @@ const formatDate = (d) => {
 }
 
 .gantt-bar.pending {
-  background-color: rgba(186, 26, 26, 0.15);
+  background-color: rgba(186, 26, 26, 0.3);
   border: 1px solid #ba1a1a;
-  color: #b91c1c;
+  color: #991b1b;
+  font-weight: 700;
 }
 
 .gantt-bar.resolved {
@@ -1068,15 +990,6 @@ const formatDate = (d) => {
   background-color: rgba(234, 179, 8, 0.15);
   border: 1px solid #ca8a04;
   color: #854d0e;
-}
-
-.bar-label {
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.bar-label.visible {
-  opacity: 1;
 }
 
 .gantt-pagination {
