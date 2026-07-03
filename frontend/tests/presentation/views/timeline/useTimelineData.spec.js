@@ -396,7 +396,7 @@ describe('useTimelineData', () => {
   })
 
   describe('fetchConnectionVulns function', () => {
-    it('sets warning when limit is reached', async () => {
+    it('handles large dataset correctly', async () => {
       const largeData = Array.from({ length: 2000 }, (_, i) => ({
         id: i,
         first_seen: '2026-03-07T10:00:00Z',
@@ -405,19 +405,19 @@ describe('useTimelineData', () => {
 
       vulnService.getVulns.mockResolvedValueOnce({ data: largeData })
 
-      await timeline.fetchConnectionVulns()
+      const result = await timeline.fetchConnectionVulns()
 
-      expect(timeline.warningMessage.value).toContain('2000')
-      expect(timeline.warningMessage.value).toContain('truncado')
+      expect(result.data.length).toBe(2000)
+      expect(result.pages).toBe(1)
     })
 
     it('handles API response without data array', async () => {
       vulnService.getVulns.mockResolvedValueOnce({ data: null })
 
       const result = await timeline.fetchConnectionVulns()
-      expect(result).toEqual([])
+      expect(result.data).toEqual([])
+      expect(result.pages).toBe(1) // una página procesada (vació)
     })
-  })
 
   describe('zoom levels and slot calculations', () => {
     it('handles different zoom levels correctly', async () => {

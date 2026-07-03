@@ -59,11 +59,12 @@ describe('Timeline.vue', () => {
     expect(wazuhService.getConnections).toHaveBeenCalled()
   })
 
-  it('displays empty card initially', () => {
+  it('shows demo data when no connection selected', () => {
     const wrapper = mount(Timeline)
 
-    const card = wrapper.find('.empty-card')
-    expect(card.exists()).toBe(true)
+    const ganttCard = wrapper.find('.gantt-card')
+    expect(ganttCard.exists()).toBe(true)
+    expect(ganttCard.text()).toContain('Seguimiento de CVEs')
   })
 
   it('fetches agents and vulns when connection changes', async () => {

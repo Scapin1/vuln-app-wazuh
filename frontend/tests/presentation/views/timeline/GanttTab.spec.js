@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils'
 import GanttTab from '@/presentation/views/timeline/components/GanttTab.vue'
 
 describe('GanttTab.vue', () => {
-  // With empty ganttData, only DEMO_DATA is shown (6 items from DEMO_DATA)
+  // With empty ganttData, DEMO_SNAPSHOTS is shown (5 CVEs)
   const emptyWrapper = () => mount(GanttTab, {
     props: { ganttData: [] }
   })
@@ -16,14 +16,14 @@ describe('GanttTab.vue', () => {
       expect(wrapper.text()).toContain('Seguimiento de CVEs')
     })
 
-    it('renders CVE headers from DEMO_DATA', () => {
+    it('renders CVE headers from DEMO_SNAPSHOTS', () => {
       const wrapper = emptyWrapper()
 
-      // DEMO_DATA has 4 distinct CVEs: CVE-2026-0001, CVE-2026-0002, CVE-2026-0003, CVE-2026-0004
       expect(wrapper.text()).toContain('CVE-2026-0001')
       expect(wrapper.text()).toContain('CVE-2026-0002')
       expect(wrapper.text()).toContain('CVE-2026-0003')
       expect(wrapper.text()).toContain('CVE-2026-0004')
+      expect(wrapper.text()).toContain('CVE-2026-0005')
     })
 
     it('renders severity badges', () => {
@@ -35,35 +35,42 @@ describe('GanttTab.vue', () => {
       expect(wrapper.text()).toContain('LOW')
     })
 
-    it('renders agent names from DEMO_DATA', () => {
+    it('renders sync count info for each CVE', () => {
       const wrapper = emptyWrapper()
 
-      expect(wrapper.text()).toContain('srv-web-01')
-      expect(wrapper.text()).toContain('srv-db-02')
-      expect(wrapper.text()).toContain('srv-api-03')
+      expect(wrapper.text()).toContain('sincronizaciones')
+      // CVE-2026-0001 has 3 snapshots
+      expect(wrapper.text()).toContain('3 sincronizaciones')
+      // CVE-2026-0004 has 5 snapshots (including resolved)
+      expect(wrapper.text()).toContain('5 sincronizaciones')
     })
 
-    it('renders gantt bars with status classes', () => {
+    it('renders snapshot bar elements', () => {
       const wrapper = emptyWrapper()
 
       const bars = wrapper.findAll('.gantt-bar')
       expect(bars.length).toBeGreaterThan(0)
-
-      const pendingBars = wrapper.findAll('.gantt-bar.pending')
-      const resolvedBars = wrapper.findAll('.gantt-bar.resolved')
-      const reopenedBars = wrapper.findAll('.gantt-bar.reopened')
-
-      expect(pendingBars.length).toBeGreaterThan(0)
-      expect(resolvedBars.length).toBeGreaterThan(0)
-      expect(reopenedBars.length).toBeGreaterThan(0)
     })
 
-    it('renders legend items', () => {
+    it('renders different bar classes by status (detected / reopened / resolved)', () => {
       const wrapper = emptyWrapper()
 
-      expect(wrapper.text()).toContain('Pendiente')
-      expect(wrapper.text()).toContain('Resuelto')
+      const detectedBars = wrapper.findAll('.gantt-bar.snap-detected')
+      const reopenedBars = wrapper.findAll('.gantt-bar.snap-reopened')
+      const resolvedBars = wrapper.findAll('.gantt-bar.snap-resolved')
+
+      // At least one of each type should exist in DEMO data
+      expect(detectedBars.length).toBeGreaterThan(0)
+      expect(reopenedBars.length).toBeGreaterThan(0)
+      expect(resolvedBars.length).toBeGreaterThan(0)
+    })
+
+    it('renders updated legend items', () => {
+      const wrapper = emptyWrapper()
+
+      expect(wrapper.text()).toContain('Activo')
       expect(wrapper.text()).toContain('Reabierto')
+      expect(wrapper.text()).toContain('Resuelto')
     })
 
     it('renders zoom controls', () => {
@@ -73,7 +80,6 @@ describe('GanttTab.vue', () => {
       expect(zoomBtns.length).toBe(2)
 
       expect(wrapper.find('.zoom-level').exists()).toBe(true)
-      // Default zoom is month
       expect(wrapper.find('.zoom-level').text()).toBe('Mes')
     })
   })
@@ -98,31 +104,26 @@ describe('GanttTab.vue', () => {
 
     it('zoomOut decreases zoom index', async () => {
       const wrapper = emptyWrapper()
-      // First zoom in
       await wrapper.find('.zoom-btn:last-child').trigger('click')
       expect(wrapper.vm.zoomIndex).toBe(2)
 
-      // Then zoom out
       await wrapper.find('.zoom-btn:first-child').trigger('click')
       expect(wrapper.vm.zoomIndex).toBe(1)
     })
 
     it('does not zoom out below minimum', async () => {
       const wrapper = emptyWrapper()
-      // Default is 1 (month), click zoom out should go to 0 (year)
       await wrapper.find('.zoom-btn:first-child').trigger('click')
       expect(wrapper.vm.zoomIndex).toBe(0)
       expect(wrapper.vm.zoomLabel).toBe('Año')
       expect(wrapper.vm.MONTH_WIDTH).toBe(80)
 
-      // One more zoom out should stay at 0
       await wrapper.find('.zoom-btn:first-child').trigger('click')
       expect(wrapper.vm.zoomIndex).toBe(0)
     })
 
     it('does not zoom in above maximum', async () => {
       const wrapper = emptyWrapper()
-      // Click zoom in 3 times to go from 1 (month) to 3 (hour)
       for (let i = 0; i < 3; i++) {
         await wrapper.find('.zoom-btn:last-child').trigger('click')
       }
@@ -130,7 +131,6 @@ describe('GanttTab.vue', () => {
       expect(wrapper.vm.zoomLabel).toBe('Hora')
       expect(wrapper.vm.MONTH_WIDTH).toBe(40)
 
-      // One more zoom in should stay at 3
       await wrapper.find('.zoom-btn:last-child').trigger('click')
       expect(wrapper.vm.zoomIndex).toBe(3)
     })
@@ -138,23 +138,19 @@ describe('GanttTab.vue', () => {
     it('changes time labels when zooming', async () => {
       const wrapper = emptyWrapper()
 
-      // Month view should have month labels
       const monthText = wrapper.find('.month-label').text()
       expect(monthText.length).toBeGreaterThan(0)
 
-      // Zoom out to year
       await wrapper.find('.zoom-btn:first-child').trigger('click')
       const yearText = wrapper.find('.month-label').text()
-      // Year view shows years
       expect(yearText).toMatch(/^\d{4}$/)
     })
   })
 
   describe('pagination', () => {
-    it('shows pagination when DEMO data has more than 20 segments', () => {
+    it('shows pagination when DEMO data exceeds ITEMS_PER_PAGE', () => {
       const wrapper = emptyWrapper()
 
-      // displaySegments.value.length with DEMO data
       const totalPages = wrapper.vm.totalPages
       if (totalPages > 1) {
         expect(wrapper.find('.gantt-pagination').exists()).toBe(true)
@@ -179,7 +175,6 @@ describe('GanttTab.vue', () => {
     it('disables Previous on first page', () => {
       const wrapper = emptyWrapper()
 
-      // Only test if pagination is shown (more than 1 page)
       if (wrapper.vm.totalPages > 1) {
         const pageBtns = wrapper.findAll('.page-btn')
         const prevBtn = pageBtns.at(0)
@@ -208,7 +203,6 @@ describe('GanttTab.vue', () => {
       const wrapper = emptyWrapper()
       const result = wrapper.vm.toLocalDate('2026-03-15T14:30:00Z')
       expect(result instanceof Date).toBe(true)
-      // Last part: time preserved
       expect(result.getHours()).toBe(14)
       expect(result.getMinutes()).toBe(30)
     })
@@ -233,37 +227,17 @@ describe('GanttTab.vue', () => {
     })
   })
 
-  describe('getBarStyle helper', () => {
+  describe('getSnapshotBarStyle helper', () => {
     it('returns empty object when no time labels', () => {
       const wrapper = emptyWrapper()
-      // Force timeLabels to be empty by mounting with no useful data
-      // With DEMO data, timeLabels should exist, but let's test the guard
-      const segment = {
-        start: new Date('2026-03-01'),
-        end: new Date('2026-03-15'),
-        status: 'PENDING'
+      // Mount with no data and force empty state to test guard
+      // Use a minimal CVE with a snapshot to test positioning
+      const cve = wrapper.vm.cveSnapshots[0]
+      if (cve && cve.snapshots.length > 0) {
+        const style = wrapper.vm.getSnapshotBarStyle(cve, 0)
+        expect(style).toHaveProperty('left')
+        expect(style).toHaveProperty('width')
       }
-      // We need timeLabels to exist; this tests at least that the function
-      // returns something with a left/width/top structure
-      const style = wrapper.vm.getBarStyle(segment)
-      expect(style).toHaveProperty('left')
-      expect(style).toHaveProperty('width')
-      expect(style).toHaveProperty('top')
-    })
-  })
-
-  describe('getRowHeight', () => {
-    it('returns minimum height for 0 lanes', () => {
-      const wrapper = emptyWrapper()
-      expect(wrapper.vm.getRowHeight(0)).toBe(56)
-    })
-
-    it('scales with lane count', () => {
-      const wrapper = emptyWrapper()
-      // Minimum is 56px (LANE_HEIGHT * 2)
-      expect(wrapper.vm.getRowHeight(1)).toBe(56)
-      expect(wrapper.vm.getRowHeight(2)).toBe(56)
-      expect(wrapper.vm.getRowHeight(3)).toBe(84)
     })
   })
 
@@ -272,7 +246,6 @@ describe('GanttTab.vue', () => {
       const wrapper = emptyWrapper()
       expect(wrapper.vm.timeLabels.length).toBeGreaterThan(0)
 
-      // Each label should have label and date
       wrapper.vm.timeLabels.forEach(label => {
         expect(label).toHaveProperty('label')
         expect(label).toHaveProperty('date')
@@ -283,7 +256,6 @@ describe('GanttTab.vue', () => {
 
     it('generates year labels at year zoom', async () => {
       const wrapper = emptyWrapper()
-      // Zoom out to year
       await wrapper.find('.zoom-btn:first-child').trigger('click')
 
       expect(wrapper.vm.zoomLabel).toBe('Año')
@@ -294,7 +266,6 @@ describe('GanttTab.vue', () => {
 
     it('generates day labels at day zoom', async () => {
       const wrapper = emptyWrapper()
-      // Zoom in once from month (1) to day (2)
       await wrapper.find('.zoom-btn:last-child').trigger('click')
 
       expect(wrapper.vm.zoomLabel).toBe('Dia')
@@ -307,125 +278,251 @@ describe('GanttTab.vue', () => {
   describe('msPerUnit computed', () => {
     it('returns correct ms for year unit', () => {
       const wrapper = emptyWrapper()
-      wrapper.vm.zoomIndex = 0 // year
+      wrapper.vm.zoomIndex = 0
       expect(wrapper.vm.msPerUnit).toBeCloseTo(365.25 * 24 * 60 * 60 * 1000, 0)
     })
 
     it('returns correct ms for month unit', () => {
       const wrapper = emptyWrapper()
-      wrapper.vm.zoomIndex = 1 // month (default)
+      wrapper.vm.zoomIndex = 1
       expect(wrapper.vm.msPerUnit).toBeCloseTo(30.44 * 24 * 60 * 60 * 1000, 0)
     })
 
     it('returns correct ms for day unit', () => {
       const wrapper = emptyWrapper()
-      wrapper.vm.zoomIndex = 2 // day
+      wrapper.vm.zoomIndex = 2
       expect(wrapper.vm.msPerUnit).toBe(24 * 60 * 60 * 1000)
     })
 
     it('returns correct ms for hour unit', () => {
       const wrapper = emptyWrapper()
-      wrapper.vm.zoomIndex = 3 // hour
+      wrapper.vm.zoomIndex = 3
       expect(wrapper.vm.msPerUnit).toBe(60 * 60 * 1000)
     })
   })
 
-  describe('displaySegments computed', () => {
-    it('processes DEMO data into segments with correct shape', () => {
+  describe('cveSnapshots computed', () => {
+    it('uses DEMO data when ganttData is empty', () => {
       const wrapper = emptyWrapper()
-      const segments = wrapper.vm.displaySegments
+      const snapshots = wrapper.vm.cveSnapshots
 
-      expect(segments.length).toBeGreaterThan(0)
+      expect(snapshots.length).toBe(5) // 5 DEMO CVEs
+    })
 
-      segments.forEach(seg => {
-        expect(seg).toHaveProperty('cve_id')
-        expect(seg).toHaveProperty('severity')
-        expect(seg).toHaveProperty('status')
-        expect(seg).toHaveProperty('start')
-        expect(seg).toHaveProperty('end')
-        expect(seg).toHaveProperty('agent_name')
-        expect(['PENDING', 'RESOLVED', 'REOPENED']).toContain(seg.status)
+    it('each CVE snapshot has correct shape', () => {
+      const wrapper = emptyWrapper()
+      const snapshots = wrapper.vm.cveSnapshots
+
+      snapshots.forEach(cve => {
+        expect(cve).toHaveProperty('cve_id')
+        expect(cve).toHaveProperty('severity')
+        expect(cve).toHaveProperty('description')
+        expect(cve).toHaveProperty('snapshots')
+        expect(Array.isArray(cve.snapshots)).toBe(true)
+        expect(cve).toHaveProperty('isResolved')
+        expect(typeof cve.isResolved).toBe('boolean')
+
+        cve.snapshots.forEach(snap => {
+          expect(snap).toHaveProperty('syncTimestamp')
+          expect(snap).toHaveProperty('agents')
+          expect(Array.isArray(snap.agents)).toBe(true)
+          expect(snap).toHaveProperty('agentCount')
+          expect(typeof snap.agentCount).toBe('number')
+        })
       })
     })
 
-    it('processes REOPENED segments correctly from demo data', () => {
+    it('marks CVE-2026-0004 as resolved (last snapshot has 0 agents)', () => {
       const wrapper = emptyWrapper()
-      const segments = wrapper.vm.displaySegments
-
-      const reopenedSegments = segments.filter(s => s.status === 'REOPENED')
-      // CVE-2026-0004 (LOW) has multiple reopen events
-      expect(reopenedSegments.length).toBeGreaterThan(0)
+      const cve = wrapper.vm.cveSnapshots.find(c => c.cve_id === 'CVE-2026-0004')
+      expect(cve).toBeTruthy()
+      expect(cve.isResolved).toBe(true)
+      const lastSnap = cve.snapshots[cve.snapshots.length - 1]
+      expect(lastSnap.agentCount).toBe(0)
     })
 
-    it('merges consecutive segments with same status', () => {
-      const wrapper = emptyWrapper()
-      const segments = wrapper.vm.displaySegments
+    it('parses real ganttData into CVE snapshots', () => {
+      const realData = [
+        {
+          cve_id: 'CVE-REAL-001',
+          severity: 'HIGH',
+          description: 'Real vuln',
+          agent_name: 'srv-web-01',
+          agent_id: 'a1',
+          first_seen: '2026-01-01T00:00:00Z',
+          historySorted: [
+            { action: 'RESOLVED', timestamp: '2026-03-01T00:00:00Z' }
+          ]
+        }
+      ]
+      const wrapper = mount(GanttTab, {
+        props: { ganttData: realData }
+      })
 
-      // After merge, no two consecutive segments for the same agent+cve should have same status
-      if (segments.length >= 2) {
-        // This is hard to assert precisely, but we can verify the merge didn't break anything
-        expect(segments.length).toBeGreaterThan(0)
-      }
+      expect(wrapper.text()).toContain('CVE-REAL-001')
+      expect(wrapper.text()).not.toContain('DEMO')
+      expect(wrapper.text()).toContain('HIGH')
+
+      const snapshots = wrapper.vm.cveSnapshots
+      expect(snapshots.length).toBe(1)
+      expect(snapshots[0].snapshots.length).toBe(2) // first_seen + history timestamps
+    })
+
+    it('builds snapshots with real data correctly', () => {
+      const realData = [
+        {
+          cve_id: 'CVE-MULTI',
+          severity: 'MEDIUM',
+          description: 'Multi agent test',
+          agent_name: 'agent-01',
+          agent_id: 'a1',
+          first_seen: '2026-02-01T00:00:00Z',
+          historySorted: [
+            { action: 'RESOLVED', timestamp: '2026-04-01T00:00:00Z' }
+          ]
+        },
+        {
+          cve_id: 'CVE-MULTI',
+          severity: 'MEDIUM',
+          description: 'Multi agent test',
+          agent_name: 'agent-02',
+          agent_id: 'a2',
+          first_seen: '2026-03-01T00:00:00Z',
+          historySorted: []
+        }
+      ]
+      const wrapper = mount(GanttTab, {
+        props: { ganttData: realData }
+      })
+
+      const cve = wrapper.vm.cveSnapshots.find(c => c.cve_id === 'CVE-MULTI')
+      expect(cve).toBeTruthy()
+      // 3 unique timestamps: Feb 1 (agent-01 first seen),
+      // Mar 1 (agent-02 first seen), Apr 1 (agent-01 history RESOLVED)
+      expect(cve.snapshots.length).toBe(3)
+
+      // Each snapshot has agents only from events at that exact timestamp
+      const snapTimestamps = cve.snapshots.map(s => s.syncTimestamp)
+      expect(snapTimestamps.some(ts => ts.includes('2026-02-01'))).toBe(true)
+      expect(snapTimestamps.some(ts => ts.includes('2026-03-01'))).toBe(true)
+      expect(snapTimestamps.some(ts => ts.includes('2026-04-01'))).toBe(true)
+
+      // The snapshot at '2026-02-01' has only agent-01
+      const febSnap = cve.snapshots.find(s => s.syncTimestamp.includes('2026-02-01'))
+      expect(febSnap.agentCount).toBe(1)
+      expect(febSnap.agents).toContain('agent-01')
+
+      // The snapshot at '2026-03-01' has only agent-02
+      const marSnap = cve.snapshots.find(s => s.syncTimestamp.includes('2026-03-01'))
+      expect(marSnap).toBeTruthy()
+      expect(marSnap.agentCount).toBe(1)
+      expect(marSnap.agents).toContain('agent-02')
+    })
+
+    it('groups agents by shared last_seen (sync) timestamp', () => {
+      const realData = [
+        {
+          cve_id: 'CVE-SHARED-SYNC',
+          severity: 'HIGH',
+          description: 'Same CVE on multiple machines at same sync',
+          agent_name: 'server-a',
+          agent_id: 'a1',
+          first_seen: '2026-01-15T00:00:00Z',
+          last_seen: '2026-06-01T12:00:00Z',
+          historySorted: []
+        },
+        {
+          cve_id: 'CVE-SHARED-SYNC',
+          severity: 'HIGH',
+          description: 'Same CVE on multiple machines at same sync',
+          agent_name: 'server-b',
+          agent_id: 'a2',
+          first_seen: '2026-02-10T00:00:00Z',
+          last_seen: '2026-06-01T12:00:00Z',
+          historySorted: []
+        },
+        {
+          cve_id: 'CVE-SHARED-SYNC',
+          severity: 'HIGH',
+          description: 'Same CVE on multiple machines at same sync',
+          agent_name: 'server-c',
+          agent_id: 'a3',
+          first_seen: '2026-03-05T00:00:00Z',
+          last_seen: '2026-06-01T12:00:00Z',
+          historySorted: []
+        }
+      ]
+      const wrapper = mount(GanttTab, {
+        props: { ganttData: realData }
+      })
+
+      const cve = wrapper.vm.cveSnapshots.find(c => c.cve_id === 'CVE-SHARED-SYNC')
+      expect(cve).toBeTruthy()
+
+      // 4 snapshots: 3 unique first_seen + 1 shared sync last_seen
+      expect(cve.snapshots.length).toBe(4)
+
+      // The shared sync snapshot has all 3 agents
+      const syncSnap = cve.snapshots.find(s => s.syncTimestamp.includes('2026-06-01'))
+      expect(syncSnap).toBeTruthy()
+      expect(syncSnap.agentCount).toBe(3)
+      expect(syncSnap.agents).toContain('server-a')
+      expect(syncSnap.agents).toContain('server-b')
+      expect(syncSnap.agents).toContain('server-c')
     })
   })
 
-  describe('groupedByCve computed', () => {
-    it('groups segments under CVE headers', () => {
-      const wrapper = emptyWrapper()
-      const groups = wrapper.vm.groupedByCve
-
-      expect(groups.length).toBeGreaterThan(0)
-      groups.forEach(group => {
-        expect(group).toHaveProperty('cve_id')
-        expect(group).toHaveProperty('severity')
-        expect(group).toHaveProperty('agents')
-        expect(Array.isArray(group.agents)).toBe(true)
-        expect(group.agents.length).toBeGreaterThan(0)
+  describe('mergeSnapshotsByZoom', () => {
+    it('merges snapshots within daily threshold at month zoom', () => {
+      const wrapper = mount(GanttTab, {
+        props: { ganttData: [] }
       })
+      // Set zoom to 'Mes' (index 1)
+      wrapper.vm.zoomIndex = 1
+
+      const snapshots = [
+        { syncTimestamp: '2026-06-01T10:00:00Z', agents: ['srv-a'], agentCount: 1 },
+        { syncTimestamp: '2026-06-01T10:05:00Z', agents: ['srv-b'], agentCount: 1 },
+        { syncTimestamp: '2026-06-15T00:00:00Z', agents: ['srv-c'], agentCount: 1 },
+      ]
+
+      const merged = wrapper.vm.mergeSnapshotsByZoom(snapshots)
+      // First 2 (same day) merged, 3rd stays separate
+      expect(merged.length).toBe(2)
+      expect(merged[0].agents).toContain('srv-a')
+      expect(merged[0].agents).toContain('srv-b')
+      expect(merged[0].agentCount).toBe(2)
+      expect(merged[1].agents).toContain('srv-c')
     })
 
-    it('assigns lanes to prevent overlapping bars', () => {
-      const wrapper = emptyWrapper()
-      const groups = wrapper.vm.groupedByCve
-
-      groups.forEach(group => {
-        group.agents.forEach(agent => {
-          if (agent.segments.length > 1) {
-            // Check that overlapping segments get different lanes
-            agent.segments.forEach(seg => {
-              expect(typeof seg.lane).toBe('number')
-            })
-          }
-        })
+    it('keeps distant timestamps separate', () => {
+      const wrapper = mount(GanttTab, {
+        props: { ganttData: [] }
       })
+      wrapper.vm.zoomIndex = 1
+
+      const snapshots = [
+        { syncTimestamp: '2026-01-01T00:00:00Z', agents: ['srv-a'], agentCount: 1 },
+        { syncTimestamp: '2026-06-01T00:00:00Z', agents: ['srv-b'], agentCount: 1 },
+      ]
+
+      expect(wrapper.vm.mergeSnapshotsByZoom(snapshots).length).toBe(2)
     })
+  })
 
-    it('computes laneCount per agent group', () => {
+  describe('paginatedCveSnapshots', () => {
+    it('returns correct page slice', () => {
       const wrapper = emptyWrapper()
-      const groups = wrapper.vm.groupedByCve
+      const page1 = wrapper.vm.paginatedCveSnapshots
 
-      groups.forEach(group => {
-        group.agents.forEach(agent => {
-          expect(agent.laneCount).toBeGreaterThanOrEqual(1)
-        })
-      })
-    })
-
-    it('calculates reopenCount per CVE', () => {
-      const wrapper = emptyWrapper()
-      const groups = wrapper.vm.groupedByCve
-
-      groups.forEach(group => {
-        expect(typeof group.reopenCount).toBe('number')
-        expect(group.reopenCount).toBeGreaterThanOrEqual(0)
-      })
+      expect(page1.length).toBeLessThanOrEqual(20)
+      expect(page1[0]).toHaveProperty('cve_id')
     })
   })
 
   describe('scrollToDate', () => {
     it('handles empty searchDate gracefully', () => {
       const wrapper = emptyWrapper()
-      // Should not throw
       expect(() => wrapper.vm.scrollToDate()).not.toThrow()
     })
 
@@ -433,8 +530,6 @@ describe('GanttTab.vue', () => {
       const wrapper = emptyWrapper()
       wrapper.vm.searchDate = '2026-04-01T00:00'
 
-      // The scrollWrapper ref is a DOM element but scrollTo might not be
-      // available in jsdom. Mock it to avoid the error.
       if (wrapper.vm.scrollWrapper && typeof wrapper.vm.scrollWrapper.scrollTo !== 'function') {
         wrapper.vm.scrollWrapper.scrollTo = vi.fn()
       }
@@ -447,103 +542,81 @@ describe('GanttTab.vue', () => {
     it('resets currentPage to 1 when ganttData changes', async () => {
       const wrapper = emptyWrapper()
 
-      // Go to page 2 if pagination exists
       if (wrapper.vm.totalPages > 1) {
         wrapper.vm.currentPage = 2
         expect(wrapper.vm.currentPage).toBe(2)
 
-        await wrapper.setProps({ ganttData: [{ cve_id: 'CVE-NEW', severity: 'HIGH', description: 'Test', agent_name: 'test', agent_id: 't1', first_seen: new Date().toISOString(), history: [] }] })
+        await wrapper.setProps({
+          ganttData: [{
+            cve_id: 'CVE-NEW',
+            severity: 'HIGH',
+            description: 'Test',
+            agent_name: 'test',
+            agent_id: 't1',
+            first_seen: new Date().toISOString(),
+            historySorted: []
+          }]
+        })
 
         expect(wrapper.vm.currentPage).toBe(1)
       }
     })
   })
 
-  describe('totalAgentRows computed', () => {
-    it('calculates total agents across all CVEs', () => {
+  describe('totalPages computed', () => {
+    it('computes totalPages from CVE count, not flat segments', () => {
       const wrapper = emptyWrapper()
-      const groups = wrapper.vm.groupedByCve
-      const manualSum = groups.reduce((sum, g) => sum + g.agents.length, 0)
-
-      expect(wrapper.vm.totalAgentRows).toBe(manualSum)
+      const cveCount = wrapper.vm.cveSnapshots.length
+      const expectedPages = Math.max(1, Math.ceil(cveCount / 20))
+      expect(wrapper.vm.totalPages).toBe(expectedPages)
     })
   })
 
-  describe('paginatedData computed', () => {
-    it('returns first page of data', () => {
-      const wrapper = emptyWrapper()
-      const page1 = wrapper.vm.paginatedData
-
-      expect(page1.length).toBeLessThanOrEqual(20)
-
-      // All items should be from the start
-      const firstId = page1[0]?.cve_id
-      expect(firstId).toBeTruthy()
-    })
-  })
-
-  describe('Phase 1: CSS cleanup — title label style', () => {
-    it('uses CSS class instead of inline style on searchDate label', () => {
-      const wrapper = emptyWrapper()
-      const label = wrapper.find('label[for="ganttSearchDate"]')
-      expect(label.exists()).toBe(true)
-      expect(label.attributes('style')).toBeFalsy()
-    })
-  })
-
-  describe('Phase 2: DEMO data gating', () => {
+  describe('DEMO data gating', () => {
     it('hides DEMO data when real ganttData is provided', () => {
       const realData = [
         {
           cve_id: 'CVE-REAL-001',
           severity: 'HIGH',
           description: 'Real vulnerability - test only',
-          start: new Date('2026-01-01'),
-          end: new Date('2026-06-01'),
-          status: 'PENDING',
-          agents: 0,
+          agent_name: 'srv-test-01',
+          agent_id: 't-001',
           first_seen: '2026-01-01T00:00:00Z',
-          resolved_at: null,
-          reopened_at: null
+          historySorted: []
         }
       ]
       const wrapper = mount(GanttTab, {
         props: { ganttData: realData }
       })
 
-      // DEMO descriptions contain '(DEMO)' — must NOT appear
       expect(wrapper.text()).not.toContain('DEMO')
-      // Real CVE must be rendered
       expect(wrapper.text()).toContain('CVE-REAL-001')
     })
   })
 
-  describe('Phase 4: Loading state', () => {
+  describe('Loading state', () => {
     it('shows loading state when ganttData is null', () => {
       const wrapper = mount(GanttTab, {
         props: { ganttData: null }
       })
 
       expect(wrapper.text()).toContain('Cargando')
-      // Chart internals should not render
       expect(wrapper.find('.gantt-controls').exists()).toBe(false)
       expect(wrapper.find('.gantt-body').exists()).toBe(false)
     })
   })
 
-  describe('Phase 4: Empty state fallback', () => {
-    it('shows DEMO data as empty-state fallback when ganttData is empty', () => {
+  describe('Empty state fallback', () => {
+    it('shows DEMO_SNAPSHOTS as fallback when ganttData is empty', () => {
       const wrapper = emptyWrapper()
 
-      // DEMO data should appear as the visual fallback
       expect(wrapper.text()).toContain('CVE-2026-0001')
-      // Chart should render normally with DEMO data
       expect(wrapper.find('.gantt-body').exists()).toBe(true)
       expect(wrapper.findAll('.gantt-bar').length).toBeGreaterThan(0)
     })
   })
 
-  describe('Phase 4: Title update', () => {
+  describe('Title', () => {
     it('shows title without "Criticos"', () => {
       const wrapper = emptyWrapper()
       expect(wrapper.text()).toContain('Seguimiento de CVEs')
@@ -551,34 +624,109 @@ describe('GanttTab.vue', () => {
     })
   })
 
-  describe('Phase 3: Pagination fix', () => {
-    it('computes totalPages from grouped CVE rows not flat segments', () => {
+  describe('Tooltip interactions', () => {
+    it('initial tooltip state is hidden', () => {
       const wrapper = emptyWrapper()
-      const groupCount = wrapper.vm.groupedByCve.length
-      const expectedPages = Math.max(1, Math.ceil(groupCount / 20))
-      expect(wrapper.vm.totalPages).toBe(expectedPages)
+      expect(wrapper.vm.isHovering).toBe(false)
+      expect(wrapper.vm.hoveredSnapshot).toBe(null)
+      expect(wrapper.find('.gantt-tooltip').exists()).toBe(false)
+    })
+
+    it('handleBarMouseEnter sets hover state', () => {
+      const wrapper = emptyWrapper()
+      const cve = wrapper.vm.cveSnapshots[0]
+      const snap = cve.snapshots[0]
+      const event = { clientX: 100, clientY: 200 }
+
+      wrapper.vm.handleBarMouseEnter(snap, cve, event)
+
+      expect(wrapper.vm.isHovering).toBe(true)
+      expect(wrapper.vm.hoveredSnapshot).toBeTruthy()
+      expect(wrapper.vm.hoveredSnapshot.cve_id).toBe(cve.cve_id)
+      expect(wrapper.vm.hoveredSnapshot.syncTimestamp).toBe(snap.syncTimestamp)
+      expect(wrapper.vm.tooltipPos.x).toBe(112) // clientX + 12
+      expect(wrapper.vm.tooltipPos.y).toBe(190) // clientY - 10
+    })
+
+    it('handleBarMouseLeave clears hover state', () => {
+      const wrapper = emptyWrapper()
+      const cve = wrapper.vm.cveSnapshots[0]
+      const snap = cve.snapshots[0]
+
+      wrapper.vm.handleBarMouseEnter(snap, cve, { clientX: 100, clientY: 200 })
+      expect(wrapper.vm.isHovering).toBe(true)
+
+      wrapper.vm.handleBarMouseLeave()
+      expect(wrapper.vm.isHovering).toBe(false)
+      expect(wrapper.vm.hoveredSnapshot).toBe(null)
+    })
+
+    it('handleBarMouseMove updates tooltip position', () => {
+      const wrapper = emptyWrapper()
+      wrapper.vm.isHovering = true
+
+      wrapper.vm.handleBarMouseMove({ clientX: 300, clientY: 150 })
+      expect(wrapper.vm.tooltipPos.x).toBe(312)
+      expect(wrapper.vm.tooltipPos.y).toBe(140)
     })
   })
 
-  describe('Phase 5: Lane positioning (bar Y offset correctness)', () => {
-    it('assigns different lanes to overlapping segments of the same agent', () => {
-      const wrapper = emptyWrapper()
-      const groups = wrapper.vm.groupedByCve
+  describe('getSnapshotBarClass (status-based)', () => {
+    const makeCve = (snapshots) => ({ snapshots })
 
-      groups.forEach(group => {
-        group.agents.forEach(agent => {
-          for (let i = 0; i < agent.segments.length; i++) {
-            for (let j = i + 1; j < agent.segments.length; j++) {
-              const a = agent.segments[i]
-              const b = agent.segments[j]
-              // If segments overlap in time, they must be in different lanes
-              if (a.start < b.end && b.start < a.end) {
-                expect(a.lane).not.toBe(b.lane)
-              }
-            }
-          }
-        })
-      })
+    it('returns snap-resolved when agentCount is 0', () => {
+      const wrapper = emptyWrapper()
+      const cve = makeCve([{ agentCount: 0 }])
+      expect(wrapper.vm.getSnapshotBarClass(cve, 0)).toBe('snap-resolved')
+    })
+
+    it('returns snap-detected when first snapshot has agents', () => {
+      const wrapper = emptyWrapper()
+      const cve = makeCve([{ agentCount: 2 }])
+      expect(wrapper.vm.getSnapshotBarClass(cve, 0)).toBe('snap-detected')
+    })
+
+    it('returns snap-detected when agentCount > 0 and previous was also > 0', () => {
+      const wrapper = emptyWrapper()
+      const cve = makeCve([{ agentCount: 1 }, { agentCount: 3 }])
+      expect(wrapper.vm.getSnapshotBarClass(cve, 1)).toBe('snap-detected')
+    })
+
+    it('returns snap-reopened when previous snapshot had 0 agents', () => {
+      const wrapper = emptyWrapper()
+      const cve = makeCve([{ agentCount: 0 }, { agentCount: 2 }])
+      expect(wrapper.vm.getSnapshotBarClass(cve, 1)).toBe('snap-reopened')
+    })
+  })
+
+  describe('getSnapshotStatusLabel', () => {
+    const makeCve = (snapshots) => ({ snapshots })
+
+    it('returns Resuelto for 0 agents', () => {
+      const wrapper = emptyWrapper()
+      const cve = makeCve([{ agentCount: 0 }])
+      expect(wrapper.vm.getSnapshotStatusLabel(cve, 0)).toBe('Resuelto')
+    })
+
+    it('returns Activo for first snapshot with agents', () => {
+      const wrapper = emptyWrapper()
+      const cve = makeCve([{ agentCount: 1 }])
+      expect(wrapper.vm.getSnapshotStatusLabel(cve, 0)).toBe('Activo')
+    })
+
+    it('returns Reabierto when previous snapshot had 0 agents', () => {
+      const wrapper = emptyWrapper()
+      const cve = makeCve([{ agentCount: 0 }, { agentCount: 3 }])
+      expect(wrapper.vm.getSnapshotStatusLabel(cve, 1)).toBe('Reabierto')
+    })
+  })
+
+  describe('CSS cleanup — title label style', () => {
+    it('uses CSS class instead of inline style on searchDate label', () => {
+      const wrapper = emptyWrapper()
+      const label = wrapper.find('label[for="ganttSearchDate"]')
+      expect(label.exists()).toBe(true)
+      expect(label.attributes('style')).toBeFalsy()
     })
   })
 })
