@@ -70,3 +70,14 @@ if (typeof localStorage !== 'undefined' && typeof localStorage.clear !== 'functi
 if (typeof sessionStorage !== 'undefined' && typeof sessionStorage.clear !== 'function') {
   globalThis.sessionStorage = createStorageMock()
 }
+
+// Mock vue-chartjs to avoid chart.js DOM access errors in jsdom.
+// chart.js tries to call getComputedStyle(null) when a canvas gets detached,
+// which causes unhandled rejections in tests.
+vi.mock('vue-chartjs', () => {
+  const stub = {
+    template: '<div class="chart-stub"><slot /></div>',
+    props: ['data', 'options']
+  }
+  return { Pie: stub, Doughnut: stub }
+})

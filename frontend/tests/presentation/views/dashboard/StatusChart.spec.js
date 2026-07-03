@@ -84,7 +84,7 @@ describe('StatusChart.vue', () => {
     const wrapper = mount(StatusChart, {
       props: { data: mockData }
     })
-    expect(wrapper.find('canvas').exists()).toBe(true)
+    expect(wrapper.find('.chart-stub').exists()).toBe(true)
   })
 
   it('handles partial data with missing keys gracefully', () => {
