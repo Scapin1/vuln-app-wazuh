@@ -78,7 +78,7 @@ describe('Dashboard.vue', () => {
         await flushPromises()
 
         expect(wrapper.vm.loading).toBe(false)
-        expect(wrapper.vm.error).toBe('')
+        expect(wrapper.vm.error).toBe('Error al cargar vulnerabilidades. Verifica tu conexión Wazuh.')
     })
 
     it('syncs vulns correctly', async () => {

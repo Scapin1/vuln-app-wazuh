@@ -418,6 +418,7 @@ describe('useTimelineData', () => {
       expect(result.data).toEqual([])
       expect(result.pages).toBe(1) // una página procesada (vació)
     })
+  })
 
   describe('zoom levels and slot calculations', () => {
     it('handles different zoom levels correctly', async () => {
