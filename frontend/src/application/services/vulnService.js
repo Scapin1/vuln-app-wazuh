@@ -1,7 +1,7 @@
 import apiClient from '../../infrastructure/http/apiClient';
 
 export default {
-    getVulns: async (params = {}) => {
+    getVulns: async (params = {}, extraConfig = {}) => {
     const queryParams = {}
 
     if (params.limit !== undefined && params.limit !== null) {
@@ -12,8 +12,13 @@ export default {
       queryParams.connection_id = params.connectionId
     }
 
+    if (params.offset !== undefined && params.offset !== null) {
+      queryParams.offset = params.offset
+    }
+
         return apiClient.get('/vulns', {
       params: queryParams,
+      ...extraConfig,
         })
     },
 
