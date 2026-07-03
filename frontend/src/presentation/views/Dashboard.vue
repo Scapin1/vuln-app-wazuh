@@ -151,11 +151,26 @@
       </div>
     </div>
 
-    <div v-if="loading" class="empty-state">
-      <div class="spinner-box">
-        <svg class="spin" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+    <!-- Loading card with progress (same design as Timeline) -->
+    <div v-if="loading" class="card loading-card">
+      <div class="loading-progress">
+        <div class="loading-info">
+          <p class="loading-message">{{ loadingMessage || 'Cargando...' }}</p>
+          <p v-if="fetchProgress.current > 0" class="loading-detail">
+            Página {{ fetchProgress.current }}
+          </p>
+          <p v-if="fetchProgress.done" class="loading-detail loading-done">
+            {{ fetchProgress.current }} páginas cargadas
+          </p>
+          <p v-if="elapsedSeconds >= 3" class="loading-detail">
+            {{ elapsedSeconds }}s transcurridos
+          </p>
+        </div>
       </div>
-      <p>Cargando datos del cluster...</p>
+      <div class="loading-bar-track">
+        <div class="loading-bar-fill" :style="{ width: loadingBarWidth + '%' }"></div>
+      </div>
+      <button v-if="!fetchProgress.done" class="btn btn-cancel" @click="cancelBuild">Cancelar</button>
     </div>
 
     <!-- Table -->
@@ -360,7 +375,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, reactive } from 'vue'
+import { ref, onMounted, computed, watch, reactive, onUnmounted } from 'vue'
 import vulnService from '../../application/services/vulnService'
 import wazuhService from '../../application/services/wazuhService'
 import SeverityChart from './dashboard/components/SeverityChart.vue'
@@ -373,6 +388,43 @@ const error = ref('')
 const sortKey = ref('last_seen')
 const sortOrder = ref('desc')
 const showFilters = ref(false)
+
+// Loading progress (same pattern as timeline)
+const loadingMessage = ref('')
+const elapsedSeconds = ref(0)
+const fetchProgress = ref({ current: 0 })
+let abortController = null
+let timerInterval = null
+
+const TICK_INTERVAL_MS = 1000
+const PAGE_SIZE = 10000
+
+const startTimer = () => {
+  elapsedSeconds.value = 0
+  clearInterval(timerInterval)
+  timerInterval = setInterval(() => { elapsedSeconds.value++ }, TICK_INTERVAL_MS)
+}
+
+const stopTimer = () => {
+  clearInterval(timerInterval)
+  timerInterval = null
+}
+
+const cancelBuild = () => {
+  if (abortController) {
+    abortController.abort()
+    abortController = null
+  }
+  stopTimer()
+  loading.value = false
+  loadingMessage.value = 'Operación cancelada'
+  fetchProgress.value = { current: 0 }
+}
+
+const loadingBarWidth = computed(() => {
+  if (fetchProgress.value.done) return 100
+  return Math.min(fetchProgress.value.current * 20, 80)
+})
 
 // Paginación
 const currentPage = ref(1)
@@ -636,18 +688,52 @@ const clearFilters = () => {
 const fetchVulns = async () => {
   loading.value = true
   error.value = ''
+  loadingMessage.value = ''
+  fetchProgress.value = { current: 0 }
+  startTimer()
+
+  abortController = new AbortController()
+  const signal = abortController.signal
+
   try {
-    const res = await vulnService.getVulns()
-    if (res.data && res.data.length > 0) {
-      vulns.value = res.data
+    let allData = []
+    let offset = 0
+    let pageNum = 0
+    while (true) {
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+
+      const res = await vulnService.getVulns({ limit: PAGE_SIZE, offset }, { signal })
+      const data = Array.isArray(res.data) ? res.data : []
+      allData = allData.concat(data)
+      pageNum++
+
+      fetchProgress.value = { current: pageNum }
+      loadingMessage.value = 'Obteniendo datos...'
+
+      if (data.length < PAGE_SIZE) break
+      offset += PAGE_SIZE
+    }
+
+    fetchProgress.value = { current: pageNum, done: true }
+    loadingMessage.value = `Cargando gráficos...`
+
+    if (allData.length > 0) {
+      vulns.value = allData
       updateFilterOptions()
     } else {
       vulns.value = []
     }
   } catch (err) {
+    if (err.name === 'AbortError') {
+      loadingMessage.value = 'Operación cancelada'
+      return
+    }
     console.error('Error fetching vulns:', err)
+    error.value = 'Error al cargar vulnerabilidades. Verifica tu conexión Wazuh.'
   } finally {
+    stopTimer()
     loading.value = false
+    abortController = null
   }
 }
 
@@ -756,6 +842,10 @@ const timeAgo = (date) => {
 onMounted(() => {
   fetchConnections()
   fetchVulns()
+})
+
+onUnmounted(() => {
+  stopTimer()
 })
 </script>
 
@@ -1338,6 +1428,93 @@ th {
 .badge-low {
   background: rgba(59, 130, 246, 0.15);
   color: #3b82f6;
+}
+
+/* ── Loading card (same design as Timeline) ── */
+.loading-card {
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+}
+
+.loading-progress {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.loading-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--border, #e2e8f0);
+  border-top-color: var(--primary, #3d6a00);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-info {
+  text-align: left;
+}
+
+.loading-message {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text, #1e293b);
+  margin: 0;
+}
+
+.loading-detail {
+  font-size: 0.8rem;
+  color: var(--text-muted, #64748b);
+  margin: 0.2rem 0 0 0;
+}
+
+.loading-done {
+  color: var(--primary, #3d6a00);
+  font-weight: 600;
+}
+
+.loading-bar-track {
+  width: 100%;
+  max-width: 400px;
+  height: 6px;
+  background: var(--border, #e2e8f0);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.loading-bar-fill {
+  height: 100%;
+  background: var(--primary, #3d6a00);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  width: 100%;
+}
+
+.btn-cancel {
+  padding: 0.4rem 1rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 4px;
+  background: white;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-cancel:hover {
+  background: #fef2f2;
+  border-color: #f87171;
+  color: #dc2626;
 }
 
 @media (max-width: 1400px) {
