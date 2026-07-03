@@ -5,7 +5,7 @@
       <p>Cargando datos de vulnerabilidades...</p>
     </div>
 
-    <div v-else-if="!displaySegments.length" class="gantt-empty-state">
+    <div v-else-if="!cveSnapshots.length" class="gantt-empty-state">
       <p>No hay datos de vulnerabilidades para mostrar</p>
     </div>
 
@@ -24,9 +24,9 @@
           <button class="zoom-btn" @click="zoomIn" title="Acercar">+</button>
         </div>
         <div class="gantt-legend">
-          <div class="legend-item"><span class="legend-dot pending"></span> Pendiente</div>
-          <div class="legend-item"><span class="legend-dot resolved"></span> Resuelto</div>
-          <div class="legend-item"><span class="legend-dot reopened"></span> Reabierto</div>
+          <div class="legend-item"><span class="legend-dot snap-detected"></span> Activo</div>
+          <div class="legend-item"><span class="legend-dot snap-reopened"></span> Reabierto</div>
+          <div class="legend-item"><span class="legend-dot snap-resolved"></span> Resuelto</div>
         </div>
       </div>
     </div>
@@ -43,63 +43,56 @@
       </div>
 
       <div class="gantt-body">
-        <template v-for="cveGroup in paginatedData" :key="cveGroup.cve_id">
-          <!-- CVE header row -->
-          <div class="cve-header-row">
-            <div class="cve-header-sidebar">
-              <span class="cve-id">{{ cveGroup.cve_id }}</span>
-              <span class="sev-badge" :class="cveGroup.severity.toLowerCase()">{{ cveGroup.severity }}</span>
-              <span v-if="cveGroup.reopenCount > 0" class="reopen-badge"
-                :title="`Reactivado ${cveGroup.reopenCount} vez${cveGroup.reopenCount > 1 ? 'es' : ''}`">
-                ↻ {{ cveGroup.reopenCount }}
-              </span>
-              <span class="cve-agent-count">{{ cveGroup.agents.length }} agente{{ cveGroup.agents.length > 1 ? 's' : ''
-                }}</span>
+        <div v-for="cve in paginatedCveSnapshots" :key="cve.cve_id" class="gantt-row cve-row">
+          <div class="gantt-sidebar-cell">
+            <div class="cve-top">
+              <span class="cve-id">{{ cve.cve_id }}</span>
+              <span class="sev-badge" :class="cve.severity.toLowerCase()">{{ cve.severity }}</span>
             </div>
-            <div class="cve-header-chart" :style="{ minWidth: timelineWidth + 'px' }"></div>
+            <span class="cve-desc">{{ cve.description }}</span>
+            <span class="cve-sync-count">{{ cve.snapshots.length }} sincronizaciones</span>
           </div>
-          <!-- Agent rows -->
-          <div v-for="agent in cveGroup.agents" :key="agent.key" class="gantt-row agent-row"
-            :style="{ height: getRowHeight(agent.laneCount) + 'px' }">
-            <div class="gantt-sidebar-cell">
-              <div class="agent-top">
-                <span class="agent-name" :title="agent.agent_name || 'Sin nombre'">{{ agent.agent_name || 'Desconocido'
-                  }}</span>
-              </div>
-              <span class="cve-desc">{{ agent.description }}</span>
-              <div class="cve-dates-inline">
-                <span class="date-chip detected">Det: {{ formatDate(agent.first_seen) }}</span>
-                <span v-if="agent.resolved_at" class="date-chip resolved">Res: {{ formatDate(agent.resolved_at)
-                  }}</span>
-                <span v-if="agent.reopened_at" class="date-chip reopened">Rea: {{ formatDate(agent.reopened_at)
-                  }}</span>
-              </div>
-            </div>
-            <div class="gantt-chart-cell" :style="{ minWidth: timelineWidth + 'px' }">
-              <div v-for="(seg, idx) in agent.segments" :key="idx" class="gantt-bar" :style="getBarStyle(seg)"
-                :class="seg.status.toLowerCase()">
-                <span class="bar-label" :class="{ visible: seg._barWidthPx > 40 }">
-                  {{ seg.status === 'PENDING' ? 'Activo' : (seg.status === 'REOPENED' ? 'Reabierto' : 'Resuelto') }}
-                </span>
-              </div>
+          <div class="gantt-chart-cell" :style="{ minWidth: timelineWidth + 'px' }">
+            <div v-for="(snap, idx) in cve.snapshots" :key="idx"
+                 class="gantt-bar snapshot-bar"
+                 :style="getSnapshotBarStyle(cve, idx)"
+                 :class="getSnapshotBarClass(cve, idx)"
+                 @mouseenter="handleBarMouseEnter(snap, cve, $event)"
+                 @mousemove="handleBarMouseMove($event)"
+                 @mouseleave="handleBarMouseLeave">
+              <span class="bar-label">{{ getSnapshotStatusLabel(cve, idx) }}</span>
             </div>
           </div>
-        </template>
+        </div>
       </div>
     </div>
 
     <div v-if="totalPages > 1" class="gantt-pagination">
       <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">Anterior</button>
-      <span class="page-info">Pagina {{ currentPage }} de {{ totalPages }} ({{ totalAgentRows }} filas)</span>
+      <span class="page-info">Pagina {{ currentPage }} de {{ totalPages }} ({{ cveSnapshots.length }} CVEs)</span>
       <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">Siguiente</button>
+    </div>
+
+    <!-- Tooltip -->
+    <div v-if="isHovering && hoveredSnapshot"
+         ref="tooltipRef"
+         class="gantt-tooltip"
+         :style="{ left: tooltipPos.x + 'px', top: tooltipPos.y + 'px' }">
+      <div class="tooltip-header">{{ hoveredSnapshot.cve_id }}</div>
+      <div class="tooltip-sync">Sincronización: {{ formatDate(hoveredSnapshot.syncTimestamp) }}</div>
+      <div class="tooltip-agents">
+        <div v-for="agent in hoveredSnapshot.agents" :key="agent" class="tooltip-agent">
+          {{ agent }}
+        </div>
+      </div>
+      <div class="tooltip-count">{{ hoveredSnapshot.agentCount }} agente{{ hoveredSnapshot.agentCount > 1 ? 's' : '' }} afectado{{ hoveredSnapshot.agentCount > 1 ? 's' : '' }}</div>
     </div>
     </template>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import * as d3 from 'd3'
+import { ref, computed, watch, nextTick } from 'vue'
 
 const props = defineProps({
   ganttData: { type: Array, default: () => null }
@@ -112,11 +105,9 @@ const currentPage = ref(1)
 const toLocalDate = (d) => {
   if (!d) return new Date()
   if (d instanceof Date) return d
-  // Handle ISO strings like '2024-01-10T14:30:00Z' or '2024-01-10'
   const dateStr = d.split('T')[0]
   const parts = dateStr.split('-')
   const base = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
-  // Preserve time if present in the original string
   if (d.includes('T')) {
     const timePart = d.split('T')[1]
     if (timePart) {
@@ -128,179 +119,169 @@ const toLocalDate = (d) => {
   return base
 }
 
-const displaySegments = computed(() => {
-  // Demo data to visualize all states (resolved, reopened, pending) with multiple agents
-  // Remove this block when real data covers all scenarios
-  const DEMO_DATA = [
-    {
-      cve_id: 'CVE-2026-0001', severity: 'CRITICAL', description: 'RCE en modulo de autenticacion (DEMO)',
-      agent_name: 'srv-web-01', agent_id: 'demo-001',
-      first_seen: new Date(2026, 3, 1).toISOString(),
-      history: [
-        { action: 'RESOLVED', timestamp: new Date(2026, 3, 15).toISOString() },
-        { action: 'REOPENED', timestamp: new Date(2026, 4, 1).toISOString() },
-        { action: 'RESOLVED', timestamp: new Date(2026, 4, 10).toISOString() }
-      ]
-    },
-    {
-      cve_id: 'CVE-2026-0001', severity: 'CRITICAL', description: 'RCE en modulo de autenticacion (DEMO)',
-      agent_name: 'srv-db-02', agent_id: 'demo-002',
-      first_seen: new Date(2026, 3, 5).toISOString(),
-      history: [
-        { action: 'RESOLVED', timestamp: new Date(2026, 3, 20).toISOString() }
-      ]
-    },
-    {
-      cve_id: 'CVE-2026-0001', severity: 'CRITICAL', description: 'RCE en modulo de autenticacion (DEMO)',
-      agent_name: 'srv-api-03', agent_id: 'demo-003',
-      first_seen: new Date(2026, 4, 1).toISOString(),
-      history: []
-    },
-    {
-      cve_id: 'CVE-2026-0002', severity: 'HIGH', description: 'SQL Injection en API REST (DEMO)',
-      agent_name: 'srv-web-01', agent_id: 'demo-004',
-      first_seen: new Date(2026, 4, 5).toISOString(),
-      history: [
-        { action: 'RESOLVED', timestamp: new Date(2026, 4, 12).toISOString() },
-        { action: 'REOPENED', timestamp: new Date(2026, 4, 14).toISOString() }
-      ]
-    },
-    {
-      cve_id: 'CVE-2026-0003', severity: 'MEDIUM', description: 'XSS reflejado en dashboard (DEMO)',
-      agent_name: 'srv-app-04', agent_id: 'demo-005',
-      first_seen: new Date(2026, 2, 20).toISOString(),
-      history: [
-        { action: 'RESOLVED', timestamp: new Date(2026, 3, 1).toISOString() }
-      ]
-    },
-    {
-      cve_id: 'CVE-2026-0004', severity: 'LOW', description: 'Info disclosure en header HTTP (DEMO)',
-      agent_name: 'srv-proxy-05', agent_id: 'demo-006',
-      first_seen: new Date(2026, 1, 10).toISOString(),
-      history: [
-        { action: 'RESOLVED', timestamp: new Date(2026, 2, 1).toISOString() },
-        { action: 'REOPENED', timestamp: new Date(2026, 2, 15).toISOString() },
-        { action: 'RESOLVED', timestamp: new Date(2026, 3, 1).toISOString() },
-        { action: 'REOPENED', timestamp: new Date(2026, 4, 1).toISOString() },
-        { action: 'RESOLVED', timestamp: new Date(2026, 4, 15).toISOString() }
-      ]
-    }
-  ]
+// ── DEMO SNAPSHOTS (replaces old DEMO_DATA) ──
+const DEMO_SNAPSHOTS = [
+  {
+    cve_id: 'CVE-2026-0001',
+    severity: 'CRITICAL',
+    description: 'RCE en modulo de autenticacion (DEMO)',
+    snapshots: [
+      { syncTimestamp: new Date(2026, 2, 1).toISOString(), agents: ['srv-web-01', 'srv-db-02', 'srv-api-03'], agentCount: 3 },
+      { syncTimestamp: new Date(2026, 3, 1).toISOString(), agents: ['srv-web-01', 'srv-db-02'], agentCount: 2 },
+      { syncTimestamp: new Date(2026, 4, 1).toISOString(), agents: ['srv-web-01'], agentCount: 1 }
+    ],
+    firstSync: new Date(2026, 2, 1).toISOString(),
+    lastSync: new Date(2026, 4, 1).toISOString(),
+    isResolved: false
+  },
+  {
+    cve_id: 'CVE-2026-0002',
+    severity: 'HIGH',
+    description: 'SQL Injection en API REST (DEMO)',
+    snapshots: [
+      { syncTimestamp: new Date(2026, 2, 15).toISOString(), agents: ['srv-api-01', 'srv-web-02'], agentCount: 2 },
+      { syncTimestamp: new Date(2026, 3, 15).toISOString(), agents: ['srv-api-01', 'srv-web-02'], agentCount: 2 },
+      { syncTimestamp: new Date(2026, 4, 15).toISOString(), agents: ['srv-api-01', 'srv-web-02'], agentCount: 2 }
+    ],
+    firstSync: new Date(2026, 2, 15).toISOString(),
+    lastSync: new Date(2026, 4, 15).toISOString(),
+    isResolved: false
+  },
+  {
+    cve_id: 'CVE-2026-0003',
+    severity: 'MEDIUM',
+    description: 'XSS reflejado en dashboard (DEMO)',
+    snapshots: [
+      { syncTimestamp: new Date(2026, 1, 1).toISOString(), agents: ['srv-app-04'], agentCount: 1 },
+      { syncTimestamp: new Date(2026, 2, 1).toISOString(), agents: ['srv-app-04', 'srv-web-03'], agentCount: 2 },
+      { syncTimestamp: new Date(2026, 3, 1).toISOString(), agents: [], agentCount: 0 },
+      { syncTimestamp: new Date(2026, 4, 1).toISOString(), agents: ['srv-app-04', 'srv-web-03', 'srv-db-01'], agentCount: 3 }
+    ],
+    firstSync: new Date(2026, 1, 1).toISOString(),
+    lastSync: new Date(2026, 4, 1).toISOString(),
+    isResolved: false
+  },
+  {
+    cve_id: 'CVE-2026-0004',
+    severity: 'LOW',
+    description: 'Info disclosure en header HTTP (DEMO)',
+    snapshots: [
+      { syncTimestamp: new Date(2026, 0, 10).toISOString(), agents: ['srv-proxy-05'], agentCount: 1 },
+      { syncTimestamp: new Date(2026, 1, 10).toISOString(), agents: ['srv-proxy-05'], agentCount: 1 },
+      { syncTimestamp: new Date(2026, 2, 10).toISOString(), agents: ['srv-proxy-05'], agentCount: 1 },
+      { syncTimestamp: new Date(2026, 3, 10).toISOString(), agents: ['srv-proxy-05'], agentCount: 1 },
+      { syncTimestamp: new Date(2026, 4, 10).toISOString(), agents: [], agentCount: 0 }
+    ],
+    firstSync: new Date(2026, 0, 10).toISOString(),
+    lastSync: new Date(2026, 4, 10).toISOString(),
+    isResolved: true
+  },
+  {
+    cve_id: 'CVE-2026-0005',
+    severity: 'CRITICAL',
+    description: 'Desbordamiento de buffer en servicio DHCP (DEMO)',
+    snapshots: [
+      { syncTimestamp: new Date(2026, 3, 5).toISOString(), agents: ['srv-dhcp-01', 'srv-dhcp-02', 'srv-dhcp-03', 'srv-dhcp-04', 'srv-dhcp-05'], agentCount: 5 }
+    ],
+    firstSync: new Date(2026, 3, 5).toISOString(),
+    lastSync: new Date(2026, 3, 5).toISOString(),
+    isResolved: false
+  }
+]
 
-  const useDemo = !props.ganttData || !props.ganttData.length
-  const allData = useDemo ? DEMO_DATA : props.ganttData
-  if (!allData || allData.length === 0) return []
+// ── Build CVEs with snapshots from real vuln data ──
+const buildCveSnapshots = (vulns) => {
+  // Group by cve_id
+  const cveMap = new Map()
 
-  const segments = []
-  const now = new Date()
-
-  allData.forEach(v => {
-    // Real data shape (no history[]): use fields as a direct segment
-    if (!v.history) {
-      segments.push({
-        cve_id: v.cve_id, severity: v.severity, description: v.description,
-        agent_name: v.agent_name || v.cve_id, agent_id: v.agent_id || v.cve_id,
-        start: v.start instanceof Date ? v.start : toLocalDate(v.start),
-        end: v.end instanceof Date ? v.end : toLocalDate(v.end),
-        status: v.status || 'PENDING',
-        agents: v.agents || 0,
-        first_seen: v.first_seen,
-        resolved_at: v.resolved_at || null,
-        reopened_at: v.reopened_at || null,
-        reopenCount: 0
+  vulns.forEach(v => {
+    if (!cveMap.has(v.cve_id)) {
+      cveMap.set(v.cve_id, {
+        cve_id: v.cve_id,
+        severity: v.severity || 'MEDIUM',
+        description: v.description || '',
+        agents: [],
+        snapshots: [],
+        isResolved: false
       })
-      return
     }
-
-    // DEMO shape (has history[]): decompose into segments
-    const history = (v.history || [])
-      .filter(h => h.action === 'RESOLVED' || h.action === 'REOPENED')
-      .sort((a, b) => toLocalDate(a.timestamp) - toLocalDate(b.timestamp))
-
-    let currentStart = toLocalDate(v.first_seen)
-    let currentState = 'PENDING'
-
-    if (history.length === 0) {
-      segments.push({
-        cve_id: v.cve_id, severity: v.severity, description: v.description,
-        agent_name: v.agent_name, agent_id: v.agent_id,
-        start: currentStart, end: now, status: 'PENDING', agents: v.agents || 0,
-        first_seen: v.first_seen, resolved_at: null, reopened_at: null, reopenCount: 0
-      })
-      return
-    }
-
-    let reopenCount = 0
-    history.forEach(event => {
-      const eventDate = toLocalDate(event.timestamp)
-      if (event.action === 'RESOLVED') {
-        segments.push({
-          cve_id: v.cve_id, severity: v.severity, description: v.description,
-          agent_name: v.agent_name, agent_id: v.agent_id,
-          start: currentStart, end: eventDate, status: currentState, agents: v.agents || 0,
-          first_seen: v.first_seen, resolved_at: event.timestamp, reopened_at: null, reopenCount: 0
-        })
-        currentState = 'RESOLVED'
-        currentStart = eventDate
-      } else if (event.action === 'REOPENED') {
-        reopenCount++
-        segments.push({
-          cve_id: v.cve_id, severity: v.severity, description: v.description,
-          agent_name: v.agent_name, agent_id: v.agent_id,
-          start: currentStart, end: eventDate, status: currentState, agents: v.agents || 0,
-          first_seen: v.first_seen, resolved_at: null, reopened_at: event.timestamp, reopenCount: 0
-        })
-        currentState = 'REOPENED'
-        currentStart = eventDate
-      }
-    })
-
-    segments.push({
-      cve_id: v.cve_id, severity: v.severity, description: v.description,
-      agent_name: v.agent_name, agent_id: v.agent_id,
-      start: currentStart, end: now, status: currentState, agents: v.agents || 0,
-      first_seen: v.first_seen, resolved_at: currentState === 'RESOLVED' ? history[history.length - 1]?.timestamp : null,
-      reopened_at: currentState === 'REOPENED' ? history[history.length - 1]?.timestamp : null,
-      reopenCount
+    const cve = cveMap.get(v.cve_id)
+    cve.agents.push({
+      agent_name: v.agent_name || 'unknown',
+      agent_id: v.agent_id || '',
+      first_seen: v.first_seen,
+      last_seen: v.last_seen, // sync timestamp — same across machines
+      history: v.historySorted || []
     })
   })
 
-  // Merge consecutive segments with the same status FOR THE SAME AGENT
-  const merged = []
-  for (const seg of segments) {
-    const last = merged[merged.length - 1]
-    const sameAgent = (last?.agent_name ?? '__none__') === (seg.agent_name ?? '__none__')
-    const sameCve = last?.cve_id === seg.cve_id
-    const sameStatus = last?.status === seg.status
-    const consecutive = last && seg.start.getTime() <= last.end.getTime() + 1000 // 1s tolerance
+  // For each CVE, collect timestamps and build snapshots
+  cveMap.forEach((cve) => {
+    const timestampMap = new Map() // timestamp → Set of agent_names
 
-    if (sameAgent && sameCve && sameStatus && consecutive) {
-      last.end = seg.end > last.end ? seg.end : last.end
-      last.resolved_at = seg.resolved_at || last.resolved_at
-      last.reopened_at = seg.reopened_at || last.reopened_at
-    } else {
-      merged.push({ ...seg })
-    }
-  }
+    cve.agents.forEach(agent => {
+      const addTimestamp = (ts) => {
+        if (!ts) return
+        if (!timestampMap.has(ts)) timestampMap.set(ts, new Set())
+        timestampMap.get(ts).add(agent.agent_name)
+      }
 
-  return merged
+      addTimestamp(agent.first_seen)
+      addTimestamp(agent.last_seen)  // sync timestamp — shared across machines
+      agent.history.forEach(h => addTimestamp(h.timestamp))
+    })
+
+    const sortedTimestamps = Array.from(timestampMap.keys()).sort(
+      (a, b) => new Date(a).getTime() - new Date(b).getTime()
+    )
+
+    cve.snapshots = sortedTimestamps.map(ts => ({
+      syncTimestamp: ts,
+      agents: Array.from(timestampMap.get(ts) || []),
+      agentCount: (timestampMap.get(ts) || new Set()).size,
+      cve_id: cve.cve_id
+    }))
+
+    // Resolved when all agents have a RESOLVED as their last history event
+    cve.isResolved = cve.agents.length > 0 && cve.agents.every(agent => {
+      const lastEvent = agent.history[agent.history.length - 1]
+      return lastEvent && lastEvent.action === 'RESOLVED'
+    })
+
+    cve.firstSync = cve.snapshots[0]?.syncTimestamp || null
+    cve.lastSync = cve.snapshots[cve.snapshots.length - 1]?.syncTimestamp || null
+  })
+
+  return Array.from(cveMap.values())
+}
+
+// ── Core computed: CVEs with sync snapshots ──
+const cveSnapshots = computed(() => {
+  const data = props.ganttData
+  if (!data || data.length === 0) return DEMO_SNAPSHOTS
+  const cves = buildCveSnapshots(data)
+  // Merge nearby snapshots based on zoom level to avoid overlapping bars
+  cves.forEach(cve => {
+    cve.snapshots = mergeSnapshotsByZoom(cve.snapshots)
+    cve.firstSync = cve.snapshots[0]?.syncTimestamp || null
+    cve.lastSync = cve.snapshots[cve.snapshots.length - 1]?.syncTimestamp || null
+  })
+  return cves
 })
 
-const totalPages = computed(() => Math.max(1, Math.ceil(groupedByCve.value.length / ITEMS_PER_PAGE)))
+// ── Pagination ──
+const totalPages = computed(() => Math.max(1, Math.ceil(cveSnapshots.value.length / ITEMS_PER_PAGE)))
 
-const totalAgentRows = computed(() => {
-  return paginatedData.value.reduce((sum, cve) => sum + cve.agents.length, 0)
-})
-
-const paginatedData = computed(() => {
+const paginatedCveSnapshots = computed(() => {
   const start = (currentPage.value - 1) * ITEMS_PER_PAGE
-  return groupedByCve.value.slice(start, start + ITEMS_PER_PAGE)
+  return cveSnapshots.value.slice(start, start + ITEMS_PER_PAGE)
 })
 
 watch(() => props.ganttData, () => {
   currentPage.value = 1
 })
 
+// ── Scroll / Search ──
 const scrollWrapper = ref(null)
 const searchDate = ref('')
 
@@ -310,7 +291,6 @@ const scrollToDate = () => {
   const targetDate = new Date(searchDate.value)
   const startMs = timeLabels.value[0].date.getTime()
   const totalPx = timelineWidth.value
-  // The timeline range spans (count - 1) intervals between labels
   const rangeMs = (timeLabels.value.length - 1) * msPerUnit.value
 
   if (rangeMs <= 0) return
@@ -321,6 +301,7 @@ const scrollToDate = () => {
   scrollWrapper.value.scrollTo({ left: Math.max(0, scrollPos - 200), behavior: 'smooth' })
 }
 
+// ── Zoom ──
 const ZOOM_LEVELS = [
   { label: 'Año', unit: 'year', width: 80 },
   { label: 'Mes', unit: 'month', width: 100 },
@@ -328,7 +309,7 @@ const ZOOM_LEVELS = [
   { label: 'Hora', unit: 'hour', width: 40 }
 ]
 
-const zoomIndex = ref(1) // Start at month view
+const zoomIndex = ref(1)
 const zoomLevel = computed(() => ZOOM_LEVELS[zoomIndex.value])
 const zoomLabel = computed(() => zoomLevel.value.label)
 
@@ -337,13 +318,60 @@ const zoomOut = () => { if (zoomIndex.value > 0) zoomIndex.value-- }
 
 const MONTH_WIDTH = computed(() => zoomLevel.value.width)
 const MIN_BAR_WIDTH = 3
-const LANE_HEIGHT = 28
 
+// ── Zoom-aware snapshot merging threshold ──
+const MIN_SNAP_GAP_MS = computed(() => {
+  const unit = zoomLevel.value.unit
+  if (unit === 'year') return 7 * 86400000  // semanal en vista año
+  if (unit === 'month') return 86400000      // diario en vista mes
+  if (unit === 'day') return 3600000         // cada hora en vista día
+  return 600000                               // 10 min en vista hora
+})
+
+/** Merge snapshots whose timestamps are closer than MIN_SNAP_GAP_MS.
+ *  Keeps the earliest timestamp, unions agent sets. */
+const mergeSnapshotsByZoom = (snapshots) => {
+  if (snapshots.length <= 1) return snapshots
+  const merged = []
+  let current = { ...snapshots[0] }
+
+  for (let i = 1; i < snapshots.length; i++) {
+    const gap = new Date(snapshots[i].syncTimestamp).getTime() - new Date(current.syncTimestamp).getTime()
+    if (gap < MIN_SNAP_GAP_MS.value) {
+      // Merge: union agents, keep earlier timestamp
+      const agentSet = new Set([...current.agents, ...snapshots[i].agents])
+      current = {
+        ...current,
+        agents: Array.from(agentSet),
+        agentCount: agentSet.size,
+      }
+    } else {
+      merged.push(current)
+      current = { ...snapshots[i] }
+    }
+  }
+  merged.push(current)
+  return merged
+}
+
+// ── Time labels & timeline dimensions ──
 const timeLabels = computed(() => {
-  if (!displaySegments.value.length) return []
+  if (!cveSnapshots.value.length) return []
 
-  const start = d3.min(displaySegments.value, d => d.start)
-  const end = new Date(Math.max(d3.max(displaySegments.value, d => d.end).getTime(), Date.now()))
+  // Find min/max dates from all snapshot timestamps
+  let minMs = Infinity
+  let maxMs = -Infinity
+  cveSnapshots.value.forEach(cve => {
+    cve.snapshots.forEach(snap => {
+      const t = toLocalDate(snap.syncTimestamp).getTime()
+      if (t < minMs) minMs = t
+      if (t > maxMs) maxMs = t
+    })
+  })
+  if (minMs === Infinity) return []
+
+  const start = new Date(minMs)
+  const end = new Date(Math.max(maxMs, Date.now()))
   const unit = zoomLevel.value.unit
 
   const labels = []
@@ -367,7 +395,6 @@ const timeLabels = computed(() => {
       labels.push({ label, date: new Date(current) })
       current = new Date(current.getFullYear(), current.getMonth() + 1, 1)
     }
-    // Add one extra month column to ensure active bars aren't cut off
     const label = spansMultipleYears
       ? current.toLocaleString('es', { month: 'short', year: '2-digit' })
       : current.toLocaleString('es', { month: 'short' })
@@ -417,139 +444,107 @@ const msPerUnit = computed(() => {
 const timelineWidth = computed(() => {
   const count = timeLabels.value.length
   if (count <= 1) return MONTH_WIDTH.value
-  // The range spans (count - 1) intervals between labels
   return (count - 1) * MONTH_WIDTH.value
 })
 
-const getBarStyle = (item) => {
+// ── Snapshot bar style: position + width for each sync segment ──
+const getSnapshotBarStyle = (cve, idx) => {
   if (!timeLabels.value.length) return {}
   const totalPx = timelineWidth.value
   const startMs = timeLabels.value[0].date.getTime()
   const rangeMs = (timeLabels.value.length - 1) * msPerUnit.value
   if (rangeMs <= 0) return {}
 
-  const leftPx = ((item.start.getTime() - startMs) / rangeMs) * totalPx
-  const widthPx = ((item.end.getTime() - item.start.getTime()) / rangeMs) * totalPx
-  const lane = item.lane ?? 0
-  const topPx = lane * LANE_HEIGHT + 4
+  const snap = cve.snapshots[idx]
+  const snapDate = toLocalDate(snap.syncTimestamp)
+  const leftPx = ((snapDate.getTime() - startMs) / rangeMs) * totalPx
+
+  // Bar ends at next snapshot or now for the last one
+  const nextSnap = cve.snapshots[idx + 1]
+  const endDate = nextSnap ? toLocalDate(nextSnap.syncTimestamp) : new Date()
+  const widthPx = ((endDate.getTime() - snapDate.getTime()) / rangeMs) * totalPx
 
   return {
     left: `${Math.max(leftPx, 0)}px`,
-    width: `${Math.max(widthPx, MIN_BAR_WIDTH)}px`,
-    top: `${topPx}px`
+    width: `${Math.max(widthPx, MIN_BAR_WIDTH)}px`
   }
 }
 
-const getRowHeight = (laneCount) => Math.max(56, laneCount * LANE_HEIGHT)
+// ── Snapshot bar class by status (detected / reopened / resolved) ──
+const getSnapshotBarClass = (cve, idx) => {
+  const snap = cve.snapshots[idx]
+  if (snap.agentCount === 0) return 'snap-resolved'
+  if (idx > 0 && cve.snapshots[idx - 1].agentCount === 0) return 'snap-reopened'
+  return 'snap-detected'
+}
 
-const groupedByCve = computed(() => {
-  void timelineWidth.value
+const getSnapshotStatusLabel = (cve, idx) => {
+  const snap = cve.snapshots[idx]
+  if (snap.agentCount === 0) return 'Resuelto'
+  if (idx > 0 && cve.snapshots[idx - 1].agentCount === 0) return 'Reabierto'
+  return 'Activo'
+}
 
-  const totalPx = timelineWidth.value
-  const startMs = timeLabels.value[0]?.date?.getTime() ?? 0
-  const rangeMs = (timeLabels.value.length - 1) * msPerUnit.value
+// ── Tooltip state ──
+const hoveredSnapshot = ref(null)
+const tooltipPos = ref({ x: 0, y: 0 })
+const isHovering = ref(false)
+const tooltipRef = ref(null)
 
-  // Deduplicate input segments by CVE + agent + status + start time
-  const seen = new Set()
-  const uniqueSegments = displaySegments.value.filter(seg => {
-    const key = `${seg.cve_id}|${seg.agent_name || ''}|${seg.status}|${seg.start.getTime()}`
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
+const handleBarMouseEnter = (snapshot, cve, event) => {
+  isHovering.value = true
+  hoveredSnapshot.value = {
+    ...snapshot,
+    cve_id: cve.cve_id,
+    syncTimestamp: snapshot.syncTimestamp,
+  }
+  // Set preliminary position immediately, refine after render
+  tooltipPos.value = { x: event.clientX + 12, y: event.clientY - 10 }
+  nextTick(() => refineTooltipPos(event))
+}
 
-  // Group by cve_id + agent_name
-  const cveMap = new Map()
-  uniqueSegments.forEach(seg => {
-    const key = `${seg.cve_id}::${seg.agent_name || 'unknown'}::${seg.agent_id || ''}`
-    if (!cveMap.has(key)) {
-      cveMap.set(key, {
-        cve_id: seg.cve_id,
-        agent_name: seg.agent_name,
-        agent_id: seg.agent_id,
-        severity: seg.severity,
-        description: seg.description,
-        segments: []
-      })
-    }
-    cveMap.get(key).segments.push(seg)
-  })
+const handleBarMouseMove = (event) => {
+  updateTooltipPos(event)
+  nextTick(() => refineTooltipPos(event))
+}
 
-  // Process each CVE+agent group
-  const agentGroups = Array.from(cveMap.values())
-  agentGroups.forEach(group => {
-    group.segments.sort((a, b) => a.start.getTime() - b.start.getTime())
+const handleBarMouseLeave = () => {
+  isHovering.value = false
+  hoveredSnapshot.value = null
+}
 
-    // Compute pixel geometry
-    group.segments.forEach(seg => {
-      const style = getBarStyle(seg)
-      seg._leftPx = parseFloat(style.left) || 0
-      seg._barWidthPx = parseFloat(style.width) || MIN_BAR_WIDTH
-      // Use true width (before floor) for lane overlap detection
-      seg._trueRightPx = seg._leftPx + ((seg.end.getTime() - seg.start.getTime()) / rangeMs) * totalPx
-      seg._rightPx = seg._leftPx + seg._barWidthPx
-    })
+const updateTooltipPos = (event) => {
+  tooltipPos.value = { x: event.clientX + 12, y: event.clientY - 10 }
+}
 
-    // Greedy lane assignment using TRUE width (not floored)
-    const lanes = []
-    group.segments.forEach(seg => {
-      let assignedLane = -1
-      for (let i = 0; i < lanes.length; i++) {
-        if (seg._leftPx >= lanes[i]) {
-          assignedLane = i
-          break
-        }
-      }
-      if (assignedLane === -1) {
-        assignedLane = lanes.length
-        lanes.push(0)
-      }
-      lanes[assignedLane] = seg._trueRightPx
-      seg.lane = assignedLane
-    })
+const refineTooltipPos = (event) => {
+  if (!tooltipRef.value) return
 
-    group.laneCount = Math.max(lanes.length, 1)
-    group.key = `${group.cve_id}-${group.agent_name || 'unknown'}-${group.agent_id || ''}`
-    group.first_seen = group.segments[0]?.first_seen
-    group.resolved_at = group.segments.find(s => s.resolved_at)?.resolved_at
-    group.reopened_at = group.segments.findLast(s => s.reopened_at)?.reopened_at
-  })
+  const tooltipHeight = tooltipRef.value.offsetHeight
+  const tooltipWidth = tooltipRef.value.offsetWidth
+  let x = event.clientX + 12
+  let y = event.clientY - 10
 
-  // Now group agents under their CVE, deduplicating by agent key
-  const cveGroups = new Map()
-  agentGroups.forEach(agent => {
-    if (!cveGroups.has(agent.cve_id)) {
-      cveGroups.set(agent.cve_id, {
-        cve_id: agent.cve_id,
-        severity: agent.severity,
-        description: agent.description,
-        agents: [],
-        reopenCount: 0,
-        _seenAgents: new Set()
-      })
-    }
-    const cve = cveGroups.get(agent.cve_id)
-    if (!cve._seenAgents.has(agent.key)) {
-      cve._seenAgents.add(agent.key)
-      cve.agents.push(agent)
-    }
-  })
+  // Flip above cursor if it overflows the bottom
+  if (y + tooltipHeight > window.innerHeight - 8) {
+    y = event.clientY - tooltipHeight - 12
+  }
+  // Keep above viewport top
+  if (y < 8) y = 8
 
-  // Calculate reopenCount per CVE
-  cveGroups.forEach(cve => {
-    cve.reopenCount = Math.max(...cve.agents.map(a =>
-      a.segments.filter(s => s.status === 'REOPENED').length
-    ), 0)
-    delete cve._seenAgents
-  })
+  // Flip left if it overflows right edge
+  if (x + tooltipWidth > window.innerWidth - 8) {
+    x = event.clientX - tooltipWidth - 12
+  }
 
-  return Array.from(cveGroups.values())
-})
+  tooltipPos.value = { x, y }
+}
 
+// ── Helpers ──
 const formatDate = (d) => {
   if (!d) return '-'
   const date = toLocalDate(d)
-  return date.toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })
+  return date.toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 </script>
 
@@ -560,6 +555,7 @@ const formatDate = (d) => {
   border-radius: var(--radius-lg, 8px);
   overflow: hidden;
   min-width: 0;
+  position: relative;
 }
 
 .gantt-header {
@@ -715,16 +711,16 @@ const formatDate = (d) => {
   border-radius: 50%;
 }
 
-.legend-dot.pending {
+.legend-dot.snap-detected {
   background-color: #ba1a1a;
 }
 
-.legend-dot.resolved {
-  background-color: #6ca42c;
+.legend-dot.snap-reopened {
+  background-color: #ca8a04;
 }
 
-.legend-dot.reopened {
-  background-color: #ca8a04;
+.legend-dot.snap-resolved {
+  background-color: #6ca42c;
 }
 
 .gantt-scroll-wrapper {
@@ -778,105 +774,29 @@ const formatDate = (d) => {
 
 .gantt-row {
   display: flex;
-  height: 56px;
+  min-width: fit-content;
+}
+
+.gantt-row.cve-row {
+  height: 32px;
   border-bottom: 1px solid #e2e8f0;
   flex-shrink: 0;
-  align-items: flex-start;
-  transition: height 0.2s ease;
-  min-width: fit-content;
+  transition: background 0.15s ease;
 }
 
-.gantt-row.agent-row:hover {
+.gantt-row.cve-row:hover {
   background: #f8fafc;
-}
-
-.cve-header-row {
-  display: flex;
-  background: #f1f5f9;
-  border-top: 2px solid #94a3b8;
-  flex-shrink: 0;
-  min-width: fit-content;
-  height: 32px;
-  align-items: center;
-}
-
-.cve-header-sidebar {
-  width: 260px;
-  flex-shrink: 0;
-  padding: 4px 10px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border-right: 1px solid #e2e8f0;
-}
-
-.cve-header-chart {
-  flex-shrink: 0;
-}
-
-.cve-agent-count {
-  font-size: 9px;
-  color: #64748b;
-  font-weight: 500;
-}
-
-.agent-top {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 2px;
-}
-
-.agent-name {
-  font-family: monospace;
-  font-size: 10px;
-  font-weight: 600;
-  color: #334155;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 200px;
 }
 
 .gantt-sidebar-cell {
   width: 260px;
   flex-shrink: 0;
-  padding: 6px 10px;
+  padding: 4px 10px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   border-right: 1px solid #e2e8f0;
   overflow: hidden;
-}
-
-.gantt-chart-cell {
-  position: relative;
-  flex-shrink: 0;
-  height: 100%;
-}
-
-.gantt-bar {
-  position: absolute;
-  height: 20px;
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  font-size: 9px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  z-index: 0;
-}
-
-.bar-label {
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.bar-label.visible {
-  opacity: 1;
 }
 
 .cve-top {
@@ -893,18 +813,19 @@ const formatDate = (d) => {
   color: #0f172a;
 }
 
-.reopen-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
+.cve-desc {
+  font-size: 10px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 1px;
+}
+
+.cve-sync-count {
   font-size: 9px;
-  font-weight: 700;
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fbbf24;
-  line-height: 1;
+  color: #94a3b8;
+  font-weight: 500;
 }
 
 .sev-badge {
@@ -935,61 +856,55 @@ const formatDate = (d) => {
   color: #166534;
 }
 
-.cve-desc {
-  font-size: 10px;
-  color: #64748b;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 2px;
+.gantt-chart-cell {
+  position: relative;
+  flex-shrink: 0;
+  height: 32px;
 }
 
-.cve-dates-inline {
+.gantt-bar {
+  position: absolute;
+  height: calc(100% - 6px);
+  top: 3px;
+  border-radius: 2px;
   display: flex;
-  gap: 6px;
-  overflow: hidden;
-}
-
-.date-chip {
+  align-items: center;
+  justify-content: center;
   font-size: 9px;
-  padding: 1px 5px;
-  border-radius: 3px;
   font-weight: 600;
   white-space: nowrap;
+  overflow: hidden;
+  z-index: 0;
+  cursor: pointer;
+  transition: opacity 0.1s ease;
 }
 
-.date-chip.detected {
-  background: #f1f5f9;
-  color: #475569;
+.gantt-bar:hover {
+  opacity: 0.85;
+  z-index: 1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 
-.date-chip.resolved {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.date-chip.reopened {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.gantt-bar.pending {
-  background-color: rgba(186, 26, 26, 0.3);
+/* Snapshot bar colors by status */
+.gantt-bar.snap-detected {
+  background-color: rgba(186, 26, 26, 0.2);
   border: 1px solid #ba1a1a;
-  color: #991b1b;
-  font-weight: 700;
 }
 
-.gantt-bar.resolved {
-  background-color: rgba(108, 164, 44, 0.15);
-  border: 1px solid #6ca42c;
-  color: #3f6212;
-}
-
-.gantt-bar.reopened {
-  background-color: rgba(234, 179, 8, 0.15);
+.gantt-bar.snap-reopened {
+  background-color: rgba(234, 179, 8, 0.2);
   border: 1px solid #ca8a04;
-  color: #854d0e;
+}
+
+.gantt-bar.snap-resolved {
+  background-color: rgba(108, 164, 44, 0.25);
+  border: 1px solid #6ca42c;
+}
+
+.bar-label {
+  font-size: 9px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .gantt-pagination {
@@ -1026,5 +941,61 @@ const formatDate = (d) => {
 .page-info {
   font-size: 0.85rem;
   color: var(--text-muted, #64748b);
+}
+
+/* ── Tooltip ── */
+.gantt-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: var(--bg-card, #ffffff);
+  color: var(--text-main, #111827);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  max-width: 260px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.tooltip-header {
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 4px;
+  color: var(--text-main, #111827);
+  font-family: monospace;
+}
+
+.tooltip-sync {
+  font-size: 11px;
+  color: var(--text-muted, #6b7280);
+  margin-bottom: 6px;
+}
+
+.tooltip-agents {
+  max-height: 120px;
+  overflow-y: auto;
+  margin-bottom: 4px;
+}
+
+.tooltip-agent {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--text-main, #111827);
+  padding: 1px 0;
+}
+
+.tooltip-agent::before {
+  content: '•';
+  color: #6b7280;
+  margin-right: 4px;
+}
+
+.tooltip-count {
+  font-size: 11px;
+  font-weight: 700;
+  padding-top: 4px;
+  border-top: 1px solid var(--border, #e5e7eb);
 }
 </style>
