@@ -31,9 +31,9 @@
     />
 
     <TimelineKpiStrip
-      :has-built="hasBuilt"
-      :painted-count="paintedCount"
-      :latest-snap="latestSnap"
+      :has-built="hasBuilt || showMock"
+      :painted-count="effectivePaintedCount"
+      :latest-snap="effectiveSnapshot"
     />
 
     <div class="view-mode-selector">
@@ -53,11 +53,28 @@
       </button>
     </div>
 
-    <GanttTab v-if="viewMode === 'per-cve' && hasBuilt" :gantt-data="ganttData" />
-    <AreaChartTab v-else-if="viewMode === 'aggregated' && hasBuilt" :area-data="areaData" />
+    <GanttTab v-if="viewMode === 'per-cve' && !loading" :gantt-data="ganttData" />
+    <AreaChartTab v-else-if="viewMode === 'aggregated' && !loading" :area-data="areaData" />
 
-    <div v-else-if="loading" class="card empty-card">
-      <p>Escaneando historial...</p>
+    <div v-else-if="loading" class="card loading-card">
+      <div class="loading-progress">
+        <div class="loading-info">
+          <p class="loading-message">{{ loadingMessage || 'Cargando...' }}</p>
+          <p v-if="!fetchProgress.done && fetchProgress.current > 0" class="loading-detail">
+            Página {{ fetchProgress.current }}
+          </p>
+          <p v-if="fetchProgress.done" class="loading-detail loading-done">
+            {{ fetchProgress.current }} páginas cargadas
+          </p>
+          <p v-if="elapsedSeconds >= 3" class="loading-detail">
+            {{ elapsedSeconds }}s transcurridos
+          </p>
+        </div>
+      </div>
+      <div class="loading-bar-track">
+        <div class="loading-bar-fill" :style="{ width: loadingBarWidth + '%' }"></div>
+      </div>
+      <button v-if="!fetchProgress.done" class="btn btn-cancel" @click="cancelBuild">Cancelar</button>
     </div>
     <div v-else class="card empty-card">
       <h3>Sin datos para mostrar</h3>
@@ -101,12 +118,17 @@ const getConnectionName = () => {
 
 const {
   loading,
+  loadingMessage,
+  elapsedSeconds,
+  fetchProgress,
   hasBuilt,
-  paintedCount,
-  latestSnap,
+  showMock,
+  effectivePaintedCount,
+  effectiveSnapshot,
   errorMessage,
   warningMessage,
   build,
+  cancelBuild,
   fetchConnectionVulns,
   filteredVulnsData,
   areaData,
@@ -120,25 +142,33 @@ const {
   getConnectionName
 })
 
+const loadingBarWidth = computed(() => {
+  // Avanza con cada página (20% * pageNum, cap 80%) sin fingir el total
+  // Cuando termina, va a 100% limpio
+  if (fetchProgress.value.done) return 100
+  return Math.min(fetchProgress.value.current * 20, 80)
+})
+
 const setPeriod = value => {
   period.value = value
 }
 
-const onConnectionChange = async () => {
-  selectedAgents.value = []
-  selectedVulns.value = []
-  agentOpts.value = []
-  vulnOpts.value = []
-  errorBanner.value = ''
+  const onConnectionChange = async () => {
+    selectedAgents.value = []
+    selectedVulns.value = []
+    agentOpts.value = []
+    vulnOpts.value = []
+    errorBanner.value = ''
 
-  if (!selectedConnection.value) return
+    if (!selectedConnection.value) return
 
-  try {
-    const data = await fetchConnectionVulns()
-    const agents = new Set()
-    const vulns = new Set()
+    try {
+      const result = await fetchConnectionVulns()
+      const data = result.data
+      const agents = new Set()
+      const vulns = new Set()
 
-    data.forEach(vuln => {
+      data.forEach(vuln => {
       if (vuln.agent_name) agents.add(vuln.agent_name)
       if (vuln.cve_id) vulns.add(vuln.cve_id)
     })
@@ -244,5 +274,92 @@ const statusWarning = computed(() => warningMessage.value)
 .tab-btn:hover:not(.active) {
   color: var(--text);
   background: rgba(255,255,255,0.05);
+}
+
+/* ── Loading card with progress ── */
+.loading-card {
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+}
+
+.loading-progress {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.loading-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--border, #e2e8f0);
+  border-top-color: var(--primary, #3d6a00);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-info {
+  text-align: left;
+}
+
+.loading-message {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text, #1e293b);
+  margin: 0;
+}
+
+.loading-detail {
+  font-size: 0.8rem;
+  color: var(--text-muted, #64748b);
+  margin: 0.2rem 0 0 0;
+}
+
+.loading-bar-track {
+  width: 100%;
+  max-width: 400px;
+  height: 6px;
+  background: var(--border, #e2e8f0);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.loading-bar-fill {
+  height: 100%;
+  background: var(--primary, #3d6a00);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  width: 100%;
+}
+
+.loading-done {
+  color: var(--primary, #3d6a00);
+  font-weight: 600;
+}
+
+.btn-cancel {
+  padding: 0.4rem 1rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 4px;
+  background: white;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-cancel:hover {
+  background: #fef2f2;
+  border-color: #f87171;
+  color: #dc2626;
 }
 </style>

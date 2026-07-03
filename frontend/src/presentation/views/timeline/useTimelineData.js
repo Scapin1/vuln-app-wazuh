@@ -1,8 +1,23 @@
-import { computed, ref } from 'vue'
+import { computed, ref, onUnmounted } from 'vue'
 import vulnService from '../../../application/services/vulnService'
 import { DAY_MS, HOUR_MS, alignHour, fmtDDMM, fmtHour, fmtYear } from './timelineFormatters'
 
-const LIMIT = 2000
+const PAGE_SIZE = 10000
+const TICK_INTERVAL_MS = 1000
+
+// Demo/mock data shown before a build is executed or when no vulnerabilities are found
+const DEMO_AREA_DATA = [
+  { date: new Date(2026, 0, 15), pending: 1, resolved: 0, total: 1 },
+  { date: new Date(2026, 1, 15), pending: 2, resolved: 0, total: 2 },
+  { date: new Date(2026, 2, 15), pending: 2, resolved: 1, total: 3 },
+  { date: new Date(2026, 3, 15), pending: 3, resolved: 2, total: 5 },
+  { date: new Date(2026, 4, 15), pending: 2, resolved: 4, total: 6 },
+  { date: new Date(2026, 5, 15), pending: 2, resolved: 4, total: 6 },
+]
+
+const DEMO_SNAPSHOT = { total: 6, pending: 2, resolved: 4 }
+
+const DEMO_PAINTED_COUNT = 3
 
 const startOfLocalDay = ms => {
   const date = new Date(ms)
@@ -36,6 +51,36 @@ export default function useTimelineData({
   const errorMessage = ref('')
   const warningMessage = ref('')
   const snapshotCache = ref(new Map())
+  const showMock = ref(true)
+
+  // ── Loading progress state ──
+  const loadingMessage = ref('')
+  const elapsedSeconds = ref(0)
+  const fetchProgress = ref({ current: 0 })
+  let abortController = null
+  let timerInterval = null
+
+  const startTimer = () => {
+    elapsedSeconds.value = 0
+    clearInterval(timerInterval)
+    timerInterval = setInterval(() => { elapsedSeconds.value++ }, TICK_INTERVAL_MS)
+  }
+
+  const stopTimer = () => {
+    clearInterval(timerInterval)
+    timerInterval = null
+  }
+
+  const cancelBuild = () => {
+    if (abortController) {
+      abortController.abort()
+      abortController = null
+    }
+    stopTimer()
+    loading.value = false
+    loadingMessage.value = 'Operación cancelada'
+    fetchProgress.value = { current: 0 }
+  }
 
   const computeRange = vulns => {
     const now = new Date()
@@ -250,19 +295,45 @@ export default function useTimelineData({
 
   const paintedCount = computed(() => allSlots.value.filter(slot => slot.painted).length)
 
-  const fetchConnectionVulns = async () => {
-    const response = await vulnService.getVulns({
-      connectionId: selectedConnection.value,
-      limit: LIMIT
-    })
+  const effectivePaintedCount = computed(() => showMock.value ? DEMO_PAINTED_COUNT : paintedCount.value)
+  const effectiveSnapshot = computed(() => showMock.value ? DEMO_SNAPSHOT : latestSnap.value)
 
-    const data = Array.isArray(response.data) ? response.data : []
+  const fetchConnectionVulns = async (signal) => {
+    let allData = []
+    let offset = 0
+    let pageNum = 0
 
-    if (data.length >= LIMIT) {
-      warningMessage.value = `Se alcanzaron ${LIMIT} registros. El analisis puede estar truncado.`
+    // First request to know total (rough estimate)
+    while (true) {
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+
+      try {
+        const response = await vulnService.getVulns({
+          connectionId: selectedConnection.value,
+          limit: PAGE_SIZE,
+          offset: offset,
+        }, { signal })
+
+        const data = Array.isArray(response.data) ? response.data : []
+        allData = allData.concat(data)
+        pageNum++
+
+        // Update progress - solo página actual, sin total estimado
+        fetchProgress.value = { current: pageNum }
+        loadingMessage.value = 'Obteniendo datos...'
+
+        if (data.length < PAGE_SIZE) break
+        offset += PAGE_SIZE
+      } catch (err) {
+        if (err.name === 'AbortError') throw err
+        console.error('Error fetching vulns page at offset', offset, err)
+        // If first page failed with no data, propagate so caller can handle it
+        if (pageNum === 0) throw err
+        break
+      }
     }
 
-    return data
+    return { data: allData, pages: pageNum }
   }
 
   const resetBuildState = () => {
@@ -325,29 +396,66 @@ export default function useTimelineData({
     if (!selectedConnection.value) return { initialZoom: 0 }
 
     resetBuildState()
+    startTimer()
+
+    abortController = new AbortController()
+    const signal = abortController.signal
 
     try {
-      const data = await fetchConnectionVulns()
+      loadingMessage.value = 'Obteniendo datos de vulnerabilidades...'
+      const result = await fetchConnectionVulns(signal)
+      const data = result.data
+
+      // Marcar fetch como completado antes de pasar a procesamiento
+      fetchProgress.value = { current: result.pages, done: true }
+
+      if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+
+      loadingMessage.value = 'Filtrando datos...'
       const filteredVulns = filterVulnerabilities(data)
+
+      loadingMessage.value = 'Procesando vulnerabilidades...'
       const processedVulns = processVulnerabilities(filteredVulns)
 
+      if (!processedVulns.length) {
+        warningMessage.value = 'No se encontraron vulnerabilidades para los filtros seleccionados.'
+        showMock.value = true
+        stopTimer()
+        loading.value = false
+        loadingMessage.value = ''
+        return { initialZoom: 0 }
+      }
+
+      showMock.value = false
       filteredVulnsData.value = processedVulns
 
+      loadingMessage.value = 'Calculando rango de tiempo...'
       const { start, end } = computeRange(filteredVulnsData.value)
       rangeStartMs.value = alignHour(start.getTime())
       rangeEndMs.value = end.getTime()
 
+      loadingMessage.value = 'Construyendo eventos...'
       const events = buildChangeEvents(filteredVulnsData.value)
+
+      loadingMessage.value = 'Finalizando...'
       return finalizeBuild(events)
     } catch (error) {
+      if (error.name === 'AbortError') {
+        loadingMessage.value = 'Operación cancelada'
+        return { initialZoom: 0 }
+      }
       errorMessage.value = 'No se pudo generar la linea de tiempo. Intenta nuevamente.'
+      showMock.value = true
       throw error
     } finally {
+      stopTimer()
       loading.value = false
+      abortController = null
     }
   }
 
   const areaData = computed(() => {
+    if (showMock.value) return DEMO_AREA_DATA
     if (!hasBuilt.value || !rangeStartMs.value || !rangeEndMs.value) return []
     
     const data = []
@@ -369,39 +477,27 @@ export default function useTimelineData({
 
   const ganttData = computed(() => {
     if (!hasBuilt.value || !filteredVulnsData.value.length) return []
-    
-    return filteredVulnsData.value.map(v => {
-      const start = new Date(v.first_seen)
-      const history = v.historySorted || []
-      const resolvedEvent = history.find(h => h.action === 'RESOLVED')
-      const reopenedEvent = history.find(h => h.action === 'REOPENED')
-      const end = resolvedEvent ? new Date(resolvedEvent.timestamp) : new Date()
-      const status = reopenedEvent ? 'REOPENED' : (resolvedEvent ? 'RESOLVED' : 'PENDING')
-      
-      return {
-        cve_id: v.cve_id,
-        severity: v.severity || 'MEDIUM',
-        description: v.description || '',
-        start,
-        end,
-        status,
-        agents: v.agents || 0,
-        first_seen: v.first_seen,
-        resolved_at: resolvedEvent?.timestamp || null,
-        reopened_at: reopenedEvent?.timestamp || null
-      }
-    }).sort((a, b) => a.start - b.start)
+    // Return full enriched vuln records for the GanttTab to group by CVE
+    // and compute sync snapshots from timestamps
+    return filteredVulnsData.value
   })
 
   return {
     loading,
+    loadingMessage,
+    elapsedSeconds,
+    fetchProgress,
     hasBuilt,
+    showMock,
     allSlots,
     paintedCount,
+    effectivePaintedCount,
     latestSnap,
+    effectiveSnapshot,
     errorMessage,
     warningMessage,
     build,
+    cancelBuild,
     fetchConnectionVulns,
     snapshotAt,
     filteredVulnsData,
