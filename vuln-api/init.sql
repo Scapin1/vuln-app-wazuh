@@ -43,7 +43,7 @@ GRANT ALL ON SCHEMA public TO vulnadmin;
 --Debino a que no se tiene certesa severity_level se deja como TEXT para permitir flexibilidad en el catálogo de vulnerabilidades, 
 --pero se podría cambiar a ENUM si se desea una validación más estricta.
 --CREATE TYPE Severity_level AS ENUM ('Low', 'Medium', 'High', 'Critical');
-CREATE TYPE Vuln_status AS ENUM ('Detected', 'Resolved', 'Re-emerged');
+CREATE TYPE vuln_status AS ENUM ('Detected', 'Resolved', 'Re-emerged');
 
 -- ==========================================================
 -- 4. TABLAS DE WAZUH
@@ -130,9 +130,9 @@ SELECT create_hypertable('vulnerability_detections', 'timestamp');
 CREATE OR REPLACE FUNCTION check_vulnerability_evolution()
 RETURNS TRIGGER AS $$
 DECLARE
-    last_status Vuln_status;
+    last_status vulnerability_detections.status%TYPE;
 BEGIN
-    SELECT NEW.status INTO last_status
+    SELECT status INTO last_status
     FROM vulnerability_detections
     WHERE asset_id = NEW.asset_id 
         AND cve_id = NEW.cve_id
