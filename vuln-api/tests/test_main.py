@@ -628,5 +628,63 @@ async def test_sync_process_batching_logic(mock_wazuh_raw_data):
     assert mock_db.execute.call_count == 5
     assert mock_db.commit.called
 
+@pytest.mark.asyncio
+async def test_create_user_success():
+    """Cubre la creación exitosa de un usuario (POST /users)"""
+    mock_db = AsyncMock(spec=AsyncSession)
+    mock_res = MagicMock()
+    mock_res.scalar_one_or_none.return_value = None
+    mock_db.execute.return_value = mock_res
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    payload = {
+        "user_email": "new@usach.cl", 
+        "user_name": "NewUserTest", 
+        "user_password": "Password1!",
+        "user_rol": "admin"
+    }
+    
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        response = await ac.post("/users", json=payload)
+
+    assert response.status_code == 200, f"Fallo de validación: {response.json()}"
+    assert mock_db.add.called
+
+@pytest.mark.asyncio
+async def test_create_asset():
+    """Cubre la creación exitosa de un asset con el UUID corregido (POST /assets)"""
+    import uuid
+    mock_db = AsyncMock(spec=AsyncSession)
+    mock_db.refresh.side_effect = lambda x: setattr(x, 'asset_id', uuid.uuid4())
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    payload = {
+        "wazuh_agent_id": "100",
+        "hostname": "test-server",
+        "os_version": "Debian 11",
+        "wazuh_connection_id": str(uuid.uuid4()),
+        "ip_address": "192.168.1.10"
+    }
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        response = await ac.post("/assets/", json=payload)
+
+    assert response.status_code == 200, f"Fallo de validación: {response.json()}"
+    assert "asset_id" in response.json()
+    assert response.json()["hostname"] == "test-server"
+
+@pytest.mark.asyncio
+async def test_validation_errors_coverage():
+    """Cubre las ramas de error 422 (Unprocessable Entity) para subir coverage en validaciones"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        res_user = await ac.post("/users", json={"bad_field": "error"})
+        
+    assert res_user.status_code == 422
+
+
 def teardown_module(module):
     app.dependency_overrides.clear()

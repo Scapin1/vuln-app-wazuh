@@ -257,7 +257,6 @@ async def delete_connection(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    # Usamos db.get que es la forma más rápida y limpia en async
     conn = await db.get(WazuhConnection, conn_id)
     
     if not conn:
@@ -444,8 +443,8 @@ def parse_wazuh_date(date_str: str):
 async def list_vulns(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-    limit: int = Query(default=10, ge=1, le=100), 
-    offset: int = Query(default=0, ge=0),
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
+    offset: Annotated[int, Query(ge=0)] = 0,
     connection_id: Optional[int] = None,
 ):
     query = select(VulnerabilityDetection).options(
