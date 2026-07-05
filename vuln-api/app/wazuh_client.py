@@ -55,7 +55,7 @@ async def fetch_all_vulns(indexer_url: str, wazuh_user: str, wazuh_password: str
             yield batch_data
             search_after = hits[-1]["sort"]
 
-def test_connection(indexer_url: str, wazuh_user: str, wazuh_password: str) -> bool:
+def check_connection(indexer_url: str, wazuh_user: str, wazuh_password: str) -> bool:
     try:
         credentials = f"{wazuh_user}:{wazuh_password}"
         encoded_credentials = base64.b64encode(credentials.encode("utf-8")).decode("utf-8")

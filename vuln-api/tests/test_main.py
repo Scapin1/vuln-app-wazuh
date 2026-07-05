@@ -182,7 +182,7 @@ async def test_create_connection_success():
         "wazuh_password": "password123"
     }
     
-    with patch("app.main.test_connection", return_value=True), \
+    with patch("app.main.check_connection", return_value=True), \
          patch("app.main.encrypt", return_value="encrypted_string"):
         
         transport = ASGITransport(app=app)
@@ -247,8 +247,8 @@ async def test_test_existing_connection_flow():
     app.dependency_overrides[get_db] = lambda: mock_db
     
     with patch("app.main.decrypt", return_value="plain"), \
-         patch("app.main.test_connection") as mock_test: 
-        mock_test.return_value = True
+         patch("app.main.check_connection") as mock_check: 
+        mock_check.return_value = True
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:

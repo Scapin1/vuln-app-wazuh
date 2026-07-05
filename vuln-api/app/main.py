@@ -21,7 +21,7 @@ from .auth import (
     hash_password,
     verify_password,
 )
-from .wazuh_client import fetch_all_vulns, test_connection
+from .wazuh_client import fetch_all_vulns, check_connection
 from .crypto import encrypt, decrypt
 from .models import Asset, VulnerabilityCatalog, VulnerabilityDetection, User, WazuhConnection
 from .schemas import (
@@ -182,7 +182,7 @@ async def create_connection(
     if existing:
         raise HTTPException(status_code=400, detail="Ya existe una conexión con ese nombre")
 
-    ok = test_connection(request.indexer_url, request.wazuh_user, request.wazuh_password)
+    ok = check_connection(request.indexer_url, request.wazuh_user, request.wazuh_password)
     if not ok:
         raise HTTPException(status_code=400, detail="No se pudo establecer conexión con Wazuh")
 
@@ -230,7 +230,7 @@ async def test_existing_wazuh_connection(
     if not conn:
         raise HTTPException(status_code=404, detail="Conexión no encontrada")
 
-    ok = test_connection(conn.indexer_url, conn.wazuh_user, decrypt(conn.wazuh_password))
+    ok = check_connection(conn.indexer_url, conn.wazuh_user, decrypt(conn.wazuh_password))
 
     conn.tested = True
     conn.last_tested_at = func.now()
