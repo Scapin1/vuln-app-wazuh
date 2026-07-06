@@ -5,16 +5,6 @@ import { DAY_MS, HOUR_MS, alignHour, fmtDDMM, fmtHour, fmtYear } from './timelin
 const PAGE_SIZE = 10000
 const TICK_INTERVAL_MS = 1000
 
-// Demo/mock data shown before a build is executed or when no vulnerabilities are found
-const DEMO_AREA_DATA = [
-  { date: new Date(2026, 0, 15), pending: 1, resolved: 0, total: 1 },
-  { date: new Date(2026, 1, 15), pending: 2, resolved: 0, total: 2 },
-  { date: new Date(2026, 2, 15), pending: 2, resolved: 1, total: 3 },
-  { date: new Date(2026, 3, 15), pending: 3, resolved: 2, total: 5 },
-  { date: new Date(2026, 4, 15), pending: 2, resolved: 4, total: 6 },
-  { date: new Date(2026, 5, 15), pending: 2, resolved: 4, total: 6 },
-]
-
 const DEMO_SNAPSHOT = { total: 6, pending: 2, resolved: 4 }
 
 const DEMO_PAINTED_COUNT = 3
@@ -454,27 +444,6 @@ export default function useTimelineData({
     }
   }
 
-  const areaData = computed(() => {
-    if (showMock.value) return DEMO_AREA_DATA
-    if (!hasBuilt.value || !rangeStartMs.value || !rangeEndMs.value) return []
-    
-    const data = []
-    const slotMs = (activeZoom?.value?.slotHours ?? 24) * HOUR_MS
-    const isDayGranularity = (activeZoom?.value?.slotHours ?? 24) >= 24
-    const baseStartMs = isDayGranularity ? startOfLocalDay(rangeStartMs.value) : rangeStartMs.value
-    
-    for (let ms = baseStartMs; ms <= rangeEndMs.value; ms += slotMs) {
-      const snap = snapshotAt(ms)
-      data.push({
-        date: new Date(ms),
-        pending: snap.pending,
-        resolved: snap.resolved,
-        total: snap.total
-      })
-    }
-    return data
-  })
-
   const ganttData = computed(() => {
     if (!hasBuilt.value || !filteredVulnsData.value.length) return []
     // Return full enriched vuln records for the GanttTab to group by CVE
@@ -501,7 +470,6 @@ export default function useTimelineData({
     fetchConnectionVulns,
     snapshotAt,
     filteredVulnsData,
-    areaData,
     ganttData
   }
 }

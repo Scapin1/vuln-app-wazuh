@@ -36,27 +36,7 @@
       :latest-snap="effectiveSnapshot"
     />
 
-    <div class="view-mode-selector">
-      <button 
-        class="tab-btn" 
-        :class="{ active: viewMode === 'per-cve' }" 
-        @click="viewMode = 'per-cve'"
-      >
-        Por CVE
-      </button>
-      <button 
-        class="tab-btn" 
-        :class="{ active: viewMode === 'aggregated' }" 
-        @click="viewMode = 'aggregated'"
-      >
-        Agrupado
-      </button>
-    </div>
-
-    <GanttTab v-if="viewMode === 'per-cve' && !loading" :gantt-data="ganttData" />
-    <AreaChartTab v-else-if="viewMode === 'aggregated' && !loading" :area-data="areaData" />
-
-    <div v-else-if="loading" class="card loading-card">
+    <div v-if="loading" class="card loading-card">
       <div class="loading-progress">
         <div class="loading-info">
           <p class="loading-message">{{ loadingMessage || 'Cargando...' }}</p>
@@ -76,10 +56,15 @@
       </div>
       <button v-if="!fetchProgress.done" class="btn btn-cancel" @click="cancelBuild">Cancelar</button>
     </div>
-    <div v-else class="card empty-card">
+    <div v-else-if="!hasBuilt && !showMock" class="card empty-card">
       <h3>Sin datos para mostrar</h3>
       <p>Selecciona filtros y presiona "Generar Vista".</p>
     </div>
+    <div v-else-if="hasBuilt && filteredVulnsData.length === 0" class="card empty-card">
+      <h3>Sin datos para mostrar</h3>
+      <p>No se encontraron vulnerabilidades para los filtros seleccionados.</p>
+    </div>
+    <VulnTable v-else :vulns="filteredVulnsData" :loading="false" />
   </div>
 </template>
 
@@ -87,10 +72,9 @@
 import { computed, onMounted, ref } from 'vue'
 import wazuhService from '../../application/services/wazuhService'
 import useTimelineData from './timeline/useTimelineData'
-import AreaChartTab from './timeline/components/AreaChartTab.vue'
-import GanttTab from './timeline/components/GanttTab.vue'
 import TimelineFilters from './timeline/components/TimelineFilters.vue'
 import TimelineKpiStrip from './timeline/components/TimelineKpiStrip.vue'
+import VulnTable from './timeline/components/VulnTable.vue'
 
 const periods = [
   { l: '24H', v: '24h' },
@@ -109,7 +93,6 @@ const selectedVulns = ref([])
 const period = ref('30d')
 const customDate = ref(new Date().toISOString().split('T')[0])
 const errorBanner = ref('')
-const viewMode = ref('per-cve')
 
 const getConnectionName = () => {
   const found = connections.value.find(conn => String(conn.id) === String(selectedConnection.value))
@@ -130,9 +113,7 @@ const {
   build,
   cancelBuild,
   fetchConnectionVulns,
-  filteredVulnsData,
-  areaData,
-  ganttData
+  filteredVulnsData
 } = useTimelineData({
   selectedConnection,
   selectedAgents,
@@ -143,8 +124,6 @@ const {
 })
 
 const loadingBarWidth = computed(() => {
-  // Avanza con cada página (20% * pageNum, cap 80%) sin fingir el total
-  // Cuando termina, va a 100% limpio
   if (fetchProgress.value.done) return 100
   return Math.min(fetchProgress.value.current * 20, 80)
 })
@@ -153,22 +132,22 @@ const setPeriod = value => {
   period.value = value
 }
 
-  const onConnectionChange = async () => {
-    selectedAgents.value = []
-    selectedVulns.value = []
-    agentOpts.value = []
-    vulnOpts.value = []
-    errorBanner.value = ''
+const onConnectionChange = async () => {
+  selectedAgents.value = []
+  selectedVulns.value = []
+  agentOpts.value = []
+  vulnOpts.value = []
+  errorBanner.value = ''
 
-    if (!selectedConnection.value) return
+  if (!selectedConnection.value) return
 
-    try {
-      const result = await fetchConnectionVulns()
-      const data = result.data
-      const agents = new Set()
-      const vulns = new Set()
+  try {
+    const result = await fetchConnectionVulns()
+    const data = result.data
+    const agents = new Set()
+    const vulns = new Set()
 
-      data.forEach(vuln => {
+    data.forEach(vuln => {
       if (vuln.agent_name) agents.add(vuln.agent_name)
       if (vuln.cve_id) vulns.add(vuln.cve_id)
     })
@@ -237,43 +216,20 @@ const statusWarning = computed(() => warningMessage.value)
   justify-content: center;
   align-items: center;
   text-align: center;
-}
-
-.empty-center p {
-  color: var(--text-muted);
-}
-
-.view-mode-selector {
-  display: flex;
+  flex-direction: column;
   gap: 0.5rem;
-  background: var(--card-bg);
-  padding: 0.3rem;
-  border-radius: var(--radius-md);
-  width: fit-content;
-  border: 1px solid var(--border);
 }
 
-.tab-btn {
-  padding: 0.4rem 1rem;
-  border-radius: var(--radius-sm);
-  border: none;
-  background: transparent;
+.empty-card h3 {
+  margin: 0;
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+.empty-card p {
   color: var(--text-muted);
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.tab-btn.active {
-  background: var(--primary-bg);
-  color: var(--primary);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.tab-btn:hover:not(.active) {
-  color: var(--text);
-  background: rgba(255,255,255,0.05);
+  font-size: 0.9rem;
+  margin: 0;
 }
 
 /* ── Loading card with progress ── */
