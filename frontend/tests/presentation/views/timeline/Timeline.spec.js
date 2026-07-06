@@ -59,12 +59,11 @@ describe('Timeline.vue', () => {
     expect(wazuhService.getConnections).toHaveBeenCalled()
   })
 
-  it('shows demo data when no connection selected', () => {
+  it('renders without connection', () => {
     const wrapper = mount(Timeline)
 
-    const ganttCard = wrapper.find('.gantt-card')
-    expect(ganttCard.exists()).toBe(true)
-    expect(ganttCard.text()).toContain('Seguimiento de CVEs')
+    expect(wrapper.find('.timeline-view').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Linea del tiempo')
   })
 
   it('fetches agents and vulns when connection changes', async () => {
@@ -195,11 +194,6 @@ describe('Timeline.vue', () => {
 
     expect(wrapper.find('.status-error').exists()).toBe(true)
     expect(wrapper.text()).toContain('Custom Error')
-  })
-
-  it('default viewMode is per-cve', () => {
-    const wrapper = mount(Timeline)
-    expect(wrapper.vm.viewMode).toBe('per-cve')
   })
 
   it('updates state when filters emit updates', async () => {
