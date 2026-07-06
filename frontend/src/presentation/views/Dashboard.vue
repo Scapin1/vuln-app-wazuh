@@ -21,8 +21,8 @@
       {{ error }}
     </div>
 
-    <!-- Charts Row -->
-    <div v-if="!loading && vulns.length > 0" class="charts-row">
+    <!-- Pie Charts Row (always visible when we have data) -->
+    <div v-if="hasBuilt && dashboardData.length > 0" class="charts-row">
       <div class="chart-col">
         <SeverityChart :data="severityDistribution" />
       </div>
@@ -31,42 +31,24 @@
       </div>
     </div>
 
-    <!-- Filter Toggle Bar (minimalista) -->
-    <div v-if="!loading && vulns.length > 0" class="filter-toggle-bar">
-      <button class="btn-filter-toggle" @click="showFilters = !showFilters">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-        </svg>
-        <span>{{ showFilters ? 'Ocultar filtros' : 'Filtros avanzados' }}</span>
-      </button>
-      <button v-if="showFilters" class="btn-clear-filters" @click="clearFilters">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 6h18"></path>
-          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-        </svg>
-        <span>Limpiar</span>
-      </button>
-    </div>
-
-    <!-- Dashboard Filters -->
-    <div v-show="showFilters" class="card filter-panel">
+    <!-- Filter Panel -->
+    <div class="card filter-panel">
       <div class="filter-row">
         <div class="f-group">
           <label>Conexión Wazuh</label>
           <select v-model="selectedConnection" @change="onConnectionChange" class="filter-input">
-            <option value="">Todas las conexiones</option>
+            <option value="" disabled>Selecciona servidor...</option>
             <option v-for="conn in connections" :key="conn.id" :value="conn.id">{{ conn.name }}</option>
           </select>
         </div>
 
-        <div class="f-group popover-wrap" v-click-outside="() => (dropdowns.agents = false)">
-          <label>Agentes</label>
-          <button class="filter-input dd-btn" @click="dropdowns.agents = !dropdowns.agents" :disabled="!agentOptions.length">
-            <span>{{ selectedAgents.length ? selectedAgents.length + ' sel.' : 'Todos' }}</span>
+        <div class="f-group popover-wrap" v-click-outside="() => (activeDropdown = '')">
+          <label>Equipos / Agentes</label>
+          <button class="filter-input dd-btn" @click="activeDropdown = activeDropdown === 'agents' ? '' : 'agents'" :disabled="!agentOptions.length">
+            <span :class="selectedAgents.length ? 'sel-badge' : ''">{{ selectedAgents.length ? selectedAgents.length + ' sel.' : 'Todos' }}</span>
             <span>▼</span>
           </button>
-          <div v-if="dropdowns.agents" class="dd-panel fade-in">
+          <div v-if="activeDropdown === 'agents'" class="dd-panel fade-in">
             <input type="text" v-model="search.agent" placeholder="Buscar agente..." class="dd-search">
             <div class="dd-actions">
               <span @click="selectedAgents = [...agentOptions]">Todos</span>
@@ -80,13 +62,13 @@
           </div>
         </div>
 
-        <div class="f-group popover-wrap" v-click-outside="() => (dropdowns.vulns = false)">
+        <div class="f-group popover-wrap" v-click-outside="() => (activeDropdown = '')">
           <label>CVE ID</label>
-          <button class="filter-input dd-btn" @click="dropdowns.vulns = !dropdowns.vulns" :disabled="!vulnOptions.length">
-            <span>{{ selectedVulns.length ? selectedVulns.length + ' sel.' : 'Todas' }}</span>
+          <button class="filter-input dd-btn" @click="activeDropdown = activeDropdown === 'vulns' ? '' : 'vulns'" :disabled="!vulnOptions.length">
+            <span :class="selectedVulns.length ? 'sel-badge' : ''">{{ selectedVulns.length ? selectedVulns.length + ' sel.' : 'Todas' }}</span>
             <span>▼</span>
           </button>
-          <div v-if="dropdowns.vulns" class="dd-panel fade-in">
+          <div v-if="activeDropdown === 'vulns'" class="dd-panel fade-in">
             <input type="text" v-model="search.vuln" placeholder="Buscar CVE..." class="dd-search">
             <div class="dd-actions">
               <span @click="selectedVulns = [...vulnOptions]">Todas</span>
@@ -100,33 +82,13 @@
           </div>
         </div>
 
-        <div class="f-group popover-wrap" v-click-outside="() => (dropdowns.packages = false)">
-          <label>Software Afectado</label>
-          <button class="filter-input dd-btn" @click="dropdowns.packages = !dropdowns.packages" :disabled="!packageOptions.length">
-            <span>{{ selectedPackages.length ? selectedPackages.length + ' sel.' : 'Todos' }}</span>
-            <span>▼</span>
-          </button>
-          <div v-if="dropdowns.packages" class="dd-panel fade-in">
-            <input type="text" v-model="search.package" placeholder="Buscar software..." class="dd-search">
-            <div class="dd-actions">
-              <span @click="selectedPackages = [...packageOptions]">Todos</span>
-              <span @click="selectedPackages = []">Limpiar</span>
-            </div>
-            <div class="dd-list custom-scroll">
-              <label v-for="pkg in filteredPackages" :key="pkg" class="dd-item">
-                <input type="checkbox" :value="pkg" v-model="selectedPackages"> {{ pkg }}
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div class="f-group popover-wrap" v-click-outside="() => (dropdowns.severity = false)">
+        <div class="f-group popover-wrap" v-click-outside="() => (activeDropdown = '')">
           <label>Severidad</label>
-          <button class="filter-input dd-btn" @click="dropdowns.severity = !dropdowns.severity" :disabled="!severityOptions.length">
-            <span>{{ selectedSeverities.length ? selectedSeverities.length + ' sel.' : 'Todas' }}</span>
+          <button class="filter-input dd-btn" @click="activeDropdown = activeDropdown === 'severity' ? '' : 'severity'" :disabled="!severityOptions.length">
+            <span :class="selectedSeverities.length ? 'sel-badge' : ''">{{ selectedSeverities.length ? selectedSeverities.length + ' sel.' : 'Todas' }}</span>
             <span>▼</span>
           </button>
-          <div v-if="dropdowns.severity" class="dd-panel fade-in">
+          <div v-if="activeDropdown === 'severity'" class="dd-panel fade-in">
             <div class="dd-actions">
               <span @click="selectedSeverities = [...severityOptions]">Todas</span>
               <span @click="selectedSeverities = []">Limpiar</span>
@@ -141,17 +103,34 @@
         </div>
 
         <div class="f-group">
-          <label>Score CVSS (Base)</label>
-          <div class="range-inputs">
-            <input type="number" v-model.number="scoreMin" min="0" max="10" step="0.1" placeholder="Min" class="filter-input-sm">
-            <span>-</span>
-            <input type="number" v-model.number="scoreMax" min="0" max="10" step="0.1" placeholder="Max" class="filter-input-sm">
+          <label>Periodo</label>
+          <div class="chip-row">
+            <button
+              v-for="p in periods"
+              :key="p.v"
+              class="chip"
+              :class="{ on: period === p.v }"
+              @click="period = p.v"
+            >
+              {{ p.l }}
+            </button>
           </div>
+        </div>
+
+        <div class="f-group" v-if="period === 'day'">
+          <label>Dia</label>
+          <input type="date" v-model="customDate" class="filter-input">
+        </div>
+
+        <div class="f-group f-action">
+          <button class="btn btn-primary" @click="buildDashboard" :disabled="!selectedConnection || loading">
+            {{ loading ? 'Analizando...' : 'Generar Vista' }}
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- Loading card with progress (same design as Timeline) -->
+    <!-- Loading card -->
     <div v-if="loading" class="card loading-card">
       <div class="loading-progress">
         <div class="loading-info">
@@ -173,26 +152,43 @@
       <button v-if="!fetchProgress.done" class="btn btn-cancel" @click="cancelBuild">Cancelar</button>
     </div>
 
-    <!-- Table (VulnTable component) -->
-    <VulnTable v-if="!loading" :vulns="filteredVulns" :loading="loading" />
+    <!-- Empty / Not built yet -->
+    <div v-else-if="!hasBuilt" class="card empty-card">
+      <h3>Sistema de Seguimiento de Vulnerabilidades</h3>
+      <p>Selecciona una conexión Wazuh y presiona "Generar Vista" para visualizar las vulnerabilidades.</p>
+    </div>
+
+    <!-- Content: GanttTab + VulnTable -->
+    <template v-else-if="hasBuilt">
+      <div v-if="dashboardData.length === 0" class="card empty-card">
+        <h3>Sin datos para mostrar</h3>
+        <p>No se encontraron vulnerabilidades para los filtros seleccionados.</p>
+      </div>
+      <template v-else>
+        <GanttTab :gantt-data="filteredVulns" />
+        <VulnTable :vulns="filteredVulns" :loading="false" />
+      </template>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, reactive, onUnmounted } from 'vue'
+import { ref, onMounted, computed, reactive, onUnmounted } from 'vue'
 import vulnService from '../../application/services/vulnService'
 import wazuhService from '../../application/services/wazuhService'
 import SeverityChart from './dashboard/components/SeverityChart.vue'
 import StatusChart from './dashboard/components/StatusChart.vue'
 import VulnTable from './timeline/components/VulnTable.vue'
+import GanttTab from './timeline/components/GanttTab.vue'
 
-const vulns = ref([])
-const loading = ref(true)
+// State
+const dashboardData = ref([])
+const loading = ref(false)
 const syncing = ref(false)
 const error = ref('')
-const showFilters = ref(false)
+const hasBuilt = ref(false)
 
-// Loading progress (same pattern as timeline)
+// Loading progress
 const loadingMessage = ref('')
 const elapsedSeconds = ref(0)
 const fetchProgress = ref({ current: 0 })
@@ -229,24 +225,33 @@ const loadingBarWidth = computed(() => {
   return Math.min(fetchProgress.value.current * 20, 80)
 })
 
-// Filter state
+// Connections
 const connections = ref([])
-const agentOptions = ref([])
-const vulnOptions = ref([])
-const packageOptions = ref([])
-const severityOptions = ref([])
 
+// Filter state
 const selectedConnection = ref('')
 const selectedAgents = ref([])
 const selectedVulns = ref([])
-const selectedPackages = ref([])
 const selectedSeverities = ref([])
-const scoreMin = ref('')
-const scoreMax = ref('')
+const period = ref('30d')
+const customDate = ref(new Date().toISOString().split('T')[0])
+
+const periods = [
+  { l: '24H', v: '24h' },
+  { l: '7D', v: '7d' },
+  { l: '30D', v: '30d' },
+  { l: 'Dia', v: 'day' },
+  { l: 'Todo', v: 'all' }
+]
+
+// Filter options (populated from fetched data)
+const agentOptions = ref([])
+const vulnOptions = ref([])
+const severityOptions = ref([])
 
 // Dropdown state
-const search = reactive({ agent: '', vuln: '', package: '' })
-const dropdowns = reactive({ agents: false, vulns: false, packages: false, severity: false })
+const search = reactive({ agent: '', vuln: '' })
+const activeDropdown = ref('')
 
 // Filtered lists for search
 const filteredAgents = computed(() =>
@@ -257,35 +262,28 @@ const filteredCVEOptions = computed(() =>
   vulnOptions.value.filter(vuln => vuln.toLowerCase().includes(search.vuln.toLowerCase()))
 )
 
-const filteredPackages = computed(() =>
-  packageOptions.value.filter(pkg => pkg.toLowerCase().includes(search.package.toLowerCase()))
-)
-
 const getSeverityLevel = (s) => {
   if (!s) return 0
   const severity = s.toLowerCase()
   if (severity === 'critical' || severity === 'critica') return 4
   if (severity === 'high' || severity === 'alta') return 3
   if (severity === 'medium' || severity === 'media') return 2
-  return 1 // low or unknown
+  return 1
 }
 
 const updateFilterOptions = () => {
   const agents = new Set()
   const vulnIds = new Set()
-  const packages = new Set()
   const severities = new Set()
 
-  vulns.value.forEach(vuln => {
+  dashboardData.value.forEach(vuln => {
     if (vuln.agent_name) agents.add(vuln.agent_name)
     if (vuln.cve_id) vulnIds.add(vuln.cve_id)
-    if (vuln.package_name) packages.add(vuln.package_name)
     if (vuln.severity) severities.add(vuln.severity.toUpperCase())
   })
 
   agentOptions.value = Array.from(agents).sort()
   vulnOptions.value = Array.from(vulnIds).sort()
-  packageOptions.value = Array.from(packages).sort()
   severityOptions.value = Array.from(severities).sort((a, b) => {
     const levelA = getSeverityLevel(a.toLowerCase())
     const levelB = getSeverityLevel(b.toLowerCase())
@@ -293,47 +291,18 @@ const updateFilterOptions = () => {
   })
 }
 
-const matchesConnection = (vuln) => 
-  !selectedConnection.value || vuln.connection_id === selectedConnection.value
-
-const matchesAgent = (vuln) => 
-  selectedAgents.value.length === 0 || selectedAgents.value.includes(vuln.agent_name)
-
-const matchesVuln = (vuln) => 
-  selectedVulns.value.length === 0 || selectedVulns.value.includes(vuln.cve_id)
-
-const matchesPackage = (vuln) => 
-  selectedPackages.value.length === 0 || selectedPackages.value.includes(vuln.package_name)
-
-const matchesSeverity = (vuln) => {
-  if (selectedSeverities.value.length === 0) return true
-  const vulnSeverity = (vuln.severity || 'UNKNOWN').toUpperCase()
-  return selectedSeverities.value.includes(vulnSeverity)
-}
-
-const matchesScore = (vuln) => {
-  if (scoreMin.value === '' && scoreMax.value === '') return true
-  
-  const score = vuln.score_base
-  if (score === null || score === undefined) return false
-  
-  const minOk = scoreMin.value === '' || score >= scoreMin.value
-  const maxOk = scoreMax.value === '' || score <= scoreMax.value
-  
-  return minOk && maxOk
-}
-
+// Filtering (client-side after build)
 const filteredVulns = computed(() => {
-  return vulns.value.filter(vuln => {
-    return matchesConnection(vuln) &&
-           matchesAgent(vuln) &&
-           matchesVuln(vuln) &&
-           matchesPackage(vuln) &&
-           matchesSeverity(vuln) &&
-           matchesScore(vuln)
+  return dashboardData.value.filter(vuln => {
+    const byConnection = !selectedConnection.value || vuln.connection_id === selectedConnection.value
+    const byAgent = selectedAgents.value.length === 0 || selectedAgents.value.includes(vuln.agent_name)
+    const byVuln = selectedVulns.value.length === 0 || selectedVulns.value.includes(vuln.cve_id)
+    const bySeverity = selectedSeverities.value.length === 0 || selectedSeverities.value.includes((vuln.severity || 'UNKNOWN').toUpperCase())
+    return byConnection && byAgent && byVuln && bySeverity
   })
 })
 
+// Chart distributions
 const severityDistribution = computed(() => {
   const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
   filteredVulns.value.forEach(v => {
@@ -345,35 +314,19 @@ const severityDistribution = computed(() => {
 
 const statusDistribution = computed(() => {
   const counts = { Detected: 0, Resolved: 0, 'Re-emerged': 0 }
-  vulns.value.forEach(v => {
+  dashboardData.value.forEach(v => {
     if (v.status && counts[v.status] !== undefined) counts[v.status]++
   })
   return counts
 })
 
-const onConnectionChange = () => {
-  // When connection changes, clear dependent filters
-  selectedAgents.value = []
-  selectedVulns.value = []
-  selectedPackages.value = []
-  selectedSeverities.value = []
-  scoreMin.value = ''
-  scoreMax.value = ''
-}
+// Build function (called on "Generar Vista" click)
+const buildDashboard = async () => {
+  if (!selectedConnection.value) return
 
-const clearFilters = () => {
-  selectedConnection.value = ''
-  selectedAgents.value = []
-  selectedVulns.value = []
-  selectedPackages.value = []
-  selectedSeverities.value = []
-  scoreMin.value = ''
-  scoreMax.value = ''
-}
-
-const fetchVulns = async () => {
   loading.value = true
   error.value = ''
+  hasBuilt.value = false
   loadingMessage.value = ''
   fetchProgress.value = { current: 0 }
   startTimer()
@@ -388,7 +341,11 @@ const fetchVulns = async () => {
     while (true) {
       if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
 
-      const res = await vulnService.getVulns({ limit: PAGE_SIZE, offset }, { signal })
+      const res = await vulnService.getVulns({
+        connectionId: selectedConnection.value,
+        limit: PAGE_SIZE,
+        offset
+      }, { signal })
       const data = Array.isArray(res.data) ? res.data : []
       allData = allData.concat(data)
       pageNum++
@@ -401,13 +358,14 @@ const fetchVulns = async () => {
     }
 
     fetchProgress.value = { current: pageNum, done: true }
-    loadingMessage.value = `Cargando gráficos...`
+    loadingMessage.value = 'Procesando datos...'
 
-    if (allData.length > 0) {
-      vulns.value = allData
-      updateFilterOptions()
-    } else {
-      vulns.value = []
+    dashboardData.value = allData
+    updateFilterOptions()
+    hasBuilt.value = true
+
+    if (!allData.length) {
+      error.value = 'No se encontraron vulnerabilidades para esta conexión.'
     }
   } catch (err) {
     if (err.name === 'AbortError') {
@@ -421,6 +379,23 @@ const fetchVulns = async () => {
     loading.value = false
     abortController = null
   }
+}
+
+const getSeverityBadgeClass = (severity) => {
+  const s = severity.toLowerCase()
+  if (['critical', 'critica'].includes(s)) return 'badge-critical'
+  if (['high', 'alta'].includes(s)) return 'badge-high'
+  if (['medium', 'media'].includes(s)) return 'badge-medium'
+  return 'badge-low'
+}
+
+const onConnectionChange = () => {
+  selectedAgents.value = []
+  selectedVulns.value = []
+  selectedSeverities.value = []
+  agentOptions.value = []
+  vulnOptions.value = []
+  severityOptions.value = []
 }
 
 const fetchConnections = async () => {
@@ -438,7 +413,9 @@ const syncVulns = async () => {
   error.value = ''
   try {
     await vulnService.syncVulns()
-    await fetchVulns()
+    if (selectedConnection.value) {
+      await buildDashboard()
+    }
   } catch (err) {
     error.value = 'Error durante la sincronización con Wazuh. Verifica tu configuración en Admin Wazuh.'
   } finally {
@@ -446,17 +423,8 @@ const syncVulns = async () => {
   }
 }
 
-const getSeverityBadgeClass = (severity) => {
-  const s = severity.toLowerCase()
-  if (['critical', 'critica'].includes(s)) return 'badge-critical'
-  if (['high', 'alta'].includes(s)) return 'badge-high'
-  if (['medium', 'media'].includes(s)) return 'badge-medium'
-  return 'badge-low'
-}
-
 onMounted(() => {
   fetchConnections()
-  fetchVulns()
 })
 
 onUnmounted(() => {
@@ -488,72 +456,34 @@ onUnmounted(() => {
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
-.filter-toggle-bar {
+/* EMPTY CARD */
+.empty-card {
+  min-height: 240px;
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  justify-content: center;
   align-items: center;
+  text-align: center;
   gap: 0.5rem;
-  padding: 0.75rem 0;
-  margin-bottom: 0.5rem;
 }
 
-.btn-filter-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.85rem;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  border-radius: 6px;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-weight: 500;
-}
-
-.btn-filter-toggle:hover {
-  background-color: var(--bg-hover);
-  border-color: var(--text-muted);
+.empty-card h3 {
+  margin: 0;
   color: var(--text-main);
+  font-weight: 600;
 }
 
-.btn-filter-toggle svg {
-  width: 16px;
-  height: 16px;
-}
-
-.btn-clear-filters {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.85rem;
-  background: transparent;
-  border: 1px solid var(--border);
+.empty-card p {
   color: var(--text-muted);
-  border-radius: 6px;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-weight: 500;
-}
-
-.btn-clear-filters:hover {
-  background-color: var(--bg-hover);
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-.btn-clear-filters svg {
-  width: 16px;
-  height: 16px;
+  font-size: 0.9rem;
+  margin: 0;
 }
 
 /* CHARTS ROW */
 .charts-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
+  gap: 1rem;
   margin-bottom: 1.25rem;
 }
 
@@ -568,45 +498,50 @@ onUnmounted(() => {
 }
 
 /* FILTER PANEL STYLES */
-.filter-panel { 
-  padding: 0; 
-  margin-bottom: 1.5rem; 
-  overflow: visible; 
+.filter-panel {
+  padding: 0;
+  margin-bottom: 1.5rem;
+  overflow: visible;
 }
 
-.filter-row { 
-  display: grid; 
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); 
-  align-items: center; 
+.filter-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  align-items: center;
 }
 
-.f-group { 
-  display: flex; 
-  flex-direction: column; 
-  padding: 1rem 1.2rem; 
-  border-right: 1px solid var(--border); 
+.f-group {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 1.2rem;
+  border-right: 1px solid var(--border);
 }
 
-.f-group:last-child { 
-  border-right: none; 
+.f-group:last-child {
+  border-right: none;
 }
 
-.f-group label { 
-  font-size: 0.7rem; 
-  font-weight: 700; 
-  color: var(--text-muted); 
-  text-transform: uppercase; 
-  margin-bottom: 0.5rem; 
+.f-group label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
 }
 
-.filter-input, .dd-btn { 
-  width: 100%; 
-  padding: 0.55rem 0.8rem; 
-  border: 1px solid var(--border); 
-  background: var(--bg-dark); 
-  border-radius: var(--radius-sm); 
-  color: var(--text-main); 
-  cursor: pointer; 
+.f-action {
+  justify-content: end;
+  background: var(--bg-hover);
+}
+
+.filter-input, .dd-btn {
+  width: 100%;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--border);
+  background: var(--bg-dark);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  cursor: pointer;
   font-size: 0.85rem;
 }
 
@@ -615,91 +550,102 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
-.filter-input-sm {
-  width: 100%;
-  padding: 0.45rem 0.6rem;
-  border: 1px solid var(--border);
-  background: var(--bg-dark);
-  border-radius: var(--radius-sm);
-  color: var(--text-main);
-  font-size: 0.8rem;
+.popover-wrap {
+  position: relative;
 }
 
-.range-inputs {
+.dd-btn {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  justify-content: space-between;
 }
 
-.range-inputs span {
-  color: var(--text-muted);
-  font-weight: 600;
-}
-
-.popover-wrap { 
-  position: relative; 
-}
-
-.dd-btn { 
-  display: flex; 
-  justify-content: space-between; 
-}
-
-.dd-panel { 
-  position: absolute; 
-  top: calc(100% + 6px); 
-  left: 0; 
-  width: 280px; 
-  border: 1px solid var(--border); 
-  border-radius: var(--radius-md); 
-  background: var(--bg-panel); 
-  z-index: 20; 
-  overflow: hidden; 
+.dd-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 280px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-panel);
+  z-index: 20;
+  overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.dd-search { 
-  width: 100%; 
-  border: none; 
-  border-bottom: 1px solid var(--border); 
-  padding: 0.65rem 0.9rem; 
-  background: var(--bg-hover); 
-  color: var(--text-main); 
+.dd-search {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 0.65rem 0.9rem;
+  background: var(--bg-hover);
+  color: var(--text-main);
 }
 
-.dd-actions { 
-  display: flex; 
-  justify-content: space-between; 
-  padding: 0.5rem 0.9rem; 
-  border-bottom: 1px solid var(--border); 
-  font-size: 0.75rem; 
-  color: var(--primary); 
+.dd-actions {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: var(--primary);
 }
 
-.dd-actions span { 
-  cursor: pointer; 
+.dd-actions span {
+  cursor: pointer;
 }
 
 .dd-actions span:hover {
   text-decoration: underline;
 }
 
-.dd-list { 
-  max-height: 220px; 
-  overflow-y: auto; 
+.dd-list {
+  max-height: 220px;
+  overflow-y: auto;
 }
 
-.dd-item { 
-  display: flex; 
-  gap: 0.6rem; 
-  padding: 0.5rem 0.9rem; 
-  font-size: 0.82rem; 
+.dd-item {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.82rem;
   cursor: pointer;
   align-items: center;
 }
 
 .dd-item:hover {
   background: var(--bg-hover);
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.chip {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-dark);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.chip.on {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.sel-badge {
+  background: var(--primary-bg);
+  color: var(--primary);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .badge-mini {
@@ -730,7 +676,7 @@ onUnmounted(() => {
   color: #3b82f6;
 }
 
-/* ── Loading card (same design as Timeline) ── */
+/* ── Loading card ── */
 .loading-card {
   min-height: 200px;
   display: flex;
@@ -818,18 +764,18 @@ onUnmounted(() => {
 }
 
 @media (max-width: 1400px) {
-  .filter-row { 
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); 
+  .filter-row {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   }
 }
 
 @media (max-width: 1100px) {
-  .filter-row { 
-    grid-template-columns: 1fr 1fr; 
+  .filter-row {
+    grid-template-columns: 1fr 1fr;
   }
-  .f-group { 
-    border-right: none; 
-    border-bottom: 1px solid var(--border); 
+  .f-group {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
   }
 }
 </style>
