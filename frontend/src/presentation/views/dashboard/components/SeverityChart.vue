@@ -91,7 +91,7 @@ const chartOptions = {
 }
 
 .chart-wrapper {
-  max-width: 280px;
+  max-width: 200px;
   margin: 0 auto;
 }
 </style>
