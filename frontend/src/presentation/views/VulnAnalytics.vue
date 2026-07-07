@@ -105,8 +105,8 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useVulnStore } from '../../application/stores/vulnStore'
 import wazuhService from '../../application/services/wazuhService'
-import vulnService from '../../application/services/vulnService'
 import { Pie, Doughnut } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -119,8 +119,7 @@ ChartJS.register(ArcElement, Tooltip)
 import TimelineFilters from './timeline/components/TimelineFilters.vue'
 import GanttTab from './timeline/components/GanttTab.vue'
 
-const PAGE_SIZE = 10000
-const TICK_INTERVAL_MS = 1000
+const store = useVulnStore()
 
 const periods = [
   { l: '24H', v: '24h' },
@@ -129,17 +128,6 @@ const periods = [
   { l: 'Dia', v: 'day' },
   { l: 'Todo', v: 'all' }
 ]
-
-const DEMO_SEVERITY = { CRITICAL: 3, HIGH: 4, MEDIUM: 6, LOW: 2 }
-const DEMO_STATUS = { Activo: 8, Resuelto: 5, Reabierto: 2 }
-const DEMO_AGENTS = [
-  { agent: 'srv-web-01', count: 8 },
-  { agent: 'srv-db-02', count: 5 },
-  { agent: 'srv-api-03', count: 4 },
-  { agent: 'srv-proxy-05', count: 3 },
-  { agent: 'srv-dhcp-01', count: 2 }
-]
-const DEMO_CRITICAL = { count: 3, topCve: 'CVE-2026-0001' }
 
 // ── Filter state ──
 const connections = ref([])
@@ -180,13 +168,11 @@ const loading = ref(false)
 const loadingMessage = ref('')
 const elapsedSeconds = ref(0)
 const fetchProgress = ref({ current: 0 })
-let abortController = null
 let timerInterval = null
 
 // ── Computed chart data ──
 
 const severityDistribution = computed(() => {
-  if (filteredVulnsData.value.length === 0) return DEMO_SEVERITY
   const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
   filteredData.value.forEach(v => {
     const sev = (v.severity || 'LOW').toUpperCase()
@@ -196,7 +182,6 @@ const severityDistribution = computed(() => {
 })
 
 const statusDistribution = computed(() => {
-  if (filteredVulnsData.value.length === 0) return DEMO_STATUS
   const counts = { Activo: 0, Resuelto: 0, Reabierto: 0 }
   filteredData.value.forEach(v => {
     const mapped = v.status ? STATUS_API_MAP[v.status] : null
@@ -206,7 +191,6 @@ const statusDistribution = computed(() => {
 })
 
 const topAgentsDistribution = computed(() => {
-  if (filteredVulnsData.value.length === 0) return DEMO_AGENTS
   const agentMap = {}
   filteredData.value.forEach(v => {
     const agent = v.agent_name || 'unknown'
@@ -219,12 +203,10 @@ const topAgentsDistribution = computed(() => {
 })
 
 const criticalCount = computed(() => {
-  if (filteredVulnsData.value.length === 0) return DEMO_CRITICAL.count
   return filteredData.value.filter(v => (v.severity || '').toUpperCase() === 'CRITICAL').length
 })
 
 const topCriticalCve = computed(() => {
-  if (filteredVulnsData.value.length === 0) return DEMO_CRITICAL.topCve
   const criticalVulns = filteredVulnsData.value.filter(v => (v.severity || '').toUpperCase() === 'CRITICAL')
   if (criticalVulns.length === 0) return null
   const cveCounts = {}
@@ -299,7 +281,7 @@ const loadingBarWidth = computed(() => {
 const startTimer = () => {
   elapsedSeconds.value = 0
   clearInterval(timerInterval)
-  timerInterval = setInterval(() => { elapsedSeconds.value++ }, TICK_INTERVAL_MS)
+  timerInterval = setInterval(() => { elapsedSeconds.value++ }, 1000)
 }
 
 const stopTimer = () => {
@@ -308,14 +290,11 @@ const stopTimer = () => {
 }
 
 const cancelBuild = () => {
-  if (abortController) {
-    abortController.abort()
-    abortController = null
-  }
   stopTimer()
   loading.value = false
   loadingMessage.value = 'Operación cancelada'
   fetchProgress.value = { current: 0 }
+  store.clearConnectionData()
 }
 
 // ── Build flow ──
@@ -330,30 +309,9 @@ const onConnectionChange = async () => {
   if (!selectedConnection.value) return
 
   try {
-    let allData = []
-    let offset = 0
-    let pageNum = 0
-
-    while (true) {
-      const res = await vulnService.getVulns({ connectionId: selectedConnection.value, limit: PAGE_SIZE, offset })
-      const data = Array.isArray(res.data) ? res.data : []
-      allData = allData.concat(data)
-      pageNum++
-
-      if (data.length < PAGE_SIZE) break
-      offset += PAGE_SIZE
-    }
-
-    const agents = new Set()
-    const vulns = new Set()
-
-    allData.forEach(vuln => {
-      if (vuln.agent_name) agents.add(vuln.agent_name)
-      if (vuln.cve_id) vulns.add(vuln.cve_id)
-    })
-
-    agentOpts.value = Array.from(agents).sort()
-    vulnOpts.value = Array.from(vulns).sort()
+    const filterOptions = await store.fetchFilterOptions(selectedConnection.value)
+    agentOpts.value = filterOptions.agents || []
+    vulnOpts.value = filterOptions.cves || []
   } catch (error) {
     console.error(error)
     errorBanner.value = 'No se pudieron cargar agentes y CVEs para la conexión seleccionada.'
@@ -361,44 +319,22 @@ const onConnectionChange = async () => {
 }
 
 const buildAnalytics = async () => {
+  if (!selectedConnection.value) return
+
   errorBanner.value = ''
   hasBuilt.value = false
   loading.value = true
-  loadingMessage.value = ''
+  loadingMessage.value = 'Obteniendo datos...'
   fetchProgress.value = { current: 0 }
   startTimer()
 
-  abortController = new AbortController()
-  const signal = abortController.signal
-
   try {
-    let allData = []
-    let offset = 0
-    let pageNum = 0
-
-    while (true) {
-      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-
-      const res = await vulnService.getVulns(
-        { connectionId: selectedConnection.value, limit: PAGE_SIZE, offset },
-        { signal }
-      )
-      const data = Array.isArray(res.data) ? res.data : []
-      allData = allData.concat(data)
-      pageNum++
-
-      fetchProgress.value = { current: pageNum }
-      loadingMessage.value = 'Obteniendo datos...'
-
-      if (data.length < PAGE_SIZE) break
-      offset += PAGE_SIZE
-    }
-
-    fetchProgress.value = { current: pageNum, done: true }
-    loadingMessage.value = 'Procesando datos...'
+    // Fetch analytics via store (uses cache, falls back to client-side computation)
+    const allVulns = await store.fetchAllVulns(selectedConnection.value)
+    fetchProgress.value = { current: 1, done: true }
 
     // Apply agent and CVE filters
-    let result = allData
+    let result = allVulns
     if (selectedAgents.value.length > 0) {
       result = result.filter(v => selectedAgents.value.includes(v.agent_name))
     }
@@ -406,20 +342,16 @@ const buildAnalytics = async () => {
       result = result.filter(v => selectedVulns.value.includes(v.cve_id))
     }
 
+    loadingMessage.value = 'Procesando datos...'
     filteredVulnsData.value = result
     hasBuilt.value = true
   } catch (err) {
-    if (err.name === 'AbortError') {
-      loadingMessage.value = 'Operación cancelada'
-      return
-    }
     console.error('Error fetching vulns:', err)
     errorBanner.value = 'Error al cargar vulnerabilidades. Verifica tu conexión Wazuh.'
     hasBuilt.value = false
   } finally {
     stopTimer()
     loading.value = false
-    abortController = null
   }
 }
 

@@ -6,7 +6,12 @@ import wazuhService from '@/application/services/wazuhService'
 
 vi.mock('@/application/services/vulnService', () => ({
     default: {
-        getVulns: vi.fn()
+        getVulns: vi.fn(),
+        getFilterOptions: vi.fn(),
+        getDashboardSummary: vi.fn(),
+        getTimeline: vi.fn(),
+        getAnalytics: vi.fn(),
+        getTimelineEvents: vi.fn()
     }
 }))
 
@@ -20,6 +25,7 @@ describe('VulnAnalytics.vue', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         wazuhService.getConnections.mockResolvedValue({ data: [] })
+        vulnService.getVulns.mockResolvedValue({ data: [] })
     })
 
     it('loads connections on mount', async () => {
@@ -33,22 +39,19 @@ describe('VulnAnalytics.vue', () => {
         expect(wrapper.vm.connections).toEqual([{ id: 1, name: 'Conn A' }])
     })
 
-    it('renders demo data when no build is performed', async () => {
+    it('renders with empty data when no build is performed', async () => {
         const wrapper = mount(VulnAnalytics)
         await flushPromises()
 
-        // Should show demo severity distribution
+        // No DEMO data — empty state
         expect(wrapper.vm.severityDistribution).toEqual({
-            CRITICAL: 3, HIGH: 4, MEDIUM: 6, LOW: 2
+            CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0
         })
-        // Should show demo status distribution
         expect(wrapper.vm.statusDistribution).toEqual({
-            Activo: 8, Resuelto: 5, Reabierto: 2
+            Activo: 0, Resuelto: 0, Reabierto: 0
         })
-        // Demo top agent
-        expect(wrapper.vm.topAgentsDistribution[0].agent).toBe('srv-web-01')
-        // Demo critical count
-        expect(wrapper.vm.criticalCount).toBe(3)
+        expect(wrapper.vm.topAgentsDistribution).toEqual([])
+        expect(wrapper.vm.criticalCount).toBe(0)
     })
 
     it('shows loading card and hides GanttTab when loading', async () => {
@@ -82,8 +85,6 @@ describe('VulnAnalytics.vue', () => {
         await wrapper.vm.buildAnalytics()
         await flushPromises()
 
-        // Should have fetched vulns
-        expect(vulnService.getVulns).toHaveBeenCalled()
         // State should not be loading
         expect(wrapper.vm.loading).toBe(false)
         expect(wrapper.vm.hasBuilt).toBe(true)
