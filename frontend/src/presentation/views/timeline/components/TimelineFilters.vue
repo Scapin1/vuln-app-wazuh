@@ -2,8 +2,8 @@
   <div class="card filter-panel" :class="{ compact }">
     <div class="filter-row">
       <div class="f-group">
-        <label>Conexion Wazuh</label>
-        <select v-model="connectionModel" @change="emit('connection-change')" class="filter-input">
+        <label for="connection-select">Conexion Wazuh</label>
+        <select id="connection-select" v-model="connectionModel" @change="emit('connection-change')" class="filter-input">
           <option value="" disabled>Selecciona servidor...</option>
           <option v-for="conn in connections" :key="conn.id" :value="conn.id">{{ conn.name }}</option>
         </select>
@@ -50,7 +50,7 @@
       </div>
 
       <div class="f-group" v-if="severityOptions?.length">
-        <label>Criticidad</label>
+        <span class="f-group-label">Criticidad</span>
         <div class="chip-row">
           <button
             v-for="sev in severityOptions"
@@ -80,8 +80,8 @@
       </div>
 
       <div class="f-group" v-if="period === 'day'">
-        <label>Dia</label>
-        <input type="date" v-model="customDateModel" class="filter-input">
+        <label for="custom-date">Dia</label>
+        <input id="custom-date" type="date" v-model="customDateModel" class="filter-input">
       </div>
 
       <div class="f-group f-action">
@@ -173,7 +173,8 @@ const toggleSeverity = (sev) => {
 .filter-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); align-items: stretch; }
 .f-group { display: flex; flex-direction: column; padding: 1rem 1.2rem; border-right: 1px solid var(--border); }
 .f-group:last-child { border-right: none; }
-.f-group label { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem; }
+.f-group label,
+.f-group .f-group-label { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem; }
 .filter-input, .dd-btn { width: 100%; padding: 0.55rem 0.8rem; border: 1px solid var(--border); background: var(--bg-dark); border-radius: var(--radius-sm); color: var(--text-main); cursor: pointer; }
 .f-action { justify-content: end; background: var(--bg-hover); }
 .popover-wrap { position: relative; }

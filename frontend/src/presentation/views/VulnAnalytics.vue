@@ -243,9 +243,10 @@ const STATUS_COLORS = { Activo: '#dc2626', Resuelto: '#6ca42c', Reabierto: '#ca8
 const STATUS_ORDER = ['Activo', 'Resuelto', 'Reabierto']
 const STATUS_API_MAP = { Detected: 'Activo', Resolved: 'Resuelto', 'Re-emerged': 'Reabierto' }
 
+const SEVERITY_SHORT_LABEL = { CRITICAL: 'CRIT', HIGH: 'HIGH', MEDIUM: 'MED', LOW: 'LOW' }
 const severityFilterOptions = SEVERITY_ORDER.map(sev => ({
   value: sev,
-  label: sev === 'CRITICAL' ? 'CRIT' : sev === 'MEDIUM' ? 'MED' : sev
+  label: SEVERITY_SHORT_LABEL[sev]
 }))
 
 const pieChartData = computed(() => ({
@@ -668,6 +669,6 @@ onUnmounted(() => {
 .btn-cancel:hover {
   background: #fef2f2;
   border-color: #f87171;
-  color: #dc2626;
+  color: #b91c1c;
 }
 </style>
