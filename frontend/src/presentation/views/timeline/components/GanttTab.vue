@@ -354,6 +354,76 @@ const mergeSnapshotsByZoom = (snapshots) => {
   return merged
 }
 
+// ── Time labels: extracted helpers ──
+const generateYearLabels = (start, end) => {
+  const labels = []
+  let current = new Date(start.getFullYear(), 0, 1)
+  const minEnd = new Date(start.getFullYear() + 2, 0, 1)
+  const effectiveEnd = end > minEnd ? end : minEnd
+  while (current <= effectiveEnd) {
+    labels.push({ label: current.getFullYear().toString(), date: new Date(current) })
+    current = new Date(current.getFullYear() + 1, 0, 1)
+  }
+  return labels
+}
+
+const generateMonthLabels = (start, end) => {
+  const labels = []
+  const spansMultipleYears = end.getFullYear() > start.getFullYear()
+  let current = new Date(start.getFullYear(), start.getMonth(), 1)
+  while (current <= end) {
+    const label = spansMultipleYears
+      ? current.toLocaleString('es', { month: 'short', year: '2-digit' })
+      : current.toLocaleString('es', { month: 'short' })
+    labels.push({ label, date: new Date(current) })
+    current = new Date(current.getFullYear(), current.getMonth() + 1, 1)
+  }
+  // Push one extra label past end for timeline buffer
+  const extraLabel = spansMultipleYears
+    ? current.toLocaleString('es', { month: 'short', year: '2-digit' })
+    : current.toLocaleString('es', { month: 'short' })
+  labels.push({ label: extraLabel, date: new Date(current) })
+  return labels
+}
+
+const generateDayLabels = (start, end) => {
+  const labels = []
+  const spansMultipleYears = end.getFullYear() > start.getFullYear()
+  let current = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+  while (current <= end) {
+    const label = spansMultipleYears
+      ? current.toLocaleString('es', { day: '2-digit', month: 'short', year: '2-digit' })
+      : current.toLocaleString('es', { day: '2-digit', month: 'short' })
+    labels.push({ label, date: new Date(current) })
+    current = new Date(current.getFullYear(), current.getMonth(), current.getDate() + 1)
+  }
+  // Push one extra label past end for timeline buffer
+  const extraLabel = spansMultipleYears
+    ? current.toLocaleString('es', { day: '2-digit', month: 'short', year: '2-digit' })
+    : current.toLocaleString('es', { day: '2-digit', month: 'short' })
+  labels.push({ label: extraLabel, date: new Date(current) })
+  return labels
+}
+
+const generateHourLabels = (start, end) => {
+  const labels = []
+  const spansMultipleDays = Math.ceil((end - start) / (24 * 60 * 60 * 1000)) >= 1
+  let current = new Date(start.getFullYear(), start.getMonth(), start.getDate(), start.getHours(), 0, 0)
+  while (current <= end) {
+    const label = spansMultipleDays
+      ? current.toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
+      : current.toLocaleString('es', { hour: '2-digit', minute: '2-digit', hour12: false })
+    labels.push({ label, date: new Date(current) })
+    current = new Date(current.getFullYear(), current.getMonth(), current.getDate(), current.getHours() + 1, 0, 0)
+  }
+  // Push one extra label past end for timeline buffer
+  const extraLabel = spansMultipleDays
+    ? current.toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
+    : current.toLocaleString('es', { hour: '2-digit', minute: '2-digit', hour12: false })
+  labels.push({ label: extraLabel, date: new Date(current) })
+  return labels
+}
+
 // ── Time labels & timeline dimensions ──
 const timeLabels = computed(() => {
   if (!cveSnapshots.value.length) return []
@@ -374,62 +444,13 @@ const timeLabels = computed(() => {
   const end = new Date(Math.max(maxMs, Date.now()))
   const unit = zoomLevel.value.unit
 
-  const labels = []
-  let current
-
-  if (unit === 'year') {
-    current = new Date(start.getFullYear(), 0, 1)
-    const minEnd = new Date(start.getFullYear() + 2, 0, 1)
-    const effectiveEnd = end > minEnd ? end : minEnd
-    while (current <= effectiveEnd) {
-      labels.push({ label: current.getFullYear().toString(), date: new Date(current) })
-      current = new Date(current.getFullYear() + 1, 0, 1)
-    }
-  } else if (unit === 'month') {
-    current = new Date(start.getFullYear(), start.getMonth(), 1)
-    const spansMultipleYears = end.getFullYear() > start.getFullYear()
-    while (current <= end) {
-      const label = spansMultipleYears
-        ? current.toLocaleString('es', { month: 'short', year: '2-digit' })
-        : current.toLocaleString('es', { month: 'short' })
-      labels.push({ label, date: new Date(current) })
-      current = new Date(current.getFullYear(), current.getMonth() + 1, 1)
-    }
-    const label = spansMultipleYears
-      ? current.toLocaleString('es', { month: 'short', year: '2-digit' })
-      : current.toLocaleString('es', { month: 'short' })
-    labels.push({ label, date: new Date(current) })
-  } else if (unit === 'day') {
-    current = new Date(start.getFullYear(), start.getMonth(), start.getDate())
-    const spansMultipleYears = end.getFullYear() > start.getFullYear()
-    while (current <= end) {
-      const label = spansMultipleYears
-        ? current.toLocaleString('es', { day: '2-digit', month: 'short', year: '2-digit' })
-        : current.toLocaleString('es', { day: '2-digit', month: 'short' })
-      labels.push({ label, date: new Date(current) })
-      current = new Date(current.getFullYear(), current.getMonth(), current.getDate() + 1)
-    }
-    const label = spansMultipleYears
-      ? current.toLocaleString('es', { day: '2-digit', month: 'short', year: '2-digit' })
-      : current.toLocaleString('es', { day: '2-digit', month: 'short' })
-    labels.push({ label, date: new Date(current) })
-  } else if (unit === 'hour') {
-    current = new Date(start.getFullYear(), start.getMonth(), start.getDate(), start.getHours(), 0, 0)
-    const spansMultipleDays = Math.ceil((end - start) / (24 * 60 * 60 * 1000)) >= 1
-    while (current <= end) {
-      const label = spansMultipleDays
-        ? current.toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
-        : current.toLocaleString('es', { hour: '2-digit', minute: '2-digit', hour12: false })
-      labels.push({ label, date: new Date(current) })
-      current = new Date(current.getFullYear(), current.getMonth(), current.getDate(), current.getHours() + 1, 0, 0)
-    }
-    const label = spansMultipleDays
-      ? current.toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
-      : current.toLocaleString('es', { hour: '2-digit', minute: '2-digit', hour12: false })
-    labels.push({ label, date: new Date(current) })
+  switch (unit) {
+    case 'year': return generateYearLabels(start, end)
+    case 'month': return generateMonthLabels(start, end)
+    case 'day': return generateDayLabels(start, end)
+    case 'hour': return generateHourLabels(start, end)
+    default: return []
   }
-
-  return labels
 })
 
 // Calculate ms per unit for accurate positioning

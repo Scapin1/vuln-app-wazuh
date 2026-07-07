@@ -5,6 +5,101 @@ import vulnService from '../services/vulnService'
 const CACHE_TTL_MS = 60_000 // 1 minuto
 const PAGE_SIZE = 10000
 
+// ── Module-level helpers ──
+
+async function fetchAllVulns(connectionId, signal) {
+  let allData = []
+  let offset = 0
+
+  while (true) {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+
+    const res = await vulnService.getVulns(
+      { connectionId, limit: PAGE_SIZE, offset },
+      { signal }
+    )
+    const data = Array.isArray(res.data) ? res.data : []
+    allData = allData.concat(data)
+
+    if (data.length < PAGE_SIZE) break
+    offset += PAGE_SIZE
+  }
+
+  return allData
+}
+
+function computeStatusDistribution(vulns) {
+  const counts = { Detected: 0, Resolved: 0, 'Re-emerged': 0 }
+  vulns.forEach(v => {
+    if (v.status && counts[v.status] !== undefined) counts[v.status]++
+  })
+  return counts
+}
+
+function computeTopAgents(vulns, limit = 5) {
+  const agentMap = {}
+  vulns.forEach(v => {
+    const agent = v.agent_name || 'unknown'
+    agentMap[agent] = (agentMap[agent] || 0) + 1
+  })
+  return Object.entries(agentMap)
+    .map(([agent, count]) => ({ agent, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit)
+}
+
+function computeCriticalInfo(vulns) {
+  const criticalVulns = vulns.filter(v => (v.severity || '').toUpperCase() === 'CRITICAL')
+  const count = criticalVulns.length
+  const cveCounts = {}
+  criticalVulns.forEach(v => {
+    if (v.cve_id) cveCounts[v.cve_id] = (cveCounts[v.cve_id] || 0) + 1
+  })
+  const sorted = Object.entries(cveCounts).sort((a, b) => b[1] - a[1])
+  return { count, topCve: sorted.length > 0 ? sorted[0][0] : null }
+}
+
+function computeFilterOptions(vulns) {
+  const agents = new Set()
+  const cves = new Set()
+  vulns.forEach(v => {
+    if (v.agent_name) agents.add(v.agent_name)
+    if (v.cve_id) cves.add(v.cve_id)
+  })
+  return {
+    agents: Array.from(agents).sort((a, b) => a.localeCompare(b)),
+    cves: Array.from(cves).sort((a, b) => a.localeCompare(b))
+  }
+}
+
+function processAgentTimestamps(cve) {
+  const timestampMap = new Map()
+  cve.agents.forEach(agent => {
+    const addTimestamp = (ts) => {
+      if (!ts) return
+      if (!timestampMap.has(ts)) timestampMap.set(ts, new Set())
+      timestampMap.get(ts).add(agent.agent_name)
+    }
+    addTimestamp(agent.first_seen)
+    addTimestamp(agent.last_seen)
+    agent.history.forEach(h => addTimestamp(h.timestamp))
+  })
+  return timestampMap
+}
+
+function buildSortedTimestamps(timestampMap, cve) {
+  const sortedTimestamps = Array.from(timestampMap.keys()).sort(
+    (a, b) => new Date(a).getTime() - new Date(b).getTime()
+  )
+
+  return sortedTimestamps.map(ts => ({
+    syncTimestamp: ts,
+    agents: Array.from(timestampMap.get(ts) || []),
+    agentCount: (timestampMap.get(ts) || new Set()).size,
+    cve_id: cve.cve_id
+  }))
+}
+
 export const useVulnStore = defineStore('vulns', () => {
   // ── Cache (por connectionId:tipo) ──
   const cache = ref(new Map())
@@ -37,28 +132,6 @@ export const useVulnStore = defineStore('vulns', () => {
 
   function invalidateCache() {
     cache.value.clear()
-  }
-
-  // ── Fallback: fetch all vulns (while new APIs aren't ready) ──
-  async function fetchAllVulns(connectionId, signal) {
-    let allData = []
-    let offset = 0
-
-    while (true) {
-      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-
-      const res = await vulnService.getVulns(
-        { connectionId, limit: PAGE_SIZE, offset },
-        { signal }
-      )
-      const data = Array.isArray(res.data) ? res.data : []
-      allData = allData.concat(data)
-
-      if (data.length < PAGE_SIZE) break
-      offset += PAGE_SIZE
-    }
-
-    return allData
   }
 
   // ── Helpers de filtrado ──
@@ -101,50 +174,6 @@ export const useVulnStore = defineStore('vulns', () => {
     return counts
   }
 
-  function computeStatusDistribution(vulns) {
-    const counts = { Detected: 0, Resolved: 0, 'Re-emerged': 0 }
-    vulns.forEach(v => {
-      if (v.status && counts[v.status] !== undefined) counts[v.status]++
-    })
-    return counts
-  }
-
-  function computeTopAgents(vulns, limit = 5) {
-    const agentMap = {}
-    vulns.forEach(v => {
-      const agent = v.agent_name || 'unknown'
-      agentMap[agent] = (agentMap[agent] || 0) + 1
-    })
-    return Object.entries(agentMap)
-      .map(([agent, count]) => ({ agent, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, limit)
-  }
-
-  function computeCriticalInfo(vulns) {
-    const criticalVulns = vulns.filter(v => (v.severity || '').toUpperCase() === 'CRITICAL')
-    const count = criticalVulns.length
-    const cveCounts = {}
-    criticalVulns.forEach(v => {
-      if (v.cve_id) cveCounts[v.cve_id] = (cveCounts[v.cve_id] || 0) + 1
-    })
-    const sorted = Object.entries(cveCounts).sort((a, b) => b[1] - a[1])
-    return { count, topCve: sorted.length > 0 ? sorted[0][0] : null }
-  }
-
-  function computeFilterOptions(vulns) {
-    const agents = new Set()
-    const cves = new Set()
-    vulns.forEach(v => {
-      if (v.agent_name) agents.add(v.agent_name)
-      if (v.cve_id) cves.add(v.cve_id)
-    })
-    return {
-      agents: Array.from(agents).sort(),
-      cves: Array.from(cves).sort()
-    }
-  }
-
   // ── Dashboard Summary ──
   async function fetchDashboardSummary(connectionId, period, customDate) {
     activeConnectionId.value = connectionId
@@ -161,6 +190,7 @@ export const useVulnStore = defineStore('vulns', () => {
       setCache('dashboard', data)
       return data
     } catch (apiErr) {
+      console.warn('[vulnStore] API fallback:', apiErr)
       // API not available yet → fallback client-side
       const allVulns = await fetchAllVulns(connectionId)
       const filtered = filterByPeriod(allVulns, period, customDate)
@@ -195,6 +225,7 @@ export const useVulnStore = defineStore('vulns', () => {
       if (page === 1) setCache(cacheType, data)
       return data
     } catch (apiErr) {
+      console.warn('[vulnStore] API fallback:', apiErr)
       // Fallback: fetch all vulns, group by CVE, build snapshots
       const allVulns = await fetchAllVulns(connectionId)
       const filtered = filterByPeriod(allVulns, period, customDate)
@@ -245,6 +276,7 @@ export const useVulnStore = defineStore('vulns', () => {
       setCache('analytics', data)
       return data
     } catch (apiErr) {
+      console.warn('[vulnStore] API fallback:', apiErr)
       // Fallback client-side
       const allVulns = await fetchAllVulns(connectionId)
       const filtered = filterByPeriod(allVulns, period, customDate)
@@ -290,6 +322,7 @@ export const useVulnStore = defineStore('vulns', () => {
       setCache('filters', data)
       return data
     } catch (apiErr) {
+      console.warn('[vulnStore] API fallback:', apiErr)
       // Fallback client-side
       const allVulns = await fetchAllVulns(connectionId)
       const options = computeFilterOptions(allVulns)
@@ -316,6 +349,7 @@ export const useVulnStore = defineStore('vulns', () => {
       setCache(cacheType, data)
       return data
     } catch (apiErr) {
+      console.warn('[vulnStore] API fallback:', apiErr)
       // Fallback: compute from vuln data with history
       const allVulns = await fetchAllVulns(connectionId)
       const events = []
@@ -365,32 +399,12 @@ export const useVulnStore = defineStore('vulns', () => {
     })
 
     cveMap.forEach((cve) => {
-      const timestampMap = new Map()
-      cve.agents.forEach(agent => {
-        const addTimestamp = (ts) => {
-          if (!ts) return
-          if (!timestampMap.has(ts)) timestampMap.set(ts, new Set())
-          timestampMap.get(ts).add(agent.agent_name)
-        }
-        addTimestamp(agent.first_seen)
-        addTimestamp(agent.last_seen)
-        agent.history.forEach(h => addTimestamp(h.timestamp))
-      })
-
-      const sortedTimestamps = Array.from(timestampMap.keys()).sort(
-        (a, b) => new Date(a).getTime() - new Date(b).getTime()
-      )
-
-      cve.snapshots = sortedTimestamps.map(ts => ({
-        syncTimestamp: ts,
-        agents: Array.from(timestampMap.get(ts) || []),
-        agentCount: (timestampMap.get(ts) || new Set()).size,
-        cve_id: cve.cve_id
-      }))
+      const timestampMap = processAgentTimestamps(cve)
+      cve.snapshots = buildSortedTimestamps(timestampMap, cve)
 
       cve.isResolved = cve.agents.length > 0 && cve.agents.every(agent => {
         const lastEvent = agent.history[agent.history.length - 1]
-        return lastEvent && lastEvent.action === 'RESOLVED'
+        return lastEvent?.action === 'RESOLVED'
       })
 
       cve.firstSync = cve.snapshots[0]?.syncTimestamp || null
@@ -454,6 +468,7 @@ export const useVulnStore = defineStore('vulns', () => {
       setCache(cacheType, result)
       return result
     } catch (err) {
+      console.warn('[vulnStore] API fallback:', err)
       error.value = err.message || 'Error al cargar datos del dashboard'
       throw err
     } finally {

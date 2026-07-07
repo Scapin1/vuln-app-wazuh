@@ -188,21 +188,21 @@ describe('GanttTab.vue', () => {
     it('handles null/undefined input', () => {
       const wrapper = emptyWrapper()
       const result = wrapper.vm.toLocalDate(null)
-      expect(result instanceof Date).toBe(true)
+      expect(result).toBeInstanceOf(Date)
     })
 
     it('handles Date object input', () => {
       const wrapper = emptyWrapper()
       const now = new Date('2026-05-15T10:30:00Z')
       const result = wrapper.vm.toLocalDate(now)
-      expect(result instanceof Date).toBe(true)
+      expect(result).toBeInstanceOf(Date)
       expect(result.getTime()).toBe(now.getTime())
     })
 
     it('handles ISO date string with time', () => {
       const wrapper = emptyWrapper()
       const result = wrapper.vm.toLocalDate('2026-03-15T14:30:00Z')
-      expect(result instanceof Date).toBe(true)
+      expect(result).toBeInstanceOf(Date)
       expect(result.getHours()).toBe(14)
       expect(result.getMinutes()).toBe(30)
     })
@@ -210,7 +210,7 @@ describe('GanttTab.vue', () => {
     it('handles ISO date string without time', () => {
       const wrapper = emptyWrapper()
       const result = wrapper.vm.toLocalDate('2026-03-15')
-      expect(result instanceof Date).toBe(true)
+      expect(result).toBeInstanceOf(Date)
     })
   })
 
@@ -250,7 +250,7 @@ describe('GanttTab.vue', () => {
         expect(label).toHaveProperty('label')
         expect(label).toHaveProperty('date')
         expect(typeof label.label).toBe('string')
-        expect(label.date instanceof Date).toBe(true)
+        expect(label.date).toBeInstanceOf(Date)
       })
     })
 
@@ -335,7 +335,7 @@ describe('GanttTab.vue', () => {
     it('marks CVE-2026-0004 as resolved (last snapshot has 0 agents)', () => {
       const wrapper = emptyWrapper()
       const cve = wrapper.vm.cveSnapshots.find(c => c.cve_id === 'CVE-2026-0004')
-      expect(cve).toBeDefined()
+      expect(cve.cve_id).toBe('CVE-2026-0004')
       expect(cve.isResolved).toBe(true)
       const lastSnap = cve.snapshots[cve.snapshots.length - 1]
       expect(lastSnap.agentCount).toBe(0)
@@ -396,7 +396,7 @@ describe('GanttTab.vue', () => {
       })
 
       const cve = wrapper.vm.cveSnapshots.find(c => c.cve_id === 'CVE-MULTI')
-      expect(cve).toBeDefined()
+      expect(cve.cve_id).toBe('CVE-MULTI')
       // 3 unique timestamps: Feb 1 (agent-01 first seen),
       // Mar 1 (agent-02 first seen), Apr 1 (agent-01 history RESOLVED)
       expect(cve.snapshots.length).toBe(3)
@@ -414,7 +414,7 @@ describe('GanttTab.vue', () => {
 
       // The snapshot at '2026-03-01' has only agent-02
       const marSnap = cve.snapshots.find(s => s.syncTimestamp.includes('2026-03-01'))
-      expect(marSnap).toBeDefined()
+      expect(marSnap.syncTimestamp).toContain('2026-03-01')
       expect(marSnap.agentCount).toBe(1)
       expect(marSnap.agents).toContain('agent-02')
     })
@@ -457,14 +457,14 @@ describe('GanttTab.vue', () => {
       })
 
       const cve = wrapper.vm.cveSnapshots.find(c => c.cve_id === 'CVE-SHARED-SYNC')
-      expect(cve).toBeDefined()
+      expect(cve.cve_id).toBe('CVE-SHARED-SYNC')
 
       // 4 snapshots: 3 unique first_seen + 1 shared sync last_seen
       expect(cve.snapshots.length).toBe(4)
 
       // The shared sync snapshot has all 3 agents
       const syncSnap = cve.snapshots.find(s => s.syncTimestamp.includes('2026-06-01'))
-      expect(syncSnap).toBeDefined()
+      expect(syncSnap.syncTimestamp).toContain('2026-06-01')
       expect(syncSnap.agentCount).toBe(3)
       expect(syncSnap.agents).toContain('server-a')
       expect(syncSnap.agents).toContain('server-b')
@@ -726,7 +726,7 @@ describe('GanttTab.vue', () => {
       const wrapper = emptyWrapper()
       const label = wrapper.find('label[for="ganttSearchDate"]')
       expect(label.exists()).toBe(true)
-      expect(label.attributes('style')).toBeFalsy()
+      expect(label.attributes('style')).toBeUndefined()
     })
   })
 })

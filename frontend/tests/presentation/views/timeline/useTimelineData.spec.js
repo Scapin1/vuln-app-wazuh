@@ -251,7 +251,7 @@ describe('useTimelineData', () => {
         slot.startMs <= startMs && slot.endMs >= endMs
       )
 
-      expect(relevantSlot).toBeDefined()
+      expect(relevantSlot.details.length).toBeGreaterThan(0)
       const vulnDetail = relevantSlot.details.find(d => d.id === vuln.id)
 
       expect(vulnDetail.timeline_event_at).toBe(vuln.first_seen)

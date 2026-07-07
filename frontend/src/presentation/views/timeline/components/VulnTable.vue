@@ -693,21 +693,21 @@ th {
 
 .badge-critical {
   background: rgba(220, 38, 38, 0.15);
-  color: #dc2626;
+  color: #b91c1c;
 }
 
 .badge-high {
   background: rgba(234, 88, 12, 0.15);
-  color: #ea580c;
+  color: #c2410c;
 }
 
 .badge-medium {
   background: rgba(234, 179, 8, 0.15);
-  color: #eab308;
+  color: #a16207;
 }
 
 .badge-low {
   background: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
+  color: #1e40af;
 }
 </style>

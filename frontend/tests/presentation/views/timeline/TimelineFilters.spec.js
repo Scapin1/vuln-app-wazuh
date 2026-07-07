@@ -154,7 +154,7 @@ describe('TimelineFilters.vue', () => {
     })
 
     const buildButton = wrapper.find('.btn-primary')
-    expect(buildButton.attributes('disabled')).toBeDefined()
+    expect(buildButton.element.disabled).toBe(true)
   })
 
   it('disables build button when loading', () => {
@@ -167,7 +167,7 @@ describe('TimelineFilters.vue', () => {
     })
 
     const buildButton = wrapper.find('.btn-primary')
-    expect(buildButton.attributes('disabled')).toBeDefined()
+    expect(buildButton.element.disabled).toBe(true)
     expect(buildButton.text()).toContain('Analizando...')
   })
 
