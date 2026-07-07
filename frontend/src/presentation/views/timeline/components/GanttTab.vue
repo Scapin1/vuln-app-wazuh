@@ -107,7 +107,7 @@ const toLocalDate = (d) => {
   if (d instanceof Date) return d
   const dateStr = d.split('T')[0]
   const parts = dateStr.split('-')
-  const base = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+  const base = new Date(Number.parseInt(parts[0]), Number.parseInt(parts[1]) - 1, Number.parseInt(parts[2]))
   if (d.includes('T')) {
     const timePart = d.split('T')[1]
     if (timePart) {
@@ -375,7 +375,7 @@ const timeLabels = computed(() => {
   const unit = zoomLevel.value.unit
 
   const labels = []
-  let current = new Date(start)
+  let current
 
   if (unit === 'year') {
     current = new Date(start.getFullYear(), 0, 1)

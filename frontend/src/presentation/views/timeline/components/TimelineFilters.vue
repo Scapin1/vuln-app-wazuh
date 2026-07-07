@@ -16,7 +16,7 @@
           <span>▼</span>
         </button>
         <div v-if="activeDropdown === 'agents'" class="dd-panel fade-in">
-          <input type="text" v-model="search.agent" placeholder="Buscar agente..." class="dd-search">
+          <input type="text" id="search-agent" v-model="search.agent" placeholder="Buscar agente..." class="dd-search" aria-label="Buscar agente">
           <div class="dd-actions">
             <span @click="selectedAgentsModel = [...agentOptions]">Todos</span>
             <span @click="selectedAgentsModel = []">Limpiar</span>
@@ -36,7 +36,7 @@
           <span>▼</span>
         </button>
         <div v-if="activeDropdown === 'vulns'" class="dd-panel fade-in">
-          <input type="text" v-model="search.vuln" placeholder="Buscar CVE..." class="dd-search">
+          <input type="text" id="search-vuln" v-model="search.vuln" placeholder="Buscar CVE..." class="dd-search" aria-label="Buscar CVE">
           <div class="dd-actions">
             <span @click="selectedVulnsModel = [...vulnOptions]">Todas</span>
             <span @click="selectedVulnsModel = []">Limpiar</span>

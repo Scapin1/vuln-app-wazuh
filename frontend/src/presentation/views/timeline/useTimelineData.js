@@ -1,4 +1,4 @@
-import { computed, ref, onUnmounted } from 'vue'
+import { computed, ref } from 'vue'
 import vulnService from '../../../application/services/vulnService'
 import { DAY_MS, HOUR_MS, alignHour, fmtDDMM, fmtHour, fmtYear } from './timelineFormatters'
 
