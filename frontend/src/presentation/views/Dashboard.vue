@@ -35,21 +35,21 @@
     <div class="card filter-panel">
       <div class="filter-row">
         <div class="f-group">
-          <label>Conexión Wazuh</label>
-          <select v-model="selectedConnection" @change="onConnectionChange" class="filter-input">
+          <label for="dashboard-connection">Conexión Wazuh</label>
+          <select id="dashboard-connection" v-model="selectedConnection" @change="onConnectionChange" class="filter-input">
             <option value="" disabled>Selecciona servidor...</option>
             <option v-for="conn in connections" :key="conn.id" :value="conn.id">{{ conn.name }}</option>
           </select>
         </div>
 
         <div class="f-group popover-wrap" v-click-outside="() => (activeDropdown = '')">
-          <label>Equipos / Agentes</label>
+          <span class="f-group-label">Equipos / Agentes</span>
           <button class="filter-input dd-btn" @click="activeDropdown = activeDropdown === 'agents' ? '' : 'agents'" :disabled="!agentOptions.length">
             <span :class="selectedAgents.length ? 'sel-badge' : ''">{{ selectedAgents.length ? selectedAgents.length + ' sel.' : 'Todos' }}</span>
             <span>▼</span>
           </button>
           <div v-if="activeDropdown === 'agents'" class="dd-panel fade-in">
-            <input type="text" v-model="search.agent" placeholder="Buscar agente..." class="dd-search">
+            <input type="text" id="dashboard-search-agent" v-model="search.agent" placeholder="Buscar agente..." class="dd-search" aria-label="Buscar agente">
             <div class="dd-actions">
               <span @click="selectedAgents = [...agentOptions]">Todos</span>
               <span @click="selectedAgents = []">Limpiar</span>
@@ -63,13 +63,13 @@
         </div>
 
         <div class="f-group popover-wrap" v-click-outside="() => (activeDropdown = '')">
-          <label>CVE ID</label>
+          <span class="f-group-label">CVE ID</span>
           <button class="filter-input dd-btn" @click="activeDropdown = activeDropdown === 'vulns' ? '' : 'vulns'" :disabled="!vulnOptions.length">
             <span :class="selectedVulns.length ? 'sel-badge' : ''">{{ selectedVulns.length ? selectedVulns.length + ' sel.' : 'Todas' }}</span>
             <span>▼</span>
           </button>
           <div v-if="activeDropdown === 'vulns'" class="dd-panel fade-in">
-            <input type="text" v-model="search.vuln" placeholder="Buscar CVE..." class="dd-search">
+            <input type="text" id="dashboard-search-vuln" v-model="search.vuln" placeholder="Buscar CVE..." class="dd-search" aria-label="Buscar CVE">
             <div class="dd-actions">
               <span @click="selectedVulns = [...vulnOptions]">Todas</span>
               <span @click="selectedVulns = []">Limpiar</span>
@@ -83,7 +83,7 @@
         </div>
 
         <div class="f-group popover-wrap" v-click-outside="() => (activeDropdown = '')">
-          <label>Severidad</label>
+          <span class="f-group-label">Severidad</span>
           <button class="filter-input dd-btn" @click="activeDropdown = activeDropdown === 'severity' ? '' : 'severity'" :disabled="!severityOptions.length">
             <span :class="selectedSeverities.length ? 'sel-badge' : ''">{{ selectedSeverities.length ? selectedSeverities.length + ' sel.' : 'Todas' }}</span>
             <span>▼</span>
@@ -103,7 +103,7 @@
         </div>
 
         <div class="f-group">
-          <label>Periodo</label>
+          <span class="f-group-label">Periodo</span>
           <div class="chip-row">
             <button
               v-for="p in periods"
@@ -118,8 +118,8 @@
         </div>
 
         <div class="f-group" v-if="period === 'day'">
-          <label>Dia</label>
-          <input type="date" v-model="customDate" class="filter-input">
+          <label for="dashboard-date">Dia</label>
+          <input id="dashboard-date" type="date" v-model="customDate" class="filter-input">
         </div>
 
         <div class="f-group f-action">
@@ -521,7 +521,7 @@ onUnmounted(() => {
   border-right: none;
 }
 
-.f-group label {
+.f-group label, .f-group .f-group-label {
   font-size: 0.7rem;
   font-weight: 700;
   color: var(--text-muted);
@@ -720,7 +720,7 @@ onUnmounted(() => {
 
 .loading-detail {
   font-size: 0.8rem;
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted, #475569);
   margin: 0.2rem 0 0 0;
 }
 
@@ -752,7 +752,7 @@ onUnmounted(() => {
   border: 1px solid var(--border, #e2e8f0);
   border-radius: 4px;
   background: white;
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted, #475569);
   cursor: pointer;
   transition: all 0.2s;
 }

@@ -335,7 +335,7 @@ describe('GanttTab.vue', () => {
     it('marks CVE-2026-0004 as resolved (last snapshot has 0 agents)', () => {
       const wrapper = emptyWrapper()
       const cve = wrapper.vm.cveSnapshots.find(c => c.cve_id === 'CVE-2026-0004')
-      expect(cve).toBeTruthy()
+      expect(cve).toBeDefined()
       expect(cve.isResolved).toBe(true)
       const lastSnap = cve.snapshots[cve.snapshots.length - 1]
       expect(lastSnap.agentCount).toBe(0)
@@ -396,7 +396,7 @@ describe('GanttTab.vue', () => {
       })
 
       const cve = wrapper.vm.cveSnapshots.find(c => c.cve_id === 'CVE-MULTI')
-      expect(cve).toBeTruthy()
+      expect(cve).toBeDefined()
       // 3 unique timestamps: Feb 1 (agent-01 first seen),
       // Mar 1 (agent-02 first seen), Apr 1 (agent-01 history RESOLVED)
       expect(cve.snapshots.length).toBe(3)
@@ -414,7 +414,7 @@ describe('GanttTab.vue', () => {
 
       // The snapshot at '2026-03-01' has only agent-02
       const marSnap = cve.snapshots.find(s => s.syncTimestamp.includes('2026-03-01'))
-      expect(marSnap).toBeTruthy()
+      expect(marSnap).toBeDefined()
       expect(marSnap.agentCount).toBe(1)
       expect(marSnap.agents).toContain('agent-02')
     })
@@ -457,14 +457,14 @@ describe('GanttTab.vue', () => {
       })
 
       const cve = wrapper.vm.cveSnapshots.find(c => c.cve_id === 'CVE-SHARED-SYNC')
-      expect(cve).toBeTruthy()
+      expect(cve).toBeDefined()
 
       // 4 snapshots: 3 unique first_seen + 1 shared sync last_seen
       expect(cve.snapshots.length).toBe(4)
 
       // The shared sync snapshot has all 3 agents
       const syncSnap = cve.snapshots.find(s => s.syncTimestamp.includes('2026-06-01'))
-      expect(syncSnap).toBeTruthy()
+      expect(syncSnap).toBeDefined()
       expect(syncSnap.agentCount).toBe(3)
       expect(syncSnap.agents).toContain('server-a')
       expect(syncSnap.agents).toContain('server-b')
@@ -641,7 +641,7 @@ describe('GanttTab.vue', () => {
       wrapper.vm.handleBarMouseEnter(snap, cve, event)
 
       expect(wrapper.vm.isHovering).toBe(true)
-      expect(wrapper.vm.hoveredSnapshot).toBeTruthy()
+      expect(wrapper.vm.hoveredSnapshot).not.toBeNull()
       expect(wrapper.vm.hoveredSnapshot.cve_id).toBe(cve.cve_id)
       expect(wrapper.vm.hoveredSnapshot.syncTimestamp).toBe(snap.syncTimestamp)
       expect(wrapper.vm.tooltipPos.x).toBe(112) // clientX + 12

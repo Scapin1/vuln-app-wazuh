@@ -276,7 +276,7 @@ const statusWarning = computed(() => warningMessage.value)
 
 .loading-detail {
   font-size: 0.8rem;
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted, #475569);
   margin: 0.2rem 0 0 0;
 }
 
@@ -308,7 +308,7 @@ const statusWarning = computed(() => warningMessage.value)
   border: 1px solid var(--border, #e2e8f0);
   border-radius: 4px;
   background: white;
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted, #475569);
   cursor: pointer;
   transition: all 0.2s;
 }

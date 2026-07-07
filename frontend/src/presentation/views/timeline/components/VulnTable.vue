@@ -285,7 +285,7 @@ const getTimelineProgress = (vuln) => {
   if (!vuln.first_seen || !vuln.last_seen) return 0
   const first = new Date(vuln.first_seen).getTime()
   const last = new Date(vuln.last_seen).getTime()
-  const now = new Date().getTime()
+  const now = Date.now()
 
   if (last === first) return 0
 
@@ -297,7 +297,7 @@ const getTimelineProgress = (vuln) => {
 
 const timeAgo = (date) => {
   if (!date) return 'N/A'
-  const seconds = Math.floor((new Date() - new Date(date)) / 1000)
+  const seconds = Math.floor((Date.now() - new Date(date)) / 1000)
 
   let interval = seconds / 31536000
   if (interval > 1) return `Hace ${Math.floor(interval)} años`
@@ -432,7 +432,7 @@ watch(() => props.vulns, () => { currentPage.value = 1 })
 
 .start .point-marker {
   background-color: #f3f4f6;
-  color: #6b7280;
+  color: #475569;
   border: 1px solid #e5e7eb;
 }
 
@@ -452,7 +452,7 @@ watch(() => props.vulns, () => { currentPage.value = 1 })
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.025em;
-  color: #9ca3af;
+  color: #64748b;
   font-weight: 600;
 }
 

@@ -36,7 +36,7 @@ describe('TimelineFilters.vue', () => {
     expect(select.exists()).toBe(true)
 
     await select.setValue('1')
-    expect(wrapper.emitted('update:selectedConnection')).toBeTruthy()
+    expect(wrapper.emitted('update:selectedConnection')).toHaveLength(1)
     expect(wrapper.emitted('update:selectedConnection')[0]).toEqual([1])
   })
 
@@ -101,7 +101,7 @@ describe('TimelineFilters.vue', () => {
 
     // Click '7d' chip
     await chips[1].trigger('click')
-    expect(wrapper.emitted('set-period')).toBeTruthy()
+    expect(wrapper.emitted('set-period')).toHaveLength(1)
     expect(wrapper.emitted('set-period')[0]).toContain('7d')
   })
 
@@ -145,7 +145,7 @@ describe('TimelineFilters.vue', () => {
     })
 
     await wrapper.find('.btn-primary').trigger('click')
-    expect(wrapper.emitted('build')).toBeTruthy()
+    expect(wrapper.emitted('build')).toHaveLength(1)
   })
 
   it('disables build button when no connection selected', () => {
@@ -214,7 +214,7 @@ describe('TimelineFilters.vue', () => {
     const todosButton = ddActions.findAll('span')[0]
     await todosButton.trigger('click')
 
-    expect(wrapper.emitted('update:selectedAgents')).toBeTruthy()
+    expect(wrapper.emitted('update:selectedAgents')).toHaveLength(1)
     expect(wrapper.emitted('update:selectedAgents')[0][0]).toHaveLength(3)
   })
 
@@ -237,7 +237,7 @@ describe('TimelineFilters.vue', () => {
     const clearButton = ddActions.findAll('span')[1]
     await clearButton.trigger('click')
 
-    expect(wrapper.emitted('update:selectedAgents')).toBeTruthy()
+    expect(wrapper.emitted('update:selectedAgents')).toHaveLength(1)
     expect(wrapper.emitted('update:selectedAgents')[0][0]).toHaveLength(0)
   })
 
@@ -255,7 +255,7 @@ describe('TimelineFilters.vue', () => {
     const todosButton = wrapper.findAll('.dd-panel .dd-actions span')[0]
     await todosButton.trigger('click')
 
-    expect(wrapper.emitted('update:selectedVulns')).toBeTruthy()
+    expect(wrapper.emitted('update:selectedVulns')).toHaveLength(1)
     expect(wrapper.emitted('update:selectedVulns')[0][0]).toHaveLength(defaultProps.vulnOptions.length)
   })
 
@@ -349,7 +349,7 @@ describe('TimelineFilters.vue', () => {
     const dateInput = wrapper.find('input[type="date"]')
     await dateInput.setValue('2026-03-10')
 
-    expect(wrapper.emitted('update:customDate')).toBeTruthy()
+    expect(wrapper.emitted('update:customDate')).toHaveLength(1)
     expect(wrapper.emitted('update:customDate')[0]).toEqual(['2026-03-10'])
   })
 })
