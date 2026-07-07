@@ -443,7 +443,7 @@ def parse_wazuh_date(date_str: str):
 async def list_vulns(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-    limit: Annotated[int, Query(ge=1, le=100)] = 10,
+    limit: Annotated[int, Query(ge=1, le=10000)] = 100,
     offset: Annotated[int, Query(ge=0)] = 0,
     connection_id: Optional[int] = None,
 ):

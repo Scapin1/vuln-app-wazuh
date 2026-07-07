@@ -4,6 +4,7 @@ import Dashboard from '../views/Dashboard.vue'
 import ConfigUser from '../views/ConfigUser.vue'
 import ConfigWazuh from '../views/ConfigWazuh.vue'
 import Timeline from '../views/Timeline.vue'
+import VulnAnalytics from '../views/VulnAnalytics.vue'
 import ChangePassword from '../views/ChangePassword.vue'
 import NotFound from '../views/NotFound.vue'
 import userService from '../../application/services/userService'
@@ -14,6 +15,7 @@ const routes = [
   { path: '/', redirect: '/login' },
   { path: '/dashboard', name: 'Dashboard', component: Dashboard, meta: { requiresAuth: true } },
   { path: '/timeline', name: 'Timeline', component: Timeline, meta: { requiresAuth: true } },
+  { path: '/vuln-analytics', name: 'VulnAnalytics', component: VulnAnalytics, meta: { requiresAuth: true } },
   { path: '/config-user', name: 'ConfigUser', component: ConfigUser, meta: { requiresAuth: true } },
   { path: '/config-wazuh', name: 'ConfigWazuh', component: ConfigWazuh, meta: { requiresAuth: true } },
   { path: '/change-password', name: 'ChangePassword', component: ChangePassword, meta: { requiresAuth: true } },

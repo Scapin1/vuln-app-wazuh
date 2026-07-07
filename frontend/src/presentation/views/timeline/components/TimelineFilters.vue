@@ -49,6 +49,21 @@
         </div>
       </div>
 
+      <div class="f-group" v-if="severityOptions?.length">
+        <label>Criticidad</label>
+        <div class="chip-row">
+          <button
+            v-for="sev in severityOptions"
+            :key="sev.value"
+            class="chip"
+            :class="{ on: selectedSeveritiesModel.includes(sev.value) }"
+            @click="toggleSeverity(sev.value)"
+          >
+            {{ sev.label }}
+          </button>
+        </div>
+      </div>
+
       <div class="f-group">
         <label>Periodo</label>
         <div class="chip-row">
@@ -88,6 +103,8 @@ const props = defineProps({
   selectedConnection: { type: [String, Number], default: '' },
   selectedAgents: { type: Array, required: true },
   selectedVulns: { type: Array, required: true },
+  severityOptions: { type: Array, default: null },
+  selectedSeverities: { type: Array, default: () => [] },
   period: { type: String, required: true },
   periods: { type: Array, required: true },
   customDate: { type: String, required: true },
@@ -98,6 +115,7 @@ const emit = defineEmits([
   'update:selectedConnection',
   'update:selectedAgents',
   'update:selectedVulns',
+  'update:selectedSeverities',
   'update:customDate',
   'connection-change',
   'set-period',
@@ -134,6 +152,19 @@ const filteredAgents = computed(() =>
 const filteredVulns = computed(() =>
   props.vulnOptions.filter(vuln => vuln.toLowerCase().includes(search.vuln.toLowerCase()))
 )
+
+const selectedSeveritiesModel = computed({
+  get: () => props.selectedSeverities,
+  set: value => emit('update:selectedSeverities', value)
+})
+
+const toggleSeverity = (sev) => {
+  const current = [...props.selectedSeverities]
+  const idx = current.indexOf(sev)
+  if (idx >= 0) current.splice(idx, 1)
+  else current.push(sev)
+  emit('update:selectedSeverities', current)
+}
 </script>
 
 <style scoped>
