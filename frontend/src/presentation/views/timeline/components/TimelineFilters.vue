@@ -1,5 +1,5 @@
 <template>
-  <div class="card filter-panel">
+  <div class="card filter-panel" :class="{ compact }">
     <div class="filter-row">
       <div class="f-group">
         <label>Conexion Wazuh</label>
@@ -108,7 +108,8 @@ const props = defineProps({
   period: { type: String, required: true },
   periods: { type: Array, required: true },
   customDate: { type: String, required: true },
-  loading: { type: Boolean, default: false }
+  loading: { type: Boolean, default: false },
+  compact: { type: Boolean, default: false }
 })
 
 const emit = defineEmits([
@@ -192,5 +193,33 @@ const toggleSeverity = (sev) => {
 @media (max-width: 1400px) {
   .filter-row { grid-template-columns: 1fr 1fr; }
   .f-group { border-right: none; border-bottom: 1px solid var(--border); }
+}
+
+/* ── Compact mode ── */
+.compact .filter-row {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.compact .f-group {
+  padding: 0.5rem 0.8rem;
+}
+
+.compact .f-group label {
+  margin-bottom: 0.3rem;
+}
+
+.compact .filter-input,
+.compact .dd-btn {
+  padding: 0.4rem 0.6rem;
+  font-size: 0.75rem;
+}
+
+.compact .chip {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.68rem;
+}
+
+.compact .dd-panel {
+  width: 240px;
 }
 </style>
