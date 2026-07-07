@@ -22,7 +22,7 @@
     </div>
 
     <!-- Pie Charts Row (always visible when we have data) -->
-    <div v-if="hasBuilt && dashboardData.length > 0" class="charts-row">
+    <div v-if="hasBuilt && store.dashboardVulns.length > 0" class="charts-row">
       <div class="chart-col">
         <SeverityChart :data="severityDistribution" />
       </div>
@@ -135,21 +135,12 @@
       <div class="loading-progress">
         <div class="loading-info">
           <p class="loading-message">{{ loadingMessage || 'Cargando...' }}</p>
-          <p v-if="fetchProgress.current > 0" class="loading-detail">
-            Página {{ fetchProgress.current }}
-          </p>
-          <p v-if="fetchProgress.done" class="loading-detail loading-done">
-            {{ fetchProgress.current }} páginas cargadas
-          </p>
-          <p v-if="elapsedSeconds >= 3" class="loading-detail">
-            {{ elapsedSeconds }}s transcurridos
-          </p>
+          <p class="loading-detail">Obteniendo datos de vulnerabilidades...</p>
         </div>
       </div>
       <div class="loading-bar-track">
-        <div class="loading-bar-fill" :style="{ width: loadingBarWidth + '%' }"></div>
+        <div class="loading-bar-fill loading-bar-ani"></div>
       </div>
-      <button v-if="!fetchProgress.done" class="btn btn-cancel" @click="cancelBuild">Cancelar</button>
     </div>
 
     <!-- Empty / Not built yet -->
@@ -160,7 +151,7 @@
 
     <!-- Content: GanttTab + VulnTable -->
     <template v-else-if="hasBuilt">
-      <div v-if="dashboardData.length === 0" class="card empty-card">
+      <div v-if="store.dashboardVulns.length === 0" class="card empty-card">
         <h3>Sin datos para mostrar</h3>
         <p>No se encontraron vulnerabilidades para los filtros seleccionados.</p>
       </div>
@@ -173,7 +164,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, reactive, onUnmounted } from 'vue'
+import { ref, onMounted, computed, reactive } from 'vue'
+import { useVulnStore } from '../../application/stores/vulnStore'
 import vulnService from '../../application/services/vulnService'
 import wazuhService from '../../application/services/wazuhService'
 import SeverityChart from './dashboard/components/SeverityChart.vue'
@@ -181,49 +173,16 @@ import StatusChart from './dashboard/components/StatusChart.vue'
 import VulnTable from './timeline/components/VulnTable.vue'
 import GanttTab from './timeline/components/GanttTab.vue'
 
+const store = useVulnStore()
+
 // State
-const dashboardData = ref([])
-const loading = ref(false)
 const syncing = ref(false)
 const error = ref('')
 const hasBuilt = ref(false)
 
-// Loading progress
-const loadingMessage = ref('')
-const elapsedSeconds = ref(0)
-const fetchProgress = ref({ current: 0 })
-let abortController = null
-let timerInterval = null
-
-const TICK_INTERVAL_MS = 1000
-const PAGE_SIZE = 10000
-
-const startTimer = () => {
-  elapsedSeconds.value = 0
-  clearInterval(timerInterval)
-  timerInterval = setInterval(() => { elapsedSeconds.value++ }, TICK_INTERVAL_MS)
-}
-
-const stopTimer = () => {
-  clearInterval(timerInterval)
-  timerInterval = null
-}
-
-const cancelBuild = () => {
-  if (abortController) {
-    abortController.abort()
-    abortController = null
-  }
-  stopTimer()
-  loading.value = false
-  loadingMessage.value = 'Operación cancelada'
-  fetchProgress.value = { current: 0 }
-}
-
-const loadingBarWidth = computed(() => {
-  if (fetchProgress.value.done) return 100
-  return Math.min(fetchProgress.value.current * 20, 80)
-})
+// Loading from store
+const loading = computed(() => store.loading)
+const loadingMessage = computed(() => store.loading ? 'Cargando datos...' : '')
 
 // Connections
 const connections = ref([])
@@ -244,7 +203,7 @@ const periods = [
   { l: 'Todo', v: 'all' }
 ]
 
-// Filter options (populated from fetched data)
+// Filter options (populated from store)
 const agentOptions = ref([])
 const vulnOptions = ref([])
 const severityOptions = ref([])
@@ -271,113 +230,73 @@ const getSeverityLevel = (s) => {
   return 1
 }
 
-const updateFilterOptions = () => {
-  const agents = new Set()
-  const vulnIds = new Set()
-  const severities = new Set()
-
-  dashboardData.value.forEach(vuln => {
-    if (vuln.agent_name) agents.add(vuln.agent_name)
-    if (vuln.cve_id) vulnIds.add(vuln.cve_id)
-    if (vuln.severity) severities.add(vuln.severity.toUpperCase())
-  })
-
-  agentOptions.value = Array.from(agents).sort()
-  vulnOptions.value = Array.from(vulnIds).sort()
-  severityOptions.value = Array.from(severities).sort((a, b) => {
-    const levelA = getSeverityLevel(a.toLowerCase())
-    const levelB = getSeverityLevel(b.toLowerCase())
-    return levelB - levelA
-  })
-}
-
-// Filtering (client-side after build)
-const filteredVulns = computed(() => {
-  return dashboardData.value.filter(vuln => {
-    const byConnection = !selectedConnection.value || vuln.connection_id === selectedConnection.value
-    const byAgent = selectedAgents.value.length === 0 || selectedAgents.value.includes(vuln.agent_name)
-    const byVuln = selectedVulns.value.length === 0 || selectedVulns.value.includes(vuln.cve_id)
-    const bySeverity = selectedSeverities.value.length === 0 || selectedSeverities.value.includes((vuln.severity || 'UNKNOWN').toUpperCase())
-    return byConnection && byAgent && byVuln && bySeverity
-  })
-})
-
-// Chart distributions
+// Chart distributions from store
 const severityDistribution = computed(() => {
-  const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
-  filteredVulns.value.forEach(v => {
-    const sev = (v.severity || 'LOW').toUpperCase()
-    if (counts[sev] !== undefined) counts[sev]++
-  })
-  return counts
+  return store.dashboardVulns.length
+    ? store.dashboardVulns.reduce((acc, v) => {
+        const sev = (v.severity || 'LOW').toUpperCase()
+        if (acc[sev] !== undefined) acc[sev]++
+        return acc
+      }, { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 })
+    : { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
 })
 
 const statusDistribution = computed(() => {
-  const counts = { Detected: 0, Resolved: 0, 'Re-emerged': 0 }
-  dashboardData.value.forEach(v => {
-    if (v.status && counts[v.status] !== undefined) counts[v.status]++
+  return store.dashboardVulns.length
+    ? store.dashboardVulns.reduce((acc, v) => {
+        if (v.status && acc[v.status] !== undefined) acc[v.status]++
+        return acc
+      }, { Detected: 0, Resolved: 0, 'Re-emerged': 0 })
+    : { Detected: 0, Resolved: 0, 'Re-emerged': 0 }
+})
+
+// Client-side filtering on cached vulns
+const filteredVulns = computed(() => {
+  return (store.dashboardVulns || []).filter(vuln => {
+    const byAgent = selectedAgents.value.length === 0 || selectedAgents.value.includes(vuln.agent_name)
+    const byVuln = selectedVulns.value.length === 0 || selectedVulns.value.includes(vuln.cve_id)
+    const bySeverity = selectedSeverities.value.length === 0 || selectedSeverities.value.includes((vuln.severity || 'UNKNOWN').toUpperCase())
+    return byAgent && byVuln && bySeverity
   })
-  return counts
 })
 
 // Build function (called on "Generar Vista" click)
 const buildDashboard = async () => {
   if (!selectedConnection.value) return
 
-  loading.value = true
   error.value = ''
   hasBuilt.value = false
-  loadingMessage.value = ''
-  fetchProgress.value = { current: 0 }
-  startTimer()
-
-  abortController = new AbortController()
-  const signal = abortController.signal
+  store.invalidateCache()
 
   try {
-    let allData = []
-    let offset = 0
-    let pageNum = 0
-    while (true) {
-      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+    const result = await store.fetchDashboard(selectedConnection.value, period.value, customDate.value)
 
-      const res = await vulnService.getVulns({
-        connectionId: selectedConnection.value,
-        limit: PAGE_SIZE,
-        offset
-      }, { signal })
-      const data = Array.isArray(res.data) ? res.data : []
-      allData = allData.concat(data)
-      pageNum++
+    if (result && result.vulns) {
+      hasBuilt.value = true
+      // Extract filter options from cached vulns
+      const agents = new Set()
+      const vulnIds = new Set()
+      const severities = new Set()
 
-      fetchProgress.value = { current: pageNum }
-      loadingMessage.value = 'Obteniendo datos...'
+      store.dashboardVulns.forEach(vuln => {
+        if (vuln.agent_name) agents.add(vuln.agent_name)
+        if (vuln.cve_id) vulnIds.add(vuln.cve_id)
+        if (vuln.severity) severities.add(vuln.severity.toUpperCase())
+      })
 
-      if (data.length < PAGE_SIZE) break
-      offset += PAGE_SIZE
-    }
+      agentOptions.value = Array.from(agents).sort()
+      vulnOptions.value = Array.from(vulnIds).sort()
+      severityOptions.value = Array.from(severities).sort((a, b) => {
+        return getSeverityLevel(b) - getSeverityLevel(a)
+      })
 
-    fetchProgress.value = { current: pageNum, done: true }
-    loadingMessage.value = 'Procesando datos...'
-
-    dashboardData.value = allData
-    updateFilterOptions()
-    hasBuilt.value = true
-
-    if (!allData.length) {
-      error.value = 'No se encontraron vulnerabilidades para esta conexión.'
+      if (!store.dashboardVulns.length) {
+        error.value = 'No se encontraron vulnerabilidades para esta conexión.'
+      }
     }
   } catch (err) {
-    if (err.name === 'AbortError') {
-      loadingMessage.value = 'Operación cancelada'
-      return
-    }
-    console.error('Error fetching vulns:', err)
+    console.error('Error building dashboard:', err)
     error.value = 'Error al cargar vulnerabilidades. Verifica tu conexión Wazuh.'
-  } finally {
-    stopTimer()
-    loading.value = false
-    abortController = null
   }
 }
 
@@ -396,6 +315,7 @@ const onConnectionChange = () => {
   agentOptions.value = []
   vulnOptions.value = []
   severityOptions.value = []
+  store.clearConnectionData()
 }
 
 const fetchConnections = async () => {
@@ -425,10 +345,6 @@ const syncVulns = async () => {
 
 onMounted(() => {
   fetchConnections()
-})
-
-onUnmounted(() => {
-  stopTimer()
 })
 </script>
 
@@ -742,25 +658,16 @@ onUnmounted(() => {
   height: 100%;
   background: var(--primary, #3d6a00);
   border-radius: 3px;
-  transition: width 0.3s ease;
   width: 100%;
 }
 
-.btn-cancel {
-  padding: 0.4rem 1rem;
-  font-size: 0.8rem;
-  border: 1px solid var(--border, #e2e8f0);
-  border-radius: 4px;
-  background: white;
-  color: var(--text-muted, #475569);
-  cursor: pointer;
-  transition: all 0.2s;
+.loading-bar-ani {
+  animation: loadingPulse 1.5s ease-in-out infinite;
 }
 
-.btn-cancel:hover {
-  background: #fef2f2;
-  border-color: #f87171;
-  color: #dc2626;
+@keyframes loadingPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
 }
 
 @media (max-width: 1400px) {

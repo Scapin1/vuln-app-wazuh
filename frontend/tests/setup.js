@@ -1,5 +1,10 @@
 import { config } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import clickOutside from '@/presentation/directives/clickOutside'
+
+// Initialize Pinia globally for all tests
+const pinia = createPinia()
+config.global.plugins = [pinia]
 
 // Polyfill canvas 2D context for Chart.js in jsdom test environment
 if (typeof HTMLCanvasElement !== 'undefined' &&

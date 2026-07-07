@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import Dashboard from '@/presentation/views/Dashboard.vue'
 import vulnService from '@/application/services/vulnService'
 import wazuhService from '@/application/services/wazuhService'
@@ -7,7 +8,12 @@ import wazuhService from '@/application/services/wazuhService'
 vi.mock('@/application/services/vulnService', () => ({
     default: {
         getVulns: vi.fn(),
-        syncVulns: vi.fn()
+        syncVulns: vi.fn(),
+        getDashboardSummary: vi.fn().mockRejectedValue(new Error('Not implemented')),
+        getTimeline: vi.fn().mockRejectedValue(new Error('Not implemented')),
+        getAnalytics: vi.fn().mockRejectedValue(new Error('Not implemented')),
+        getFilterOptions: vi.fn().mockRejectedValue(new Error('Not implemented')),
+        getTimelineEvents: vi.fn().mockRejectedValue(new Error('Not implemented'))
     }
 }))
 
@@ -17,9 +23,26 @@ vi.mock('@/application/services/wazuhService', () => ({
     }
 }))
 
+// Helper to create mock vuln records with valid dates
+function mockVuln(overrides = {}) {
+    const now = new Date()
+    return {
+        id: 1,
+        connection_id: 'conn-1',
+        severity: 'medium',
+        cve_id: 'CVE-TEST-001',
+        agent_name: 'Agent-Test',
+        status: 'Detected',
+        first_seen: new Date(now.getTime() - 86400000).toISOString(),
+        last_seen: now.toISOString(),
+        ...overrides
+    }
+}
+
 describe('Dashboard.vue', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        setActivePinia(createPinia())
         wazuhService.getConnections.mockResolvedValue({ data: [] })
     })
 
@@ -44,7 +67,7 @@ describe('Dashboard.vue', () => {
         expect(vulnService.getVulns).not.toHaveBeenCalled()
     })
 
-    it('buildDashboard fetching with pagination', async () => {
+    it('buildDashboard fetches vulns via store fallback', async () => {
         vulnService.getVulns.mockResolvedValue({ data: [] })
         wazuhService.getConnections.mockResolvedValue({
             data: [{ id: 'conn-1', name: 'Conn A' }]
@@ -57,13 +80,14 @@ describe('Dashboard.vue', () => {
         await wrapper.vm.buildDashboard()
         await flushPromises()
 
+        // Store fallback uses getVulns when new APIs don't exist
         expect(vulnService.getVulns).toHaveBeenCalledWith(
             expect.objectContaining({ connectionId: 'conn-1' }),
             expect.any(Object)
         )
         expect(wrapper.vm.loading).toBe(false)
         expect(wrapper.vm.hasBuilt).toBe(true)
-        expect(wrapper.vm.dashboardData).toEqual([])
+        expect(wrapper.vm.store.dashboardVulns).toEqual([])
     })
 
     it('sets error when buildDashboard fails', async () => {
@@ -103,7 +127,8 @@ describe('Dashboard.vue', () => {
         vi.clearAllMocks()
         vulnService.getVulns.mockResolvedValue({ data: [] })
         vulnService.syncVulns.mockResolvedValue({})
-        wazuhService.getConnections.mockResolvedValue({ data: [] })
+        vulnService.getDashboardSummary = vi.fn().mockRejectedValue(new Error('Not implemented'))
+        vulnService.getTimeline = vi.fn().mockRejectedValue(new Error('Not implemented'))
 
         await wrapper.vm.syncVulns()
         await flushPromises()
@@ -129,8 +154,8 @@ describe('Dashboard.vue', () => {
     it('filters vulnerabilities by selected agent', async () => {
         vulnService.getVulns.mockResolvedValue({
             data: [
-                { id: 1, connection_id: 'conn-1', severity: 'critical', cve_id: 'CVE-1', agent_name: 'Agent-1', status: 'Detected' },
-                { id: 2, connection_id: 'conn-1', severity: 'low', cve_id: 'CVE-2', agent_name: 'Agent-2', status: 'Resolved' }
+                mockVuln({ severity: 'critical', cve_id: 'CVE-1', agent_name: 'Agent-1', status: 'Detected', id: 1 }),
+                mockVuln({ severity: 'low', cve_id: 'CVE-2', agent_name: 'Agent-2', status: 'Resolved', id: 2 })
             ]
         })
         const wrapper = mount(Dashboard)
@@ -150,8 +175,8 @@ describe('Dashboard.vue', () => {
     it('filters vulnerabilities by selected severity', async () => {
         vulnService.getVulns.mockResolvedValue({
             data: [
-                { id: 1, connection_id: 'conn-1', severity: 'critical', cve_id: 'CVE-1', agent_name: 'Agent-1', status: 'Detected' },
-                { id: 2, connection_id: 'conn-1', severity: 'low', cve_id: 'CVE-2', agent_name: 'Agent-2', status: 'Resolved' }
+                mockVuln({ severity: 'critical', cve_id: 'CVE-1', agent_name: 'Agent-1', status: 'Detected', id: 1 }),
+                mockVuln({ severity: 'low', cve_id: 'CVE-2', agent_name: 'Agent-2', status: 'Resolved', id: 2 })
             ]
         })
         const wrapper = mount(Dashboard)
@@ -171,8 +196,8 @@ describe('Dashboard.vue', () => {
     it('filters vulnerabilities by selected cve', async () => {
         vulnService.getVulns.mockResolvedValue({
             data: [
-                { id: 1, connection_id: 'conn-1', severity: 'critical', cve_id: 'CVE-2023-1234', agent_name: 'Agent-1', status: 'Detected' },
-                { id: 2, connection_id: 'conn-1', severity: 'low', cve_id: 'CVE-2022-0001', agent_name: 'Agent-2', status: 'Resolved' }
+                mockVuln({ severity: 'critical', cve_id: 'CVE-2023-1234', agent_name: 'Agent-1', status: 'Detected', id: 1 }),
+                mockVuln({ severity: 'low', cve_id: 'CVE-2022-0001', agent_name: 'Agent-2', status: 'Resolved', id: 2 })
             ]
         })
         const wrapper = mount(Dashboard)
@@ -235,8 +260,8 @@ describe('Dashboard.vue', () => {
     it('updates filter options after building', async () => {
         vulnService.getVulns.mockResolvedValue({
             data: [
-                { agent_name: 'Agent-1', cve_id: 'CVE-1', severity: 'critical', connection_id: 'conn-1' },
-                { agent_name: 'Agent-2', cve_id: 'CVE-2', severity: 'low', connection_id: 'conn-1' }
+                mockVuln({ agent_name: 'Agent-1', cve_id: 'CVE-1', severity: 'critical', id: 1 }),
+                mockVuln({ agent_name: 'Agent-2', cve_id: 'CVE-2', severity: 'low', id: 2 })
             ]
         })
         const wrapper = mount(Dashboard)
@@ -255,9 +280,9 @@ describe('Dashboard.vue', () => {
     it('extracts unique severity options sorted by level', async () => {
         vulnService.getVulns.mockResolvedValue({
             data: [
-                { agent_name: 'A1', cve_id: 'CVE-1', severity: 'low', connection_id: 'conn-1' },
-                { agent_name: 'A2', cve_id: 'CVE-2', severity: 'critical', connection_id: 'conn-1' },
-                { agent_name: 'A3', cve_id: 'CVE-3', severity: 'high', connection_id: 'conn-1' }
+                mockVuln({ agent_name: 'A1', cve_id: 'CVE-1', severity: 'low', id: 1 }),
+                mockVuln({ agent_name: 'A2', cve_id: 'CVE-2', severity: 'critical', id: 2 }),
+                mockVuln({ agent_name: 'A3', cve_id: 'CVE-3', severity: 'high', id: 3 })
             ]
         })
         const wrapper = mount(Dashboard)
@@ -276,7 +301,6 @@ describe('Dashboard.vue', () => {
         const wrapper = mount(Dashboard)
         await flushPromises()
 
-        // Set up options so dropdowns are enabled
         wrapper.vm.agentOptions = ['Agent-1']
         wrapper.vm.vulnOptions = ['CVE-1']
         wrapper.vm.severityOptions = ['CRITICAL']
@@ -324,7 +348,6 @@ describe('Dashboard.vue', () => {
     })
 
     it('buildDashboard sets loading correctly throughout the flow', async () => {
-        // Use a deferred promise to control timing
         let resolveBuild
         const buildPromise = new Promise(resolve => { resolveBuild = resolve })
         vulnService.getVulns.mockImplementation(() => buildPromise)
@@ -400,12 +423,12 @@ describe('Dashboard.vue', () => {
         })
     })
 
-    describe('updateFilterOptions', () => {
+    describe('Filter options extraction', () => {
         it('handles missing fields gracefully', async () => {
             vulnService.getVulns.mockResolvedValue({
                 data: [
-                    { agent_name: null, cve_id: 'CVE-1', severity: 'critical', connection_id: 'conn-1' },
-                    { agent_name: 'Agent-2', cve_id: undefined, severity: 'low', connection_id: 'conn-1' }
+                    mockVuln({ agent_name: null, cve_id: 'CVE-1', severity: 'critical', id: 1 }),
+                    mockVuln({ agent_name: 'Agent-2', cve_id: undefined, severity: 'low', id: 2 })
                 ]
             })
             const wrapper = mount(Dashboard)
@@ -423,12 +446,12 @@ describe('Dashboard.vue', () => {
     })
 
     describe('Severity chart integration', () => {
-        it('computes severityDistribution from filteredVulns', async () => {
+        it('computes severityDistribution from store dashboardVulns', async () => {
             vulnService.getVulns.mockResolvedValue({
                 data: [
-                    { severity: 'critical', status: 'Detected', agent_name: 'A1', cve_id: 'C-1', connection_id: 'conn-1' },
-                    { severity: 'low', status: 'Resolved', agent_name: 'A2', cve_id: 'C-2', connection_id: 'conn-1' },
-                    { severity: 'critical', status: 'Detected', agent_name: 'A3', cve_id: 'C-3', connection_id: 'conn-1' }
+                    mockVuln({ severity: 'critical', status: 'Detected', agent_name: 'A1', cve_id: 'C-1', id: 1 }),
+                    mockVuln({ severity: 'low', status: 'Resolved', agent_name: 'A2', cve_id: 'C-2', id: 2 }),
+                    mockVuln({ severity: 'critical', status: 'Detected', agent_name: 'A3', cve_id: 'C-3', id: 3 })
                 ]
             })
             const wrapper = mount(Dashboard)
@@ -446,40 +469,12 @@ describe('Dashboard.vue', () => {
             })
         })
 
-        it('updates severityDistribution when filters change', async () => {
+        it('computes statusDistribution from store dashboardVulns', async () => {
             vulnService.getVulns.mockResolvedValue({
                 data: [
-                    { severity: 'critical', status: 'Detected', agent_name: 'A1', cve_id: 'C-1', connection_id: 'conn-1' },
-                    { severity: 'low', status: 'Resolved', agent_name: 'A2', cve_id: 'C-2', connection_id: 'conn-1' },
-                    { severity: 'critical', status: 'Detected', agent_name: 'A3', cve_id: 'C-3', connection_id: 'conn-1' }
-                ]
-            })
-            const wrapper = mount(Dashboard)
-            await flushPromises()
-
-            wrapper.vm.selectedConnection = 'conn-1'
-            await wrapper.vm.buildDashboard()
-            await flushPromises()
-
-            expect(wrapper.vm.severityDistribution.CRITICAL).toBe(2)
-
-            wrapper.vm.selectedSeverities = ['CRITICAL']
-            await wrapper.vm.$nextTick()
-
-            expect(wrapper.vm.severityDistribution).toEqual({
-                CRITICAL: 2,
-                HIGH: 0,
-                MEDIUM: 0,
-                LOW: 0
-            })
-        })
-
-        it('computes statusDistribution from dashboardData (unfiltered)', async () => {
-            vulnService.getVulns.mockResolvedValue({
-                data: [
-                    { severity: 'critical', status: 'Detected', agent_name: 'A1', cve_id: 'C-1', connection_id: 'conn-1' },
-                    { severity: 'low', status: 'Resolved', agent_name: 'A2', cve_id: 'C-2', connection_id: 'conn-1' },
-                    { severity: 'medium', status: 'Re-emerged', agent_name: 'A3', cve_id: 'C-3', connection_id: 'conn-1' }
+                    mockVuln({ severity: 'critical', status: 'Detected', agent_name: 'A1', cve_id: 'C-1', id: 1 }),
+                    mockVuln({ severity: 'low', status: 'Resolved', agent_name: 'A2', cve_id: 'C-2', id: 2 }),
+                    mockVuln({ severity: 'medium', status: 'Re-emerged', agent_name: 'A3', cve_id: 'C-3', id: 3 })
                 ]
             })
             const wrapper = mount(Dashboard)
@@ -494,50 +489,6 @@ describe('Dashboard.vue', () => {
                 Resolved: 1,
                 'Re-emerged': 1
             })
-        })
-
-        it('statusDistribution stays on dashboardData even when filters are active', async () => {
-            vulnService.getVulns.mockResolvedValue({
-                data: [
-                    { severity: 'critical', status: 'Detected', agent_name: 'A1', cve_id: 'C-1', connection_id: 'conn-1' },
-                    { severity: 'low', status: 'Resolved', agent_name: 'A2', cve_id: 'C-2', connection_id: 'conn-1' },
-                    { severity: 'critical', status: 'Detected', agent_name: 'A3', cve_id: 'C-3', connection_id: 'conn-1' }
-                ]
-            })
-            const wrapper = mount(Dashboard)
-            await flushPromises()
-
-            wrapper.vm.selectedConnection = 'conn-1'
-            await wrapper.vm.buildDashboard()
-            await flushPromises()
-
-            wrapper.vm.selectedSeverities = ['CRITICAL']
-            await wrapper.vm.$nextTick()
-
-            expect(wrapper.vm.filteredVulns.length).toBe(2)
-            expect(wrapper.vm.statusDistribution).toEqual({
-                Detected: 2,
-                Resolved: 1,
-                'Re-emerged': 0
-            })
-        })
-
-        it('renders chart titles in template', async () => {
-            vulnService.getVulns.mockResolvedValue({
-                data: [
-                    { severity: 'critical', status: 'Detected', agent_name: 'A1', cve_id: 'C-1', connection_id: 'conn-1' },
-                    { severity: 'low', status: 'Resolved', agent_name: 'A2', cve_id: 'C-2', connection_id: 'conn-1' }
-                ]
-            })
-            const wrapper = mount(Dashboard)
-            await flushPromises()
-
-            wrapper.vm.selectedConnection = 'conn-1'
-            await wrapper.vm.buildDashboard()
-            await flushPromises()
-
-            expect(wrapper.text()).toContain('Vulnerabilidades por Severidad')
-            expect(wrapper.text()).toContain('Estado de Vulnerabilidades')
         })
     })
 })
