@@ -51,22 +51,26 @@ Ahora el backend calcula las distribuciones directamente en DB.
 
 ---
 
-### 2. Timeline / Gantt Data (paginado)
+### 2. Timeline Gantt (CVE Snapshots — paginado)
 
 ```
-GET /api/vulns/timeline?connection_id={id}&period={period}&page={n}&per_page={n}
+GET /api/vulns/timeline/gantt?connection_id={id}&period={period}&page={n}&per_page={n}&agent={name}&severity={level}&search={text}
 ```
 
-**Purpose**: Reemplaza `GanttTab.vue buildCveSnapshots()` — el backend agrupa por CVE y construye snapshots.
-Acepta los mismos filtros que dashboard + paginación.
+**Purpose**: Reemplaza `GanttTab.vue buildCveSnapshots()`. El backend agrupa por `cve_id`,
+colecta los `sync_timestamp` (momentos de sincronización Wazuh), y arma snapshots
+con los agentes afectados en cada timestamp. El frontend evita traer TODAS las vulns.
 
-| Param          | Type   | Default | Description                      |
-| -------------- | ------ | ------- | -------------------------------- |
-| `connection_id` | int    | —       | ID de conexión (requerido)       |
-| `period`        | string | `30d`   | `24h`, `7d`, `30d`, `all`        |
-| `date`          | string | —       | Si `period=day`, fecha `YYYY-MM-DD` |
-| `page`          | int    | `1`     | Número de página                 |
-| `per_page`      | int    | `50`    | Items por página (max 100)       |
+| Param          | Type   | Default | Description                                      |
+| -------------- | ------ | ------- | ------------------------------------------------ |
+| `connection_id` | int    | —       | ID de conexión (requerido)                       |
+| `period`        | string | `all`   | `24h`, `7d`, `30d`, `all`. Filtra CVEs activos en el período |
+| `date`          | string | —       | Si `period=day`, fecha `YYYY-MM-DD`              |
+| `agent`         | string | —       | Filtrar por agent_name                           |
+| `severity`      | string | —       | Filtrar por severity: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW` |
+| `search`        | string | —       | Búsqueda parcial en `cve_id` o `description`     |
+| `page`          | int    | `1`     | Número de página                                 |
+| `per_page`      | int    | `20`    | Items por página. El frontend usa 20.            |
 
 **Response** (200):
 ```json
@@ -88,23 +92,59 @@ Acepta los mismos filtros que dashboard + paginación.
           "agents": ["srv-web-01", "srv-db-02"]
         }
       ],
-      "first_seen": "2026-03-01T00:00:00Z",
-      "last_seen": "2026-04-01T00:00:00Z",
+      "first_sync": "2026-03-01T00:00:00Z",
+      "last_sync": "2026-04-01T00:00:00Z",
       "is_resolved": false
     }
   ],
   "total_cves": 10234,
-  "total_pages": 205,
+  "total_pages": 512,
   "current_page": 1,
-  "per_page": 50
+  "per_page": 20,
+  "min_timestamp": "2024-01-15T00:00:00Z",
+  "max_timestamp": "2026-07-07T00:00:00Z"
 }
 ```
 
-**Importante**: Los `sync_timestamp` deben ser strings ISO8601, NO timestamps numéricos.
-El frontend usa `new Date()` directo.
+**Campos críticos:**
 
-**Paginación**: El frontend usa `total_pages` para mostrar controles. Si `total_pages=1`,
-oculta la paginación.
+- **`sync_timestamp`** (dentro de cada snapshot): momentos de sincronización Wazuh donde se detectó
+  vulnerabilidad. ISO8601 string. El frontend usa `new Date()` directo.
+- **`agents`**: lista de agent_name afectados en ese timestamp. Si hay 500+ agentes por CVE,
+  puede omitirse y mandar solo `agent_count` (el tooltip mostrará "N agentes afectados" sin nombres).
+  El frontend es robusto a `agents: undefined` o `agents: []`.
+- **`is_resolved`**: `true` SOLO cuando el ULTIMO snapshot de ese CVE tiene `agent_count: 0`
+  (todos los agentes resolvieron la vulnerabilidad). NO se define por un campo en la tabla de vulns,
+  sino por la ausencia de agentes en el último snapshot.
+- **`first_sync`** / **`last_sync`**: primer y último timestamp del array de snapshots.
+  Usados para calcular duración de la barra.
+- **`min_timestamp` / `max_timestamp`** (metadata global): El rango de tiempo total considerando
+  TODOS los CVEs del conjunto filtrado (no solo de esta página). El frontend NECESITA esto para
+  dibujar el header del timeline (etiquetas de meses/años). Sin esto, solo vería el rango de la
+  página actual, que es muy angosto.
+
+**Cómo se construyen los snapshots (backend):**
+
+```
+Por cada vuln record único (cve_id + agent_name + sync_timestamp):
+  1. Agrupar todos los registros por cve_id
+  2. Para cada CVE, colectar todos los (sync_timestamp, agent_name) únicos
+  3. Ordenar timestamps ascendente
+  4. Cada timestamp único → un snapshot con:
+     - sync_timestamp
+     - agent_count = cantidad de agentes únicos en ese timestamp
+     - agents = lista de agentes (opcional, solo si < umbral)
+  5. is_resolved = el último snapshot tiene agent_count === 0
+  6. Calcular min/max global sobre TODOS los CVEs (no solo esta página)
+```
+
+**Snapshot merging**: El frontend MERGEA snapshots cercanos según el nivel de zoom (año/mes/día/hora).
+El backend debe devolver TODOS los snapshots, SIN mergear. El merge depende del zoom actual que
+cambia dinámicamente.
+
+**Performance**: Si hay CVEs con 10.000+ snapshots (vuln que se detecta/resuelve/reabre constantemente
+con cada sync), considerar limitar a los últimos 1000 snapshots por CVE o muestrear. El frontend
+mergea por zoom así que no pierde precisión visible.
 
 ---
 

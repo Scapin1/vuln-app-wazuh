@@ -178,9 +178,9 @@ export const useVulnStore = defineStore('vulns', () => {
   }
 
   // ── Timeline / Gantt Data ──
-  async function fetchTimeline(connectionId, period, customDate, page = 1, perPage = 50) {
+  async function fetchTimeline(connectionId, period, customDate, page = 1, perPage = 20, filters = {}) {
     activeConnectionId.value = connectionId
-    const cacheType = `timeline:${period}:${customDate || ''}`
+    const cacheType = `timeline:${period}:${customDate || ''}:${page}:${perPage}`
     const cached = getCached(cacheType)
     if (cached) return cached
 
@@ -189,10 +189,9 @@ export const useVulnStore = defineStore('vulns', () => {
 
     try {
       // Try new API endpoint
-      const res = await vulnService.getTimeline(connectionId, period, customDate, page, perPage)
+      const res = await vulnService.getTimeline(connectionId, period, customDate, page, perPage, filters)
       const data = res.data
-      setCache(cacheType, data)
-      // If we got paginated data, we need ALL pages cached. Only cache if page=1
+      // Cache only first page (pagination is cheap, don't cache every page)
       if (page === 1) setCache(cacheType, data)
       return data
     } catch (apiErr) {
@@ -200,6 +199,14 @@ export const useVulnStore = defineStore('vulns', () => {
       const allVulns = await fetchAllVulns(connectionId)
       const filtered = filterByPeriod(allVulns, period, customDate)
       const cves = buildCveSnapshots(filtered)
+
+      // Compute global min/max across all CVEs for timeline header
+      let minTimestamp = null
+      let maxTimestamp = null
+      cves.forEach(cve => {
+        if (cve.firstSync && (!minTimestamp || cve.firstSync < minTimestamp)) minTimestamp = cve.firstSync
+        if (cve.lastSync && (!maxTimestamp || cve.lastSync > maxTimestamp)) maxTimestamp = cve.lastSync
+      })
 
       const totalPages = Math.max(1, Math.ceil(cves.length / perPage))
       const start = (page - 1) * perPage
@@ -210,7 +217,9 @@ export const useVulnStore = defineStore('vulns', () => {
         total_cves: cves.length,
         total_pages: totalPages,
         current_page: page,
-        per_page: perPage
+        per_page: perPage,
+        min_timestamp: minTimestamp,
+        max_timestamp: maxTimestamp
       }
 
       // Only cache first page (full dataset is too large)
@@ -410,7 +419,7 @@ export const useVulnStore = defineStore('vulns', () => {
       // Try new API endpoints
       const [summaryRes, timelineRes] = await Promise.allSettled([
         vulnService.getDashboardSummary(connectionId, period, customDate),
-        vulnService.getTimeline(connectionId, period, customDate, 1, 200)
+        vulnService.getTimeline(connectionId, period, customDate, 1, 200, {})
       ])
 
       const summary = summaryRes.status === 'fulfilled'

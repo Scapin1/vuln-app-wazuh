@@ -44,19 +44,23 @@ export default {
   },
 
   /**
-   * GET /api/vulns/timeline
+   * GET /api/vulns/timeline/gantt
    * Paginated CVE snapshot data for GanttTab
+   * Response includes min_timestamp/max_timestamp for timeline header
    */
-  getTimeline: async (connectionId, period, customDate, page = 1, perPage = 50) => {
-    return apiClient.get('/vulns/timeline', {
-      params: {
-        connection_id: connectionId,
-        period: period || '30d',
-        date: customDate || undefined,
-        page,
-        per_page: perPage
-      }
-    })
+  getTimeline: async (connectionId, period, customDate, page = 1, perPage = 20, filters = {}) => {
+    const params = {
+      connection_id: connectionId,
+      period: period || 'all',
+      date: customDate || undefined,
+      page,
+      per_page: perPage
+    }
+    if (filters.agent) params.agent = filters.agent
+    if (filters.severity) params.severity = filters.severity
+    if (filters.search) params.search = filters.search
+
+    return apiClient.get('/vulns/timeline/gantt', { params })
   },
 
   /**
