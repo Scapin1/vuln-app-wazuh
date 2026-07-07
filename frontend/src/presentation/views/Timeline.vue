@@ -56,7 +56,7 @@
       </div>
       <button v-if="!fetchProgress.done" class="btn btn-cancel" @click="cancelBuild">Cancelar</button>
     </div>
-    <div v-else-if="!hasBuilt && !showMock" class="card empty-card">
+    <div v-else-if="!hasBuilt" class="card empty-card">
       <h3>Sin datos para mostrar</h3>
       <p>Selecciona filtros y presiona "Generar Vista".</p>
     </div>
