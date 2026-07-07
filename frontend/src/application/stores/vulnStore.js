@@ -391,18 +391,88 @@ export const useVulnStore = defineStore('vulns', () => {
     return Array.from(cveMap.values())
   }
 
+  // ── Dashboard data (raw vulns for GanttTab/VulnTable) ──
+  const dashboardVulns = ref([])
+
+  async function fetchDashboard(connectionId, period, customDate) {
+    activeConnectionId.value = connectionId
+    const cacheType = `dashboard-data:${period}:${customDate || ''}`
+    const cached = getCached(cacheType)
+    if (cached) {
+      dashboardVulns.value = cached.vulns
+      return cached
+    }
+
+    loading.value = true
+    error.value = null
+
+    try {
+      // Try new API endpoints
+      const [summaryRes, timelineRes] = await Promise.allSettled([
+        vulnService.getDashboardSummary(connectionId, period, customDate),
+        vulnService.getTimeline(connectionId, period, customDate, 1, 200)
+      ])
+
+      const summary = summaryRes.status === 'fulfilled'
+        ? summaryRes.value.data
+        : null
+
+      const timeline = timelineRes.status === 'fulfilled'
+        ? timelineRes.value.data
+        : null
+
+      // If both APIs worked, use them
+      if (summary && timeline) {
+        const result = { summary, vulns: timeline.cves }
+        dashboardVulns.value = timeline.cves
+        setCache(cacheType, result)
+        return result
+      }
+
+      // Fallback: fetch all vulns via existing endpoint
+      const allVulns = await fetchAllVulns(connectionId)
+      const filtered = filterByPeriod(allVulns, period, customDate)
+
+      const result = {
+        summary: {
+          severity_distribution: computeSeverityDistribution(filtered),
+          status_distribution: computeStatusDistribution(filtered),
+          total: filtered.length
+        },
+        vulns: filtered
+      }
+      dashboardVulns.value = filtered
+      setCache(cacheType, result)
+      return result
+    } catch (err) {
+      error.value = err.message || 'Error al cargar datos del dashboard'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // ── Clear data when connection changes ──
+  function clearConnectionData() {
+    dashboardVulns.value = []
+  }
+
   return {
     // State
     loading,
     error,
     activeConnectionId,
+    dashboardVulns,
     // Actions
+    fetchAllVulns,
     fetchDashboardSummary,
+    fetchDashboard,
     fetchTimeline,
     fetchAnalytics,
     fetchFilterOptions,
     fetchTimelineEvents,
     invalidateCache,
+    clearConnectionData,
     buildCveSnapshots
   }
 })

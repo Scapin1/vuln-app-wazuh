@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref } from 'vue'
+import { setActivePinia, createPinia } from 'pinia'
 import useTimelineData from '@/presentation/views/timeline/useTimelineData'
 import vulnService from '@/application/services/vulnService'
 
@@ -15,6 +16,7 @@ describe('useTimelineData', () => {
   let defaultProps
 
   beforeEach(() => {
+    setActivePinia(createPinia())
     vi.clearAllMocks()
 
     // El hook calcula rangos usando `new Date()` (now). Congelamos el tiempo

@@ -1,13 +1,8 @@
 import { computed, ref } from 'vue'
-import vulnService from '../../../application/services/vulnService'
+import { useVulnStore } from '../../../application/stores/vulnStore'
 import { DAY_MS, HOUR_MS, alignHour, fmtDDMM, fmtHour, fmtYear } from './timelineFormatters'
 
-const PAGE_SIZE = 10000
 const TICK_INTERVAL_MS = 1000
-
-const DEMO_SNAPSHOT = { total: 6, pending: 2, resolved: 4 }
-
-const DEMO_PAINTED_COUNT = 3
 
 const startOfLocalDay = ms => {
   const date = new Date(ms)
@@ -41,7 +36,6 @@ export default function useTimelineData({
   const errorMessage = ref('')
   const warningMessage = ref('')
   const snapshotCache = ref(new Map())
-  const showMock = ref(true)
 
   // ── Loading progress state ──
   const loadingMessage = ref('')
@@ -285,45 +279,10 @@ export default function useTimelineData({
 
   const paintedCount = computed(() => allSlots.value.filter(slot => slot.painted).length)
 
-  const effectivePaintedCount = computed(() => showMock.value ? DEMO_PAINTED_COUNT : paintedCount.value)
-  const effectiveSnapshot = computed(() => showMock.value ? DEMO_SNAPSHOT : latestSnap.value)
-
   const fetchConnectionVulns = async (signal) => {
-    let allData = []
-    let offset = 0
-    let pageNum = 0
-
-    // First request to know total (rough estimate)
-    while (true) {
-      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-
-      try {
-        const response = await vulnService.getVulns({
-          connectionId: selectedConnection.value,
-          limit: PAGE_SIZE,
-          offset: offset,
-        }, { signal })
-
-        const data = Array.isArray(response.data) ? response.data : []
-        allData = allData.concat(data)
-        pageNum++
-
-        // Update progress - solo página actual, sin total estimado
-        fetchProgress.value = { current: pageNum }
-        loadingMessage.value = 'Obteniendo datos...'
-
-        if (data.length < PAGE_SIZE) break
-        offset += PAGE_SIZE
-      } catch (err) {
-        if (err.name === 'AbortError') throw err
-        console.error('Error fetching vulns page at offset', offset, err)
-        // If first page failed with no data, propagate so caller can handle it
-        if (pageNum === 0) throw err
-        break
-      }
-    }
-
-    return { data: allData, pages: pageNum }
+    const store = useVulnStore()
+    const allData = await store.fetchAllVulns(selectedConnection.value, signal)
+    return { data: allData, pages: Math.ceil(allData.length / 10000) || 1 }
   }
 
   const resetBuildState = () => {
@@ -409,14 +368,12 @@ export default function useTimelineData({
 
       if (!processedVulns.length) {
         warningMessage.value = 'No se encontraron vulnerabilidades para los filtros seleccionados.'
-        showMock.value = true
         stopTimer()
         loading.value = false
         loadingMessage.value = ''
         return { initialZoom: 0 }
       }
 
-      showMock.value = false
       filteredVulnsData.value = processedVulns
 
       loadingMessage.value = 'Calculando rango de tiempo...'
@@ -435,7 +392,6 @@ export default function useTimelineData({
         return { initialZoom: 0 }
       }
       errorMessage.value = 'No se pudo generar la linea de tiempo. Intenta nuevamente.'
-      showMock.value = true
       throw error
     } finally {
       stopTimer()
@@ -457,12 +413,9 @@ export default function useTimelineData({
     elapsedSeconds,
     fetchProgress,
     hasBuilt,
-    showMock,
     allSlots,
     paintedCount,
-    effectivePaintedCount,
     latestSnap,
-    effectiveSnapshot,
     errorMessage,
     warningMessage,
     build,

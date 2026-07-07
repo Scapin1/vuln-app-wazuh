@@ -31,9 +31,9 @@
     />
 
     <TimelineKpiStrip
-      :has-built="hasBuilt || showMock"
-      :painted-count="effectivePaintedCount"
-      :latest-snap="effectiveSnapshot"
+      :has-built="hasBuilt || loading"
+      :painted-count="paintedCount"
+      :latest-snap="latestSnap"
     />
 
     <div v-if="loading" class="card loading-card">
@@ -70,11 +70,14 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useVulnStore } from '../../application/stores/vulnStore'
 import wazuhService from '../../application/services/wazuhService'
 import useTimelineData from './timeline/useTimelineData'
 import TimelineFilters from './timeline/components/TimelineFilters.vue'
 import TimelineKpiStrip from './timeline/components/TimelineKpiStrip.vue'
 import VulnTable from './timeline/components/VulnTable.vue'
+
+const store = useVulnStore()
 
 const periods = [
   { l: '24H', v: '24h' },
@@ -105,14 +108,12 @@ const {
   elapsedSeconds,
   fetchProgress,
   hasBuilt,
-  showMock,
-  effectivePaintedCount,
-  effectiveSnapshot,
+  paintedCount,
+  latestSnap,
   errorMessage,
   warningMessage,
   build,
   cancelBuild,
-  fetchConnectionVulns,
   filteredVulnsData
 } = useTimelineData({
   selectedConnection,
@@ -142,18 +143,9 @@ const onConnectionChange = async () => {
   if (!selectedConnection.value) return
 
   try {
-    const result = await fetchConnectionVulns()
-    const data = result.data
-    const agents = new Set()
-    const vulns = new Set()
-
-    data.forEach(vuln => {
-      if (vuln.agent_name) agents.add(vuln.agent_name)
-      if (vuln.cve_id) vulns.add(vuln.cve_id)
-    })
-
-    agentOpts.value = Array.from(agents).sort()
-    vulnOpts.value = Array.from(vulns).sort()
+    const filterOptions = await store.fetchFilterOptions(selectedConnection.value)
+    agentOpts.value = filterOptions.agents || []
+    vulnOpts.value = filterOptions.cves || []
   } catch (error) {
     console.error(error)
     errorBanner.value = 'No se pudieron cargar agentes y CVEs para la conexion seleccionada.'
