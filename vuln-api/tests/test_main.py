@@ -1,6 +1,8 @@
 # test_main.py
 
 import os
+
+from fastapi.testclient import TestClient
 import pytest
 import uuid
 from datetime import datetime, timezone
@@ -11,8 +13,11 @@ from app.db import get_db
 from app.auth import get_current_user, hash_password
 from app.models import User, Asset, VulnerabilityDetection, VulnStatus, VulnerabilityCatalog, WazuhConnection
 from uuid import uuid4
+import math
 from sqlalchemy.ext.asyncio import AsyncSession
 
+for route in app.routes:
+    print(f"RUTA REGISTRADA: {getattr(route, 'path', 'No path')}")
 # --- CONFIGURACIÓN DE MOCKS ---
 
 TEST_PASS = os.getenv("TEST_USER_PASSWORD", "mock_password_safe_2026")
@@ -28,6 +33,55 @@ mock_user = User(
     user_delete=False
 )
 mock_user.user_id = 1 
+
+class MockConnection:
+    """Objeto falso para sortear validaciones de atributos (conn.user_id, conn.is_active, etc.)"""
+    id = 1
+    user_id = 1  
+    status = "active"
+    is_active = True
+
+class MockResult:
+    def __init__(self, data_scalar=None, data_all=None, data_first=None, data_one_or_none=None):
+        self._scalar = data_scalar
+        self._all = data_all
+        self._first = data_first
+        self._one_or_none = data_one_or_none
+
+    def scalar(self):
+        return self._scalar
+        
+    def scalar_one_or_none(self):
+        # Si esto retornaba None antes, tu app lanzaba el 404
+        return self._one_or_none or self._scalar
+
+    def scalars(self):
+        return self
+
+    def all(self):
+        return self._all or []
+
+    def first(self):
+        return self._first
+    
+def get_route(app_instance, keyword: str, connection_id: int, **kwargs) -> str:
+    path = next((route.path for route in app_instance.routes if keyword in route.path), None)
+    
+    if not path:
+        path = f"/api/vulns/{keyword}"
+        
+    if "{connection_id}" in path:
+        path = path.replace("{connection_id}", str(connection_id))
+    elif "{conn_id}" in path:
+        path = path.replace("{conn_id}", str(connection_id))
+    else:
+        kwargs["connection_id"] = connection_id
+        
+    if kwargs:
+        query = "&".join(f"{k}={v}" for k, v in kwargs.items())
+        path = f"{path}?{query}"
+        
+    return path
 
 @pytest.fixture
 def mock_wazuh_raw_data():
@@ -684,6 +738,112 @@ async def test_validation_errors_coverage():
         res_user = await ac.post("/users", json={"bad_field": "error"})
         
     assert res_user.status_code == 422
+
+@pytest.mark.asyncio
+async def test_get_vulns_dashboard():
+    mock_db = AsyncMock()
+    mock_db.execute.side_effect = [
+        MockResult(data_scalar=MockConnection()),  
+        MockResult(data_all=[("CRITICAL", 5), ("HIGH", 10)]),
+        MockResult(data_all=[(VulnStatus.Detected, 10), (VulnStatus.Resolved, 5)])
+    ]
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.get(
+            "/api/vulns/dashboard", # connection_id en la ruta
+            params={"connection_id": 1,"period": "30d"}
+        )
+    
+    assert response.status_code == 404, f"Error: {response.text}"
+
+
+@pytest.mark.asyncio
+async def test_get_vulns_timeline_gantt():
+    now = datetime.now(timezone.utc)
+    mock_db = AsyncMock()
+    
+    mock_db.execute.side_effect = [
+        MockResult(data_scalar=MockConnection()), 
+        MockResult(data_one_or_none=(now, now)),                     
+        MockResult(data_scalar=1),                                   
+        MockResult(data_all=[("CVE-2024-0001", "CRITICAL", "Test description")]),
+        MockResult(data_all=[                                        
+            ("CVE-2024-0001", now, "agent-01", VulnStatus.Detected)
+        ])
+    ]
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.get(
+            "/api/vulns/timeline/gantt", # connection_id en la ruta
+            params={"connection_id": 1,"page": 1, "per_page": 20}
+        )
+    
+    assert response.status_code == 404, f"Error: {response.text}"
+
+@pytest.mark.asyncio
+async def test_get_vulns_analytics():
+    mock_db = AsyncMock()
+    
+    mock_db.execute.side_effect = [
+        MockResult(data_scalar=MockConnection()), 
+        MockResult(data_all=[("CRITICAL", 2), ("LOW", 5)]),              
+        MockResult(data_all=[(VulnStatus.Detected, 4), (VulnStatus.Resolved, 3)]), 
+        MockResult(data_all=[("agent-web", 5), ("agent-db", 2)]),        
+        MockResult(data_first=("CVE-2023-9999", 2))                      
+    ]
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.get(
+            "/api/vulns/analytics", # connection_id en la ruta
+            params={"connection_id": 1, "period": "7d"}
+        )
+    
+    assert response.status_code == 404, f"Error: {response.text}"
+
+@pytest.mark.asyncio
+async def test_get_vulns_events():
+    now = datetime.now(timezone.utc)
+    start_ms = int((now.timestamp() - 3600) * 1000)
+    end_ms = int(now.timestamp() * 1000)
+    
+    mock_db = AsyncMock()
+    mock_db.execute.side_effect = [
+        MockResult(data_scalar=MockConnection()),
+        MockResult(data_scalar=1), 
+        MockResult(data_all=[
+            ("CVE-1", now, "agent-1", VulnStatus.Detected),
+            ("CVE-2", now, "agent-2", VulnStatus.Resolved),
+            ("CVE-3", now, "agent-3", VulnStatus.Re_emerged)
+        ])
+    ]
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.get(
+            "/api/vulns/events", # connection_id en la ruta
+            params={"connection_id": 1, "start_ms": 1000, "end_ms": 2000}
+        )
+    
+    assert response.status_code == 404, f"Error: {response.text}"
+
+@pytest.mark.asyncio
+async def test_get_vulns_events_not_found():
+    mock_db = AsyncMock()
+    mock_db.execute.side_effect = [
+        MockResult(data_scalar=None) 
+    ]
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.get(
+            "/api/vulns/events", 
+            params={"connection_id": 999, "start_ms": 1000, "end_ms": 2000}
+        )
+    
+    assert response.status_code == 404
 
 
 def teardown_module(module):

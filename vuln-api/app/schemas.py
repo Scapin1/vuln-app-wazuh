@@ -1,7 +1,7 @@
 # schemas.py
 from pydantic import BaseModel, ConfigDict, EmailStr, IPvAnyAddress
 from uuid import UUID
-from typing import Optional, List
+from typing import Dict, Optional, List
 from datetime import datetime
 from .models import VulnStatus # SeverityLevel lo manejamos como str según init.sql
 
@@ -75,3 +75,64 @@ class DetectionOut(BaseModel):
     package_name: Optional[str] = None
     package_version: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
+
+class DashboardSummaryResponse(BaseModel):
+    severity_distribution: Dict[str, int]
+    status_distribution: Dict[str, int]
+    total: int
+
+class SnapshotSchema(BaseModel):
+    sync_timestamp: str
+    agent_count: int
+    agents: Optional[List[str]] = None
+
+class TimelineCVESchema(BaseModel):
+    cve_id: str
+    severity: str
+    description: Optional[str] = None
+    snapshots: List[SnapshotSchema]
+    first_sync: Optional[str] = None
+    last_sync: Optional[str] = None
+    is_resolved: bool
+
+class GanttTimelineResponse(BaseModel):
+    cves: List[TimelineCVESchema]
+    total_cves: int
+    total_pages: int
+    current_page: int
+    per_page: int
+    min_timestamp: Optional[str] = None
+    max_timestamp: Optional[str] = None
+
+class TopAgentSchema(BaseModel):
+    agent: str
+    count: int
+
+class AnalyticsSummaryResponse(BaseModel):
+    severity_distribution: Dict[str, int]
+    status_distribution: Dict[str, int]
+    top_agents: List[TopAgentSchema]
+    critical_count: int
+    top_critical_cve: Optional[str] = None
+
+class AgentOptionSchema(BaseModel):
+    name: str
+    count: int
+
+class CVEOptionSchema(BaseModel):
+    id: str
+    count: int
+
+class FilterOptionsResponse(BaseModel):
+    agents: List[AgentOptionSchema]
+    cves: List[CVEOptionSchema]
+
+class TimelineEventItemSchema(BaseModel):
+    cve_id: str
+    timestamp: str
+    agent: str
+
+class TimelineEventsResponse(BaseModel):
+    detections: List[TimelineEventItemSchema]
+    resolutions: List[TimelineEventItemSchema]
+
