@@ -86,7 +86,7 @@
 
       <div class="f-group f-action">
         <button class="btn btn-primary" @click="emit('build')" :disabled="!selectedConnection || loading">
-          {{ loading ? 'Analizando...' : 'Generar Vista' }}
+          {{ loading ? 'Analizando...' : 'Aplicar Filtros' }}
         </button>
       </div>
     </div>

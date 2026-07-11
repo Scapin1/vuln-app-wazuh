@@ -18,7 +18,10 @@ async function fetchAllVulns(connectionId, signal) {
       { connectionId, limit: PAGE_SIZE, offset },
       { signal }
     )
-    const data = Array.isArray(res.data) ? res.data : []
+    const body = res.data
+    // La API devuelve { total, limit, offset, data: [...] }, o eventualmente un array plano
+    const items = body?.data ?? body
+    const data = Array.isArray(items) ? items : []
     allData = allData.concat(data)
 
     if (data.length < PAGE_SIZE) break
@@ -151,7 +154,7 @@ export const useVulnStore = defineStore('vulns', () => {
           startMs = d.getTime()
           const endMs = startMs + 24 * 60 * 60 * 1000
           return vulns.filter(v => {
-            const ts = new Date(v.first_seen || v.last_seen).getTime()
+            const ts = new Date(v.last_seen || v.first_seen).getTime()
             return ts >= startMs && ts <= endMs
           })
         }
@@ -489,6 +492,7 @@ export const useVulnStore = defineStore('vulns', () => {
     dashboardVulns,
     // Actions
     fetchAllVulns,
+    filterByPeriod,
     fetchDashboardSummary,
     fetchDashboard,
     fetchTimeline,

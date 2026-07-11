@@ -281,7 +281,8 @@ export default function useTimelineData({
 
   const fetchConnectionVulns = async (signal) => {
     const store = useVulnStore()
-    const allData = await store.fetchAllVulns(selectedConnection.value, signal)
+    const connId = selectedConnection.value || undefined
+    const allData = await store.fetchAllVulns(connId, signal)
     return { data: allData, pages: Math.ceil(allData.length / 10000) || 1 }
   }
 
@@ -342,8 +343,6 @@ export default function useTimelineData({
   }
 
   const build = async () => {
-    if (!selectedConnection.value) return { initialZoom: 0 }
-
     resetBuildState()
     startTimer()
 
@@ -353,7 +352,11 @@ export default function useTimelineData({
     try {
       loadingMessage.value = 'Obteniendo datos de vulnerabilidades...'
       const result = await fetchConnectionVulns(signal)
-      const data = result.data
+      let data = result.data
+
+      // Apply period filter client-side
+      const store = useVulnStore()
+      data = store.filterByPeriod(data, period.value, customDate.value)
 
       // Marcar fetch como completado antes de pasar a procesamiento
       fetchProgress.value = { current: result.pages, done: true }

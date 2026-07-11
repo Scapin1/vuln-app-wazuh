@@ -58,20 +58,26 @@ describe('VulnAnalytics.vue', () => {
         const wrapper = mount(VulnAnalytics)
         await flushPromises()
 
-        // Trigger loading state
+        // Trigger loading state (clear stale auto-load message)
+        wrapper.vm.loadingMessage = ''
         wrapper.vm.loading = true
         await wrapper.vm.$nextTick()
 
         // GanttTab should be hidden (v-if="!loading")
         expect(wrapper.findComponent({ name: 'GanttTab' }).exists()).toBe(false)
         // Loading card should be visible
+        expect(wrapper.find('.loading-card').exists()).toBe(true)
         expect(wrapper.text()).toContain('Cargando')
     })
 
     it('buildAnalytics fetches vulns and updates state', async () => {
+        const recentDate = new Date()
+        recentDate.setDate(recentDate.getDate() - 1)
         const mockVulns = [
-            { cve_id: 'CVE-2026-0001', severity: 'CRITICAL', status: 'Detected', agent_name: 'srv-web-01' },
-            { cve_id: 'CVE-2026-0002', severity: 'HIGH', status: 'Resolved', agent_name: 'srv-db-02' }
+            { cve_id: 'CVE-2026-0001', severity: 'CRITICAL', status: 'Detected', agent_name: 'srv-web-01',
+              last_seen: recentDate.toISOString() },
+            { cve_id: 'CVE-2026-0002', severity: 'HIGH', status: 'Resolved', agent_name: 'srv-db-02',
+              last_seen: recentDate.toISOString() }
         ]
         vulnService.getVulns.mockResolvedValue({ data: mockVulns })
         wazuhService.getConnections.mockResolvedValue({
@@ -93,10 +99,15 @@ describe('VulnAnalytics.vue', () => {
     })
 
     it('severity filter reduces data shown', async () => {
+        const recentDate = new Date()
+        recentDate.setDate(recentDate.getDate() - 1)
         const mockVulns = [
-            { cve_id: 'CVE-2026-0001', severity: 'CRITICAL', status: 'Detected', agent_name: 'srv-web-01' },
-            { cve_id: 'CVE-2026-0002', severity: 'HIGH', status: 'Resolved', agent_name: 'srv-db-02' },
-            { cve_id: 'CVE-2026-0003', severity: 'LOW', status: 'Detected', agent_name: 'srv-api-03' }
+            { cve_id: 'CVE-2026-0001', severity: 'CRITICAL', status: 'Detected', agent_name: 'srv-web-01',
+              last_seen: recentDate.toISOString() },
+            { cve_id: 'CVE-2026-0002', severity: 'HIGH', status: 'Resolved', agent_name: 'srv-db-02',
+              last_seen: recentDate.toISOString() },
+            { cve_id: 'CVE-2026-0003', severity: 'LOW', status: 'Detected', agent_name: 'srv-api-03',
+              last_seen: recentDate.toISOString() }
         ]
         vulnService.getVulns.mockResolvedValue({ data: mockVulns })
         wazuhService.getConnections.mockResolvedValue({
@@ -106,6 +117,7 @@ describe('VulnAnalytics.vue', () => {
         const wrapper = mount(VulnAnalytics)
         await flushPromises()
 
+        wrapper.vm.selectedSeverities = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
         wrapper.vm.selectedConnection = 'conn-1'
         await wrapper.vm.buildAnalytics()
         await flushPromises()

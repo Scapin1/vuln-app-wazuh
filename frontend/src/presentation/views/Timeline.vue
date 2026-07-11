@@ -58,7 +58,7 @@
     </div>
     <div v-else-if="!hasBuilt" class="card empty-card">
       <h3>Sin datos para mostrar</h3>
-      <p>Selecciona filtros y presiona "Generar Vista".</p>
+      <p>Selecciona filtros y presiona "Aplicar Filtros".</p>
     </div>
     <div v-else-if="hasBuilt && filteredVulnsData.length === 0" class="card empty-card">
       <h3>Sin datos para mostrar</h3>
@@ -140,16 +140,19 @@ const onConnectionChange = async () => {
   vulnOpts.value = []
   errorBanner.value = ''
 
-  if (!selectedConnection.value) return
-
-  try {
-    const filterOptions = await store.fetchFilterOptions(selectedConnection.value)
-    agentOpts.value = filterOptions.agents || []
-    vulnOpts.value = filterOptions.cves || []
-  } catch (error) {
-    console.error(error)
-    errorBanner.value = 'No se pudieron cargar agentes y CVEs para la conexion seleccionada.'
+  if (selectedConnection.value) {
+    try {
+      const filterOptions = await store.fetchFilterOptions(selectedConnection.value)
+      agentOpts.value = filterOptions.agents || []
+      vulnOpts.value = filterOptions.cves || []
+    } catch (error) {
+      console.error(error)
+      errorBanner.value = 'No se pudieron cargar agentes y CVEs para la conexion seleccionada.'
+    }
   }
+
+  // Reload data when connection changes
+  await buildTimeline()
 }
 
 const buildTimeline = async () => {
@@ -165,6 +168,12 @@ onMounted(async () => {
   try {
     const response = await wazuhService.getConnections()
     connections.value = Array.isArray(response.data) ? response.data : []
+    // Auto-select first connection if available
+    if (connections.value.length > 0) {
+      selectedConnection.value = connections.value[0].id
+    }
+    // Auto-load timeline data
+    await buildTimeline()
   } catch (error) {
     console.error(error)
     errorBanner.value = 'No se pudieron cargar las conexiones Wazuh.'

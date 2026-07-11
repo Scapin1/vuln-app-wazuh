@@ -136,7 +136,7 @@ const agentOpts = ref([])
 const vulnOpts = ref([])
 const selectedAgents = ref([])
 const selectedVulns = ref([])
-const selectedSeverities = ref([])
+const selectedSeverities = ref(['CRITICAL', 'HIGH'])
 const period = ref('30d')
 const customDate = ref(new Date().toISOString().split('T')[0])
 const errorBanner = ref('')
@@ -306,21 +306,22 @@ const onConnectionChange = async () => {
   vulnOpts.value = []
   errorBanner.value = ''
 
-  if (!selectedConnection.value) return
-
-  try {
-    const filterOptions = await store.fetchFilterOptions(selectedConnection.value)
-    agentOpts.value = filterOptions.agents || []
-    vulnOpts.value = filterOptions.cves || []
-  } catch (error) {
-    console.error(error)
-    errorBanner.value = 'No se pudieron cargar agentes y CVEs para la conexión seleccionada.'
+  if (selectedConnection.value) {
+    try {
+      const filterOptions = await store.fetchFilterOptions(selectedConnection.value)
+      agentOpts.value = filterOptions.agents || []
+      vulnOpts.value = filterOptions.cves || []
+    } catch (error) {
+      console.error(error)
+      errorBanner.value = 'No se pudieron cargar agentes y CVEs para la conexión seleccionada.'
+    }
   }
+
+  // Reload data when connection changes
+  await buildAnalytics()
 }
 
 const buildAnalytics = async () => {
-  if (!selectedConnection.value) return
-
   errorBanner.value = ''
   hasBuilt.value = false
   loading.value = true
@@ -329,12 +330,15 @@ const buildAnalytics = async () => {
   startTimer()
 
   try {
-    // Fetch analytics via store (uses cache, falls back to client-side computation)
-    const allVulns = await store.fetchAllVulns(selectedConnection.value)
+    // Fetch all vulns (without connectionId when none selected → returns ALL)
+    const connId = selectedConnection.value || undefined
+    const allVulns = await store.fetchAllVulns(connId)
     fetchProgress.value = { current: 1, done: true }
 
+    // Apply period filter client-side
+    let result = store.filterByPeriod(allVulns, period.value, customDate.value)
+
     // Apply agent and CVE filters
-    let result = allVulns
     if (selectedAgents.value.length > 0) {
       result = result.filter(v => selectedAgents.value.includes(v.agent_name))
     }
@@ -361,6 +365,12 @@ onMounted(async () => {
   try {
     const response = await wazuhService.getConnections()
     connections.value = Array.isArray(response.data) ? response.data : []
+    // Auto-select first connection if available
+    if (connections.value.length > 0) {
+      selectedConnection.value = connections.value[0].id
+    }
+    // Auto-load analytics data
+    await buildAnalytics()
   } catch (error) {
     console.error(error)
     errorBanner.value = 'No se pudieron cargar las conexiones Wazuh.'

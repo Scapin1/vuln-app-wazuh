@@ -80,6 +80,8 @@ describe('useTimelineData', () => {
     })
 
     it('handles empty connection gracefully', async () => {
+      vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+
       const emptyTimeline = useTimelineData({
         ...defaultProps,
         selectedConnection: ref('')
@@ -371,6 +373,7 @@ describe('useTimelineData', () => {
         agent_name: 'srv-01',
         cve_id: 'CVE-2023-1234',
         first_seen: 'invalid-date',
+        last_seen: '2026-03-07T10:00:00Z',
         history: []
       }]
 
