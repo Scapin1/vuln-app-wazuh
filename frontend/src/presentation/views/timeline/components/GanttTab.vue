@@ -15,7 +15,15 @@
       <div class="gantt-controls">
         <div class="search-date">
           <label for="ganttSearchDate" class="search-date-label">Buscar fecha:</label>
-          <input id="ganttSearchDate" type="datetime-local" v-model="searchDate" class="date-input" />
+          <div class="search-dt-row">
+            <input id="ganttSearchDate" type="date" :value="ganttDatePart" @input="e => onGanttDateChange(e.target.value)" class="date-input" />
+            <select :value="ganttHourPart" @change="e => onGanttHourChange(e.target.value)" class="date-input time-sel">
+              <option v-for="h in GANTT_HOURS" :key="h" :value="h">{{ h }}</option>
+            </select>
+            <select :value="ganttMinutePart" @change="e => onGanttMinuteChange(e.target.value)" class="date-input time-sel">
+              <option v-for="m in GANTT_MINUTES" :key="m" :value="m">{{ m }}</option>
+            </select>
+          </div>
           <button class="search-btn" @click="scrollToDate">Ir</button>
         </div>
         <div class="zoom-controls">
@@ -282,8 +290,22 @@ watch(() => props.ganttData, () => {
 })
 
 // ── Scroll / Search ──
+const GANTT_HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+const GANTT_MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
+
 const scrollWrapper = ref(null)
 const searchDate = ref('')
+
+const ganttDatePart = computed(() => searchDate.value?.split('T')[0] || '')
+const ganttHourPart = computed(() => searchDate.value?.split('T')[1]?.split(':')[0] || '00')
+const ganttMinutePart = computed(() => searchDate.value?.split('T')[1]?.split(':')[1] || '00')
+
+const updateSearchDate = (date, hour, minute) => {
+  searchDate.value = `${date || ganttDatePart.value}T${hour || ganttHourPart.value}:${minute || ganttMinutePart.value}`
+}
+const onGanttDateChange = (d) => updateSearchDate(d)
+const onGanttHourChange = (h) => updateSearchDate(null, h)
+const onGanttMinuteChange = (m) => updateSearchDate(null, null, m)
 
 const scrollToDate = () => {
   if (!searchDate.value || !scrollWrapper.value || !timeLabels.value.length) return
@@ -602,6 +624,18 @@ const formatDate = (d) => {
   display: flex;
   gap: 4px;
   align-items: center;
+}
+
+.search-dt-row {
+  display: flex;
+  gap: 2px;
+  align-items: stretch;
+}
+
+.time-sel {
+  flex: 0 0 58px;
+  cursor: pointer;
+  appearance: auto;
 }
 
 .date-input {

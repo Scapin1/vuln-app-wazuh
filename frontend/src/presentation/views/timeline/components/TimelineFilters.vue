@@ -81,7 +81,15 @@
 
       <div class="f-group day-datetime-group" v-if="period === 'day'">
         <label for="custom-date">Dia</label>
-        <input id="custom-date" type="datetime-local" v-model="customDateModel" class="filter-input">
+        <div class="dt-row">
+          <input id="custom-date" type="date" :value="datePart" @input="onDateChange" class="filter-input">
+          <select :value="hourPart" @change="onHourChange" class="filter-input time-sel">
+            <option v-for="h in HOURS" :key="h" :value="h">{{ h }}</option>
+          </select>
+          <select :value="minutePart" @change="onMinuteChange" class="filter-input time-sel">
+            <option v-for="m in MINUTES" :key="m" :value="m">{{ m }}</option>
+          </select>
+        </div>
       </div>
 
       <div class="f-group f-action">
@@ -139,10 +147,19 @@ const selectedVulnsModel = computed({
   set: value => emit('update:selectedVulns', value)
 })
 
-const customDateModel = computed({
-  get: () => props.customDate,
-  set: value => emit('update:customDate', value)
-})
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
+
+const datePart = computed(() => props.customDate?.split('T')[0] || '')
+const hourPart = computed(() => props.customDate?.split('T')[1]?.split(':')[0] || '00')
+const minutePart = computed(() => props.customDate?.split('T')[1]?.split(':')[1] || '00')
+
+const emitDatetime = (date, hour, minute) => {
+  emit('update:customDate', `${date || datePart.value}T${hour || hourPart.value}:${minute || minutePart.value}`)
+}
+const onDateChange = (e) => emitDatetime(e.target.value)
+const onHourChange = (e) => emitDatetime(null, e.target.value)
+const onMinuteChange = (e) => emitDatetime(null, null, e.target.value)
 
 const search = reactive({ agent: '', vuln: '' })
 const activeDropdown = ref('')
@@ -191,7 +208,10 @@ const toggleSeverity = (sev) => {
 .chip { padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-dark); font-size: 0.72rem; font-weight: 700; color: var(--text-muted); cursor: pointer; }
 .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
 .sel-badge { background: var(--primary-bg); color: var(--primary); border-radius: 999px; padding: 0.1rem 0.45rem; font-size: 0.72rem; font-weight: 700; }
-.day-datetime-group { min-width: 220px; }
+.day-datetime-group { min-width: 320px; }
+.dt-row { display: flex; gap: 0.35rem; align-items: stretch; }
+.dt-row .filter-input { flex: 1; min-width: 0; }
+.time-sel { flex: 0 0 70px; cursor: pointer; appearance: auto; }
 
 @media (max-width: 1400px) {
   .filter-row { grid-template-columns: 1fr 1fr; }
