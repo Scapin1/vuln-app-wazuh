@@ -79,12 +79,9 @@
         </div>
       </div>
 
-      <div class="f-group" v-if="period === 'day'">
+      <div class="f-group day-datetime-group" v-if="period === 'day'">
         <label for="custom-date">Dia</label>
-        <div class="filter-row-inner">
-          <input id="custom-date" type="date" :value="datePart" @input="onDateChange" class="filter-input">
-          <input type="time" :value="timePart" @input="onTimeChange" class="filter-input">
-        </div>
+        <input id="custom-date" type="datetime-local" v-model="customDateModel" class="filter-input">
       </div>
 
       <div class="f-group f-action">
@@ -142,20 +139,10 @@ const selectedVulnsModel = computed({
   set: value => emit('update:selectedVulns', value)
 })
 
-const datePart = computed(() => props.customDate?.split('T')[0] || '')
-const timePart = computed(() => props.customDate?.split('T')[1] || '')
-
-const onDateChange = (e) => {
-  const d = e.target.value
-  const t = timePart.value
-  emit('update:customDate', t ? `${d}T${t}` : d)
-}
-
-const onTimeChange = (e) => {
-  const d = datePart.value
-  const t = e.target.value
-  emit('update:customDate', d ? `${d}T${t}` : t)
-}
+const customDateModel = computed({
+  get: () => props.customDate,
+  set: value => emit('update:customDate', value)
+})
 
 const search = reactive({ agent: '', vuln: '' })
 const activeDropdown = ref('')
@@ -204,7 +191,7 @@ const toggleSeverity = (sev) => {
 .chip { padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-dark); font-size: 0.72rem; font-weight: 700; color: var(--text-muted); cursor: pointer; }
 .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
 .sel-badge { background: var(--primary-bg); color: var(--primary); border-radius: 999px; padding: 0.1rem 0.45rem; font-size: 0.72rem; font-weight: 700; }
-.filter-row-inner { display: flex; flex-direction: column; gap: 0.35rem; }
+.day-datetime-group { min-width: 220px; }
 
 @media (max-width: 1400px) {
   .filter-row { grid-template-columns: 1fr 1fr; }
