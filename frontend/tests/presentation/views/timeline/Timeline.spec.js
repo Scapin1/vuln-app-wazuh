@@ -192,8 +192,8 @@ describe('Timeline.vue', () => {
     await filters.vm.$emit('update:selectedVulns', ['CVE-Y'])
     expect(wrapper.vm.selectedVulns).toEqual(['CVE-Y'])
 
-    await filters.vm.$emit('update:customDate', '2026-05-05')
-    expect(wrapper.vm.customDate).toBe('2026-05-05')
+    await filters.vm.$emit('update:customDate', '2026-05-05T10:00')
+    expect(wrapper.vm.customDate).toBe('2026-05-05T10:00')
   })
 
 })

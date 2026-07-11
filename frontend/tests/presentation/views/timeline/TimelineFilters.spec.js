@@ -110,13 +110,13 @@ describe('TimelineFilters.vue', () => {
       props: {
         ...defaultProps,
         period: 'day',
-        customDate: '2026-03-08'
+        customDate: '2026-03-08T10:00'
       }
     })
 
-    const dateInput = wrapper.find('input[type="date"]')
+    const dateInput = wrapper.find('input[type="datetime-local"]')
     expect(dateInput.exists()).toBe(true)
-    expect(dateInput.element.value).toBe('2026-03-08')
+    expect(dateInput.element.value).toBe('2026-03-08T10:00')
   })
 
   it('emits vuln selection changes', async () => {
@@ -346,10 +346,10 @@ describe('TimelineFilters.vue', () => {
       }
     })
 
-    const dateInput = wrapper.find('input[type="date"]')
-    await dateInput.setValue('2026-03-10')
+    const dateInput = wrapper.find('input[type="datetime-local"]')
+    await dateInput.setValue('2026-03-10T10:00')
 
     expect(wrapper.emitted('update:customDate')).toHaveLength(1)
-    expect(wrapper.emitted('update:customDate')[0]).toEqual(['2026-03-10'])
+    expect(wrapper.emitted('update:customDate')[0]).toEqual(['2026-03-10T10:00'])
   })
 })

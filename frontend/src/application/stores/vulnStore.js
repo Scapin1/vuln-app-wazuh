@@ -150,7 +150,7 @@ export const useVulnStore = defineStore('vulns', () => {
       case '30d': startMs = now.getTime() - 30 * 24 * 60 * 60 * 1000; break
       case 'day':
         if (customDate) {
-          const d = new Date(`${customDate}T00:00:00`)
+          const d = new Date(customDate)
           startMs = d.getTime()
           const endMs = startMs + 24 * 60 * 60 * 1000
           return vulns.filter(v => {

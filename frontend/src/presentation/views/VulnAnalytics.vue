@@ -107,6 +107,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useVulnStore } from '../../application/stores/vulnStore'
 import wazuhService from '../../application/services/wazuhService'
+import { toLocalDatetimeString } from './timeline/timelineFormatters'
 import { Pie, Doughnut } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -138,7 +139,7 @@ const selectedAgents = ref([])
 const selectedVulns = ref([])
 const selectedSeverities = ref(['CRITICAL', 'HIGH'])
 const period = ref('30d')
-const customDate = ref(new Date().toISOString().split('T')[0])
+const customDate = ref(toLocalDatetimeString())
 const errorBanner = ref('')
 
 // ── Data state ──

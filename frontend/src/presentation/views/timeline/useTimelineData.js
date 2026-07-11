@@ -76,8 +76,8 @@ export default function useTimelineData({
     if (period.value === '30d') start = new Date(now.getTime() - 30 * DAY_MS)
 
     if (period.value === 'day') {
-      start = new Date(`${customDate.value}T00:00:00`)
-      end = new Date(`${customDate.value}T23:59:59`)
+      start = new Date(customDate.value)
+      end = new Date(start.getTime() + DAY_MS - 1)
     }
 
     if (period.value === 'all' && vulns.length > 0) {

@@ -72,6 +72,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useVulnStore } from '../../application/stores/vulnStore'
 import wazuhService from '../../application/services/wazuhService'
+import { toLocalDatetimeString } from './timeline/timelineFormatters'
 import useTimelineData from './timeline/useTimelineData'
 import TimelineFilters from './timeline/components/TimelineFilters.vue'
 import TimelineKpiStrip from './timeline/components/TimelineKpiStrip.vue'
@@ -94,7 +95,7 @@ const selectedConnection = ref('')
 const selectedAgents = ref([])
 const selectedVulns = ref([])
 const period = ref('30d')
-const customDate = ref(new Date().toISOString().split('T')[0])
+const customDate = ref(toLocalDatetimeString())
 const errorBanner = ref('')
 
 const getConnectionName = () => {

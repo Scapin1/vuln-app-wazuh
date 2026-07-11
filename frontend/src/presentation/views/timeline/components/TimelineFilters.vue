@@ -81,7 +81,7 @@
 
       <div class="f-group" v-if="period === 'day'">
         <label for="custom-date">Dia</label>
-        <input id="custom-date" type="date" v-model="customDateModel" class="filter-input">
+        <input id="custom-date" type="datetime-local" v-model="customDateModel" class="filter-input">
       </div>
 
       <div class="f-group f-action">
