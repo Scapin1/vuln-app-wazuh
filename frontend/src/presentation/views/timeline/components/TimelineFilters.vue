@@ -81,7 +81,7 @@
 
       <div class="f-group" v-if="period === 'day'">
         <label for="custom-date">Dia</label>
-        <div class="datetime-group">
+        <div class="filter-row-inner">
           <input id="custom-date" type="date" :value="datePart" @input="onDateChange" class="filter-input">
           <input type="time" :value="timePart" @input="onTimeChange" class="filter-input">
         </div>
@@ -204,8 +204,7 @@ const toggleSeverity = (sev) => {
 .chip { padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-dark); font-size: 0.72rem; font-weight: 700; color: var(--text-muted); cursor: pointer; }
 .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
 .sel-badge { background: var(--primary-bg); color: var(--primary); border-radius: 999px; padding: 0.1rem 0.45rem; font-size: 0.72rem; font-weight: 700; }
-.datetime-group { display: flex; gap: 0.35rem; }
-.datetime-group .filter-input { flex: 1; min-width: 0; }
+.filter-row-inner { display: flex; flex-direction: column; gap: 0.35rem; }
 
 @media (max-width: 1400px) {
   .filter-row { grid-template-columns: 1fr 1fr; }
