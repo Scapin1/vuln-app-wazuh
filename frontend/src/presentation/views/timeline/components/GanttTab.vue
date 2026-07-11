@@ -15,7 +15,10 @@
       <div class="gantt-controls">
         <div class="search-date">
           <label for="ganttSearchDate" class="search-date-label">Buscar fecha:</label>
-          <input id="ganttSearchDate" type="datetime-local" v-model="searchDate" class="date-input" />
+          <div class="search-date-inputs">
+            <input id="ganttSearchDate" type="date" :value="searchDatePart" @input="e => onSearchDateChange(e.target.value, searchTimePart)" class="date-input" />
+            <input type="time" :value="searchTimePart" @input="e => onSearchTimeChange(e.target.value)" class="date-input" />
+          </div>
           <button class="search-btn" @click="scrollToDate">Ir</button>
         </div>
         <div class="zoom-controls">
@@ -284,6 +287,17 @@ watch(() => props.ganttData, () => {
 // ── Scroll / Search ──
 const scrollWrapper = ref(null)
 const searchDate = ref('')
+
+const searchDatePart = computed(() => searchDate.value?.split('T')[0] || '')
+const searchTimePart = computed(() => searchDate.value?.split('T')[1] || '')
+
+const onSearchDateChange = (dateVal, timeVal) => {
+  searchDate.value = timeVal ? `${dateVal}T${timeVal}` : dateVal
+}
+const onSearchTimeChange = (timeVal) => {
+  const datePart = searchDatePart.value
+  searchDate.value = datePart ? `${datePart}T${timeVal}` : timeVal
+}
 
 const scrollToDate = () => {
   if (!searchDate.value || !scrollWrapper.value || !timeLabels.value.length) return
@@ -602,6 +616,12 @@ const formatDate = (d) => {
   display: flex;
   gap: 4px;
   align-items: center;
+}
+
+.search-date-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .date-input {
