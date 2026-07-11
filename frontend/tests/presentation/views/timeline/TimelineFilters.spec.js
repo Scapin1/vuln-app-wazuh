@@ -114,9 +114,12 @@ describe('TimelineFilters.vue', () => {
       }
     })
 
-    const dateInput = wrapper.find('input[type="datetime-local"]')
+    const dateInput = wrapper.find('input[type="date"]')
     expect(dateInput.exists()).toBe(true)
-    expect(dateInput.element.value).toBe('2026-03-08T10:00')
+    expect(dateInput.element.value).toBe('2026-03-08')
+    const timeInput = wrapper.find('input[type="time"]')
+    expect(timeInput.exists()).toBe(true)
+    expect(timeInput.element.value).toBe('10:00')
   })
 
   it('emits vuln selection changes', async () => {
@@ -338,18 +341,35 @@ describe('TimelineFilters.vue', () => {
     expect(wrapper.findAll('.dd-panel')).toHaveLength(0)
   })
 
-  it('updates custom date when input changes', async () => {
+  it('updates custom date when date input changes', async () => {
     const wrapper = mount(TimelineFilters, {
       props: {
         ...defaultProps,
-        period: 'day'
+        period: 'day',
+        customDate: '2026-03-08T10:00'
       }
     })
 
-    const dateInput = wrapper.find('input[type="datetime-local"]')
-    await dateInput.setValue('2026-03-10T10:00')
+    const dateInput = wrapper.find('input[type="date"]')
+    await dateInput.setValue('2026-03-10')
 
     expect(wrapper.emitted('update:customDate')).toHaveLength(1)
     expect(wrapper.emitted('update:customDate')[0]).toEqual(['2026-03-10T10:00'])
+  })
+
+  it('updates custom date when time input changes', async () => {
+    const wrapper = mount(TimelineFilters, {
+      props: {
+        ...defaultProps,
+        period: 'day',
+        customDate: '2026-03-08T10:00'
+      }
+    })
+
+    const timeInput = wrapper.find('input[type="time"]')
+    await timeInput.setValue('14:30')
+
+    expect(wrapper.emitted('update:customDate')).toHaveLength(1)
+    expect(wrapper.emitted('update:customDate')[0]).toEqual(['2026-03-08T14:30'])
   })
 })
