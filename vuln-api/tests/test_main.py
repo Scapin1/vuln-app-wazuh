@@ -845,5 +845,190 @@ async def test_get_vulns_events_not_found():
     assert response.status_code == 404
 
 
+@pytest.mark.anyio
+async def test_get_vulns_timeline_gantt_success():
+    """
+    Verifica que el endpoint del diagrama de Gantt retorne la estructura 
+    correcta realizando un mock de las 4 consultas secuenciales de SQLAlchemy.
+    """
+    # 1. Preparar las fechas de prueba
+    mock_now = datetime(2026, 7, 13, 12, 0, 0, tzinfo=timezone.utc)
+    
+    # 2. Configurar los resultados simulados (Mocks) para cada query
+    
+    # Query 1: res_bounds (min_ts, max_ts)
+    mock_result_bounds = MagicMock()
+    mock_result_bounds.one_or_none.return_value = (mock_now, mock_now)
+    
+    # Query 2: total_cves (count)
+    mock_result_count = MagicMock()
+    mock_result_count.scalar.return_value = 1
+    
+    # Query 3: page_cves (cve_id, severity, description)
+    mock_result_page = MagicMock()
+    mock_result_page.all.return_value = [
+        ("CVE-2024-1234", "CRITICAL", "Descripción de prueba para el CVE")
+    ]
+    
+    # Query 4: all_snapshots (cve_id, timestamp, hostname, status)
+    mock_result_snaps = MagicMock()
+    # Retornamos el estado como string ya que tu código soporta (hasattr(st, 'value') else str(st))
+    mock_result_snaps.all.return_value = [
+        ("CVE-2024-1234", mock_now, "agent-test-01", "Detected")
+    ]
+
+    # 3. Crear el mock de la sesión de base de datos
+    mock_session = AsyncMock()
+    # side_effect devolverá los resultados en el orden en que se llama a 'await db.execute()'
+    mock_session.execute.side_effect = [
+        mock_result_bounds, 
+        mock_result_count, 
+        mock_result_page, 
+        mock_result_snaps
+    ]
+
+    # 4. Sobrescribir la dependencia get_db en FastAPI
+    app.dependency_overrides[get_db] = lambda: mock_session
+
+    # 5. Ejecutar la petición HTTP usando ASGITransport
+    transport = ASGITransport(app=app)
+    original_root_path = app.root_path
+    app.root_path = ""
+        
+    try:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get(
+                "/api/vulns/timeline/gantt",
+                params={
+                    "connection_id": 1,
+                    "period": "30d"
+                }
+            )
+    finally:
+
+    # 6. Limpiar el override para no afectar otros tests
+        app.dependency_overrides.clear()
+        app.root_path = original_root_path
+
+    # 7. Aserciones (Verificar el comportamiento)
+    assert response.status_code == 200
+    
+    data = response.json()
+    
+    # Validar la paginación y metadata
+    assert data["total_cves"] == 1
+    assert data["total_pages"] == 1
+    assert data["current_page"] == 1
+    assert data["min_timestamp"] == mock_now.isoformat()
+    assert data["max_timestamp"] == mock_now.isoformat()
+    
+    # Validar la estructura del CVE
+    assert len(data["cves"]) == 1
+    cve_data = data["cves"][0]
+    assert cve_data["cve_id"] == "CVE-2024-1234"
+    assert cve_data["severity"] == "CRITICAL"
+    assert cve_data["is_resolved"] is False  # Falso porque el snapshot es "Detected"
+    
+    # Validar el snapshot generado
+    assert len(cve_data["snapshots"]) == 1
+    snapshot = cve_data["snapshots"][0]
+    assert snapshot["agent_count"] == 1
+    assert "agent-test-01" in snapshot["agents"]
+
+
+@pytest.mark.anyio
+async def test_get_vulns_analytics_summary_success():
+    """
+    Verifica que el endpoint de analíticas retorne las distribuciones correctas,
+    simulando las 4 consultas secuenciales (Severity, Status, Top Agents, Top CVE).
+    """
+    # 1. Configurar los resultados simulados (Mocks) para cada query
+
+    # Query 1: res_severity (severity, count)
+    mock_result_severity = MagicMock()
+    mock_result_severity.all.return_value = [
+        ("CRITICAL", 5),
+        ("HIGH", 2),
+        ("LOW", 1)
+    ]
+
+    # Query 2: res_status (status, count)
+    mock_result_status = MagicMock()
+    # Usamos string para el estado, compatible con tu lógica hasattr(row[0], 'value')
+    mock_result_status.all.return_value = [
+        ("Detected", 4),
+        ("Resolved", 3),
+        ("Re-emerged", 1)
+    ]
+
+    # Query 3: res_top_agents (hostname, count)
+    mock_result_top_agents = MagicMock()
+    mock_result_top_agents.all.return_value = [
+        ("server-prod-01", 4),
+        ("desktop-dev-02", 2)
+    ]
+
+    # Query 4: res_top_cve (cve_id, count) - Solo se llama si critical_count > 0
+    mock_result_top_cve = MagicMock()
+    # Atento aquí: tu código usa .first() en esta query, no .all()
+    mock_result_top_cve.first.return_value = ("CVE-2024-9999", 5)
+
+    # 2. Crear el mock de la sesión de base de datos
+    mock_session = AsyncMock()
+    mock_session.execute.side_effect = [
+        mock_result_severity,
+        mock_result_status,
+        mock_result_top_agents,
+        mock_result_top_cve
+    ]
+
+    # 3. Sobrescribir la dependencia get_db en FastAPI
+    app.dependency_overrides[get_db] = lambda: mock_session
+
+    # 4. Ejecutar la petición HTTP evitando el problema del root_path (404)
+    transport = ASGITransport(app=app)
+    original_root_path = app.root_path
+    app.root_path = ""
+    
+    try:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get(
+                "/api/vulns/analytics",
+                params={
+                    "connection_id": 1,
+                    "period": "30d"
+                }
+            )
+    finally:
+        # 5. Limpiar overrides y restaurar estado
+        app.dependency_overrides.clear()
+        app.root_path = original_root_path
+
+    # 6. Aserciones (Verificar el comportamiento)
+    assert response.status_code == 200
+    
+    data = response.json()
+
+    # Validar distribución de severidad
+    assert data["severity_distribution"]["CRITICAL"] == 5
+    assert data["severity_distribution"]["HIGH"] == 2
+    assert data["severity_distribution"]["MEDIUM"] == 0 # No enviado en el mock, debe ser 0
+    assert data["critical_count"] == 5
+
+    # Validar distribución de estados
+    # Ojo: Tu código mapea "Detected" a "Activo", "Resolved" a "Resuelto", etc.
+    assert data["status_distribution"]["Activo"] == 4
+    assert data["status_distribution"]["Resuelto"] == 3
+    assert data["status_distribution"]["Reabierto"] == 1
+
+    # Validar top agents
+    assert len(data["top_agents"]) == 2
+    assert data["top_agents"][0]["agent"] == "server-prod-01"
+    assert data["top_agents"][0]["count"] == 4
+
+    # Validar Top CVE Crítico
+    assert data["top_critical_cve"] == "CVE-2024-9999"
+
+
 def teardown_module(module):
     app.dependency_overrides.clear()

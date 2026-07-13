@@ -2,7 +2,6 @@
 from collections import defaultdict
 import logging
 import math
-from operator import and_, or_
 import re
 import os
 from fastapi import FastAPI, Depends, HTTPException, Query, logger
@@ -16,7 +15,7 @@ from uuid import UUID
 from typing import List, Annotated, Literal, Optional, Dict, Set, Any, Tuple
 from pydantic import BaseModel
 from sqlalchemy.sql import func
-from sqlalchemy import select, insert, update, delete, text
+from sqlalchemy import select, insert, update, delete, text, and_, or_
 from .db import Base, engine, get_db
 from .auth import (
     authenticate_user,
