@@ -25,7 +25,8 @@ def test_password_hashing_workflow():
 def test_password_salt_is_random():
     """Verifica que dos hashes de la misma clave sean distintos (salting)"""
     password = "secret_password"
-    assert hash_password(password) != hash_password(password)
+    expected_hash1 = hash_password(password)
+    assert hash_password(password) != expected_hash1
 
 
 # --- TESTS DE ENCRIPTACIÓN DE DATOS (FERNET) ---

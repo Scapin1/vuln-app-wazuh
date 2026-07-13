@@ -39,7 +39,7 @@ from datetime import datetime
 
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.INFO)
 CONNECTION_NOT_FOUND = "Conexión no encontrada"
 
 
@@ -616,11 +616,11 @@ async def get_vulns_timeline_events(
         )
         .select_from(VulnerabilityDetection)
         .join(Asset, VulnerabilityDetection.asset_id == Asset.asset_id)
-        .where(and_(
+        .where(
             Asset.wazuh_connection_id == connection_id,
             VulnerabilityDetection.timestamp >= start_dt,
             VulnerabilityDetection.timestamp <= end_dt
-        ))
+        )
         .order_by(VulnerabilityDetection.timestamp.asc())
     )
     
