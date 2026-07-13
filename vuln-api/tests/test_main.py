@@ -1,5 +1,6 @@
 # test_main.py
 
+from http.client import HTTPException
 import os
 
 from fastapi.testclient import TestClient
@@ -8,12 +9,14 @@ import uuid
 from datetime import datetime, timezone
 from httpx import AsyncClient, ASGITransport
 from unittest.mock import AsyncMock, MagicMock, patch
-from app.main import app
+from app.main import app, get_date_filters
 from app.db import get_db
 from app.auth import get_current_user, hash_password
 from app.models import User, Asset, VulnerabilityDetection, VulnStatus, VulnerabilityCatalog, WazuhConnection
 from uuid import uuid4
 import math
+from sqlalchemy import Column, DateTime
+from fastapi import HTTPException as FastAPIException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 for route in app.routes:
@@ -935,6 +938,108 @@ async def test_get_vulns_timeline_gantt_success():
     assert snapshot["agent_count"] == 1
     assert "agent-test-01" in snapshot["agents"]
 
+@pytest.mark.anyio
+async def test_get_vulns_timeline_gantt_with_filters():
+    """
+    Verifica que el endpoint procese correctamente los parámetros opcionales
+    agent, severity y search para alcanzar cobertura en esas ramas (if).
+    """
+    mock_now = datetime(2026, 7, 13, 12, 0, 0, tzinfo=timezone.utc)
+    
+    mock_result_bounds = MagicMock()
+    mock_result_bounds.one_or_none.return_value = (mock_now, mock_now)
+    
+    mock_result_count = MagicMock()
+    mock_result_count.scalar.return_value = 1
+    
+    mock_result_page = MagicMock()
+    mock_result_page.all.return_value = [("CVE-2024-1234", "CRITICAL", "Desc")]
+    
+    mock_result_snaps = MagicMock()
+    mock_result_snaps.all.return_value = [("CVE-2024-1234", mock_now, "agent-01", "Detected")]
+
+    mock_session = AsyncMock()
+    mock_session.execute.side_effect = [
+        mock_result_bounds, 
+        mock_result_count, 
+        mock_result_page, 
+        mock_result_snaps
+    ]
+
+    app.dependency_overrides[get_db] = lambda: mock_session
+    transport = ASGITransport(app=app)
+    original_root_path = app.root_path
+    app.root_path = ""
+    
+    try:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get(
+                "/api/vulns/timeline/gantt",
+                params={
+                    "connection_id": 1,
+                    "agent": "ubuntu",          # Activa 'if agent:'
+                    "severity": "CRITICAL",     # Activa 'if severity:'
+                    "search": "CVE-2024"        # Activa 'if search:'
+                }
+            )
+    finally:
+        app.dependency_overrides.clear()
+        app.root_path = original_root_path
+
+    assert response.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_get_vulns_timeline_gantt_empty_results():
+    """
+    Verifica el comportamiento cuando no hay vulnerabilidades detectadas,
+    cubriendo el escenario donde 'page_cves' está vacío.
+    """
+    # Query 1: res_bounds (Sin fechas registradas)
+    mock_result_bounds = MagicMock()
+    mock_result_bounds.one_or_none.return_value = (None, None)
+    
+    # Query 2: total_cves (Cero CVEs)
+    mock_result_count = MagicMock()
+    mock_result_count.scalar.return_value = 0
+    
+    # Query 3: page_cves (Lista vacía)
+    mock_result_page = MagicMock()
+    mock_result_page.all.return_value = []
+
+    # Mock DB: Solo pasamos 3 resultados porque la consulta de snapshots no se ejecutará
+    mock_session = AsyncMock()
+    mock_session.execute.side_effect = [
+        mock_result_bounds, 
+        mock_result_count, 
+        mock_result_page
+    ]
+
+    app.dependency_overrides[get_db] = lambda: mock_session
+    transport = ASGITransport(app=app)
+    original_root_path = app.root_path
+    app.root_path = ""
+    
+    try:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get(
+                "/api/vulns/timeline/gantt",
+                params={"connection_id": 1}
+            )
+    finally:
+        app.dependency_overrides.clear()
+        app.root_path = original_root_path
+
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Validaciones del escenario vacío
+    assert data["total_cves"] == 0
+    assert data["total_pages"] == 0
+    assert len(data["cves"]) == 0
+    assert data["min_timestamp"] is None
+    assert data["max_timestamp"] is None
+
 
 @pytest.mark.anyio
 async def test_get_vulns_analytics_summary_success():
@@ -1029,6 +1134,141 @@ async def test_get_vulns_analytics_summary_success():
     # Validar Top CVE Crítico
     assert data["top_critical_cve"] == "CVE-2024-9999"
 
+def test_get_date_filters_valid_periods():
+    """
+    Verifica que los periodos predefinidos devuelvan la cantidad 
+    correcta de filtros usando una columna real de SQLAlchemy.
+    """
+    # Usamos una columna ficticia de SQLAlchemy en vez de MagicMock
+    mock_col = Column('timestamp', DateTime)
+    
+    assert len(get_date_filters("24h", None, mock_col)) == 1
+    assert len(get_date_filters("7d", None, mock_col)) == 1
+    assert len(get_date_filters("30d", None, mock_col)) == 1
+    assert len(get_date_filters("all", None, mock_col)) == 0
+
+
+def test_get_date_filters_day_valid():
+    """
+    Verifica el periodo 'day' cuando se pasa una fecha correcta.
+    """
+    mock_col = Column('timestamp', DateTime)
+    filters = get_date_filters("day", "2026-07-13", mock_col)
+    
+    assert len(filters) == 2
+
+
+def test_get_date_filters_day_missing_date():
+    """
+    Verifica que arroje error 400 si se pide 'day' pero no se envía la fecha.
+    """
+    mock_col = Column('timestamp', DateTime)
+    
+    # Usamos el alias FastAPIException para garantizar que atrapamos la correcta
+    with pytest.raises(FastAPIException) as exc_info:
+        get_date_filters("day", None, mock_col)
+        
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail["error"] == "Falta parámetro date"
+
+
+def test_get_date_filters_day_invalid_date():
+    """
+    Verifica que arroje error 400 si se pide 'day' con un formato de fecha incorrecto.
+    """
+    mock_col = Column('timestamp', DateTime)
+    
+    with pytest.raises(FastAPIException) as exc_info:
+        get_date_filters("day", "13-07-2026", mock_col) 
+        
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail["error"] == "Formato de fecha inválido"
+
+
+def test_get_date_filters_invalid_period():
+    """
+    Verifica que arroje error 400 si se pasa un periodo que no existe.
+    """
+    mock_col = Column('timestamp', DateTime)
+    
+    with pytest.raises(FastAPIException) as exc_info:
+        get_date_filters("48h", None, mock_col) 
+        
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail["error"] == "Periodo no válido"
+
+@pytest.mark.anyio
+async def test_get_vulns_dashboard_success():
+    """
+    Verifica que el endpoint del dashboard retorne las distribuciones
+    correctas de severidad y estado haciendo un mock de las 2 consultas.
+    """
+    # 1. Configurar Mocks para las 2 queries
+    
+    # Query 1: res_sev (severity, count)
+    mock_result_sev = MagicMock()
+    # Incluimos una severidad "UNKNOWN" para verificar que el código
+    # la ignora correctamente sin fallar (gracias al 'if sev in severity_distribution')
+    mock_result_sev.all.return_value = [
+        ("CRITICAL", 10),
+        ("HIGH", 5),
+        ("UNKNOWN", 2) 
+    ]
+    
+    # Query 2: res_status (status, count)
+    mock_result_status = MagicMock()
+    mock_result_status.all.return_value = [
+        ("Detected", 8),
+        ("Resolved", 7)
+    ]
+
+    # 2. Mock de la sesión de base de datos
+    mock_session = AsyncMock()
+    mock_session.execute.side_effect = [
+        mock_result_sev, 
+        mock_result_status
+    ]
+
+    # 3. Inyectar dependencias y manejar el root_path
+    app.dependency_overrides[get_db] = lambda: mock_session
+    transport = ASGITransport(app=app)
+    original_root_path = app.root_path
+    app.root_path = ""
+    
+    try:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get(
+                "/api/vulns/dashboard",
+                params={
+                    "connection_id": 1,
+                    "period": "7d"
+                }
+            )
+    finally:
+        # 4. Limpiar overrides
+        app.dependency_overrides.clear()
+        app.root_path = original_root_path
+
+    # 5. Aserciones
+    assert response.status_code == 200
+    
+    data = response.json()
+    
+    # Validar distribución de severidad
+    assert data["severity_distribution"]["CRITICAL"] == 10
+    assert data["severity_distribution"]["HIGH"] == 5
+    assert data["severity_distribution"]["MEDIUM"] == 0 # Sin datos, debe ser 0
+    assert data["severity_distribution"]["LOW"] == 0    # Sin datos, debe ser 0
+    # "UNKNOWN" no debe estar en la respuesta final
+    assert "UNKNOWN" not in data["severity_distribution"]
+
+    # Validar distribución de estado
+    assert data["status_distribution"]["Detected"] == 8
+    assert data["status_distribution"]["Resolved"] == 7
+    assert data["status_distribution"]["Re-emerged"] == 0 # Sin datos, debe ser 0
+    
+    # Validar suma total de los estados reportados
+    assert data["total"] == 15
 
 def teardown_module(module):
     app.dependency_overrides.clear()
