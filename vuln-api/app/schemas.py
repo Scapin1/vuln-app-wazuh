@@ -136,3 +136,13 @@ class TimelineEventsResponse(BaseModel):
     detections: List[TimelineEventItemSchema]
     resolutions: List[TimelineEventItemSchema]
 
+class CriticalVulnViewDTO(BaseModel):
+    cve_id: str
+    cvss_score: Optional[float] = None
+    description: Optional[str] = None
+    total_affected_agents: int
+    affected_wazuh_agent_ids: List[str]
+    affected_hostnames: List[str]
+
+    class Config:
+        from_attributes = True

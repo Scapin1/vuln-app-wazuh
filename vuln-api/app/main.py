@@ -30,7 +30,7 @@ from .models import Asset, VulnerabilityCatalog, VulnerabilityDetection, User, W
 from .schemas import (
     AnalyticsSummaryResponse, DashboardSummaryResponse, FilterOptionsResponse, GanttTimelineResponse, SnapshotSchema, TimelineCVESchema, TimelineEventsResponse, UserCreate, UserOut, AssetCreate, AssetOut, 
     CatalogCreate, CatalogOut, DetectionCreate, DetectionOut, 
-    VulnStatus, AssetUpdate, CatalogUpdate,
+    VulnStatus, AssetUpdate, CatalogUpdate, CriticalVulnViewDTO,
 ) 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -1120,3 +1120,39 @@ async def refresh_critical_view(
             status_code=500, 
             detail="Error interno al intentar actualizar las analíticas. Contacte al administrador."
         )
+    
+@app.get(
+    "/api/vulns/analytics/critical-view", 
+    response_model=List[CriticalVulnViewDTO], 
+    tags=["Analytics"]
+)
+async def get_critical_vulnerabilities_view(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db)
+):
+    query = """
+        SELECT 
+            cve_id, 
+            cvss_score, 
+            description, 
+            total_affected_agents, 
+            affected_wazuh_agent_ids, 
+            affected_hostnames
+        FROM mv_critical_vulnerabilities
+        ORDER BY total_affected_agents DESC;
+    """
+
+    result = await db.execute(text(query))
+    rows = result.mappings().all()
+    response_data = []
+    for row in rows:
+        response_data.append({
+            "cve_id": row["cve_id"],
+            "cvss_score": float(row["cvss_score"]) if row["cvss_score"] else None,
+            "description": row["description"],
+            "total_affected_agents": row["total_affected_agents"],
+            "affected_wazuh_agent_ids": row["affected_wazuh_agent_ids"] or [],
+            "affected_hostnames": row["affected_hostnames"] or []
+        })
+        
+    return response_data

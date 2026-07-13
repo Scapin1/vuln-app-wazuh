@@ -1270,5 +1270,107 @@ async def test_get_vulns_dashboard_success():
     # Validar suma total de los estados reportados
     assert data["total"] == 15
 
+@pytest.mark.anyio
+async def test_get_critical_vulnerabilities_view_success():
+    """
+    Verifica que el endpoint de la vista materializada procese correctamente 
+    los resultados de la query cruda simulando diccionarios.
+    """
+    # 1. Configurar el Mock de la Base de Datos para mappings().all()
+    mock_result = MagicMock()
+    mock_result.mappings().all.return_value = [
+        {
+            "cve_id": "CVE-2024-0001",
+            "cvss_score": "9.8",  # En BD esto suele venir como String, Decimal o Numeric
+            "description": "Ejemplo de vulnerabilidad crítica",
+            "total_affected_agents": 2,
+            "affected_wazuh_agent_ids": ["001", "002"],
+            "affected_hostnames": ["server-prod-1", "server-prod-2"]
+        },
+        {
+            "cve_id": "CVE-2024-0002",
+            "cvss_score": None,   # Caso de prueba: score nulo
+            "description": "Otra vulnerabilidad",
+            "total_affected_agents": 1,
+            "affected_wazuh_agent_ids": ["003"],
+            "affected_hostnames": ["desktop-01"]
+        }
+    ]
+    
+    mock_session = AsyncMock()
+    mock_session.execute.return_value = mock_result
+    
+    # 2. Configurar el Mock del Usuario Autenticado
+    mock_user = User(user_email="test@empresa.com", user_name="Admin Test")
+
+    # 3. Sobrescribir las dependencias
+    app.dependency_overrides[get_db] = lambda: mock_session
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    
+    transport = ASGITransport(app=app)
+    original_root_path = app.root_path
+    app.root_path = ""
+    
+    try:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get("/api/vulns/analytics/critical-view")
+    finally:
+        # Limpiar dependencias
+        app.dependency_overrides.clear()
+        app.root_path = original_root_path
+
+    # 4. Aserciones
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Validamos que devuelva 2 registros
+    assert len(data) == 2
+    
+    # Validar el primer registro (Conversión a Float y listas)
+    assert data[0]["cve_id"] == "CVE-2024-0001"
+    assert data[0]["cvss_score"] == 9.8  # El test confirma que parseó el "9.8" a float 9.8
+    assert data[0]["total_affected_agents"] == 2
+    assert "server-prod-1" in data[0]["affected_hostnames"]
+    
+    # Validar el segundo registro (manejo de nulos)
+    assert data[1]["cve_id"] == "CVE-2024-0002"
+    assert data[1]["cvss_score"] is None
+
+
+@pytest.mark.anyio
+async def test_get_critical_vulnerabilities_view_empty():
+    """
+    Verifica que el endpoint devuelva una lista vacía si la vista materializada 
+    no tiene registros.
+    """
+    mock_result = MagicMock()
+    mock_result.mappings().all.return_value = []
+    
+    mock_session = AsyncMock()
+    mock_session.execute.return_value = mock_result
+    
+    mock_user = User(user_email="test@empresa.com")
+
+    app.dependency_overrides[get_db] = lambda: mock_session
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    
+    transport = ASGITransport(app=app)
+    original_root_path = app.root_path
+    app.root_path = ""
+    
+    try:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get("/api/vulns/analytics/critical-view")
+    finally:
+        app.dependency_overrides.clear()
+        app.root_path = original_root_path
+
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Validar que responde correctamente con un array vacío
+    assert isinstance(data, list)
+    assert len(data) == 0
+
 def teardown_module(module):
     app.dependency_overrides.clear()
