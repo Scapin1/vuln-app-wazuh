@@ -1,10 +1,11 @@
 # app/main.py
 from collections import defaultdict
+import logging
 import math
 from operator import and_, or_
 import re
 import os
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, logger
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import set_key, find_dotenv
@@ -35,6 +36,9 @@ from .schemas import (
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from datetime import datetime
+
+
+logger = logging.getLogger(__name__)
 
 CONNECTION_NOT_FOUND = "Conexión no encontrada"
 
@@ -1090,3 +1094,30 @@ async def update_catalog(
     await db.commit()
     await db.refresh(db_cve)
     return db_cve
+
+
+# ===================================================================
+# Vistas Materializadas
+# ===================================================================
+
+@app.post("/api/vulns/analytics/refresh-critical", tags=["Analytics"])
+async def refresh_critical_view(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        await db.execute(text("SELECT refresh_critical_vulns_view();"))
+        await db.commit()
+        
+        return {
+            "status": "success", 
+            "message": "Analíticas críticas actualizadas correctamente."
+        }
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error actualizando la vista materializada: {e}")
+        
+        raise HTTPException(
+            status_code=500, 
+            detail="Error interno al intentar actualizar las analíticas. Contacte al administrador."
+        )

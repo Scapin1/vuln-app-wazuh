@@ -52,7 +52,6 @@ class MockResult:
         return self._scalar
         
     def scalar_one_or_none(self):
-        # Si esto retornaba None antes, tu app lanzaba el 404
         return self._one_or_none or self._scalar
 
     def scalars(self):

@@ -91,7 +91,7 @@ CREATE TABLE assets (
 -- Tabla para registrar interacciones de los usuarios con la API 
 CREATE TABLE user_interactions (
     user_interaction_id SERIAL PRIMARY KEY,
-    user_id SERIAL REFERENCES "user"(user_id) ON DELETE CASCADE,
+    user_id BIGINT REFERENCES "user"(user_id) ON DELETE CASCADE,
     endpoint VARCHAR(255),
     method VARCHAR(50),
     details TEXT,
@@ -183,4 +183,41 @@ VALUES (
     TRUE, 
     FALSE
 ) ON CONFLICT (user_email) DO NOTHING;
+
+-- ==========================================================
+-- 9. VISTAS MATERIALIZADAS
+-- ==========================================================
+
+CREATE MATERIALIZED VIEW mv_critical_vulnerabilities AS
+SELECT 
+    vc.cve_id,
+    vc.cvss_score,
+    vc.description,
+    COUNT(DISTINCT vd.asset_id) AS total_affected_agents,
+    array_agg(DISTINCT a.wazuh_agent_id) AS affected_wazuh_agent_ids,
+    array_agg(DISTINCT a.hostname) AS affected_hostnames
+FROM 
+    vulnerability_catalog vc
+JOIN 
+    vulnerability_detections vd ON vc.cve_id = vd.cve_id
+JOIN 
+    assets a ON vd.asset_id = a.asset_id
+WHERE 
+    UPPER(vc.severity) = 'CRITICAL'
+    AND vd.status IN ('Detected', 'Re-emerged')
+GROUP BY 
+    vc.cve_id, 
+    vc.cvss_score, 
+    vc.description;
+
+CREATE UNIQUE INDEX idx_mv_critical_cve_id ON mv_critical_vulnerabilities (cve_id);
+
+CREATE OR REPLACE FUNCTION refresh_critical_vulns_view()
+RETURNS void AS $$
+BEGIN
+    REFRESH MATERIALIZED VIEW CONCURRENTLY mv_critical_vulnerabilities;
+END;
+$$ LANGUAGE plpgsql;
+
+GRANT SELECT ON mv_critical_vulnerabilities TO vulnadmin;
 
