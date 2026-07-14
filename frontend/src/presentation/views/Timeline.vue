@@ -318,6 +318,6 @@ const statusWarning = computed(() => warningMessage.value)
 .btn-cancel:hover {
   background: #fef2f2;
   border-color: #f87171;
-  color: #dc2626;
+  color: #991b1b;
 }
 </style>

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import vulnService from '../services/vulnService'
 
 const CACHE_TTL_MS = 60_000 // 1 minuto
@@ -75,6 +75,46 @@ function computeFilterOptions(vulns) {
   }
 }
 
+// ── Period filtering ──
+function filterByPeriod(vulns, period, customDate) {
+  if (!period || period === 'all') return vulns
+
+  const now = new Date()
+  let startMs
+
+  switch (period) {
+    case '24h': startMs = now.getTime() - 24 * 60 * 60 * 1000; break
+    case '7d':  startMs = now.getTime() - 7 * 24 * 60 * 60 * 1000; break
+    case '30d': startMs = now.getTime() - 30 * 24 * 60 * 60 * 1000; break
+    case 'day':
+      if (customDate) {
+        const d = new Date(`${customDate}T00:00:00`)
+        startMs = d.getTime()
+        const endMs = startMs + 24 * 60 * 60 * 1000
+        return vulns.filter(v => {
+          const ts = new Date(v.first_seen || v.last_seen).getTime()
+          return ts >= startMs && ts <= endMs
+        })
+      }
+      return vulns
+    default: return vulns
+  }
+
+  return vulns.filter(v => {
+    const ts = new Date(v.last_seen || v.first_seen).getTime()
+    return ts >= startMs
+  })
+}
+
+function computeSeverityDistribution(vulns) {
+  const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
+  vulns.forEach(v => {
+    const sev = (v.severity || 'LOW').toUpperCase()
+    if (counts[sev] !== undefined) counts[sev]++
+  })
+  return counts
+}
+
 function processAgentTimestamps(cve) {
   const timestampMap = new Map()
   cve.agents.forEach(agent => {
@@ -135,46 +175,6 @@ export const useVulnStore = defineStore('vulns', () => {
 
   function invalidateCache() {
     cache.value.clear()
-  }
-
-  // ── Helpers de filtrado ──
-  function filterByPeriod(vulns, period, customDate) {
-    if (!period || period === 'all') return vulns
-
-    const now = new Date()
-    let startMs
-
-    switch (period) {
-      case '24h': startMs = now.getTime() - 24 * 60 * 60 * 1000; break
-      case '7d':  startMs = now.getTime() - 7 * 24 * 60 * 60 * 1000; break
-      case '30d': startMs = now.getTime() - 30 * 24 * 60 * 60 * 1000; break
-      case 'day':
-        if (customDate) {
-          const d = new Date(customDate)
-          startMs = d.getTime()
-          const endMs = startMs + 24 * 60 * 60 * 1000
-          return vulns.filter(v => {
-            const ts = new Date(v.last_seen || v.first_seen).getTime()
-            return ts >= startMs && ts <= endMs
-          })
-        }
-        return vulns
-      default: return vulns
-    }
-
-    return vulns.filter(v => {
-      const ts = new Date(v.last_seen || v.first_seen).getTime()
-      return ts >= startMs
-    })
-  }
-
-  function computeSeverityDistribution(vulns) {
-    const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
-    vulns.forEach(v => {
-      const sev = (v.severity || 'LOW').toUpperCase()
-      if (counts[sev] !== undefined) counts[sev]++
-    })
-    return counts
   }
 
   // ── Dashboard Summary ──

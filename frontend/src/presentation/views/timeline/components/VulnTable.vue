@@ -438,7 +438,7 @@ watch(() => props.vulns, () => { currentPage.value = 1 })
 
 .end .point-marker {
   background-color: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
+  color: #1e40af;
   border: 1px solid rgba(59, 130, 246, 0.2);
 }
 
@@ -692,22 +692,22 @@ th {
 }
 
 .badge-critical {
-  background: rgba(220, 38, 38, 0.15);
-  color: #b91c1c;
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 .badge-high {
-  background: rgba(234, 88, 12, 0.15);
-  color: #c2410c;
+  background: #ffedd5;
+  color: #7c2d12;
 }
 
 .badge-medium {
-  background: rgba(234, 179, 8, 0.15);
-  color: #a16207;
+  background: #fef9c3;
+  color: #713f12;
 }
 
 .badge-low {
-  background: rgba(59, 130, 246, 0.15);
-  color: #1e40af;
+  background: #dbeafe;
+  color: #1e3a5e;
 }
 </style>
