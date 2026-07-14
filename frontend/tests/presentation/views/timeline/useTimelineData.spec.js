@@ -55,7 +55,7 @@ describe('useTimelineData', () => {
       selectedAgents: ref([]),
       selectedVulns: ref([]),
       period: ref('7d'),
-      customDate: ref('2026-03-08'),
+      customDate: ref('2026-03-07'),
       activeZoom: ref({ slotHours: 24 }),
       getConnectionName: () => 'Demo Connection'
     }
