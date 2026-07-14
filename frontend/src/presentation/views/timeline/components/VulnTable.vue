@@ -452,7 +452,7 @@ watch(() => props.vulns, () => { currentPage.value = 1 })
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.025em;
-  color: #64748b;
+  color: #475569;
   font-weight: 600;
 }
 

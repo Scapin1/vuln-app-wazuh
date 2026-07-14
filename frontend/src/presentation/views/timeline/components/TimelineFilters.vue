@@ -83,10 +83,10 @@
         <label for="custom-date">Dia</label>
         <div class="dt-row">
           <input id="custom-date" type="date" :value="datePart" @input="onDateChange" class="filter-input">
-          <select :value="hourPart" @change="onHourChange" class="filter-input time-sel">
+          <select id="filter-hour" :value="hourPart" @change="onHourChange" class="filter-input time-sel" aria-label="Hora">
             <option v-for="h in HOURS" :key="h" :value="h">{{ h }}</option>
           </select>
-          <select :value="minutePart" @change="onMinuteChange" class="filter-input time-sel">
+          <select id="filter-minute" :value="minutePart" @change="onMinuteChange" class="filter-input time-sel" aria-label="Minuto">
             <option v-for="m in MINUTES" :key="m" :value="m">{{ m }}</option>
           </select>
         </div>

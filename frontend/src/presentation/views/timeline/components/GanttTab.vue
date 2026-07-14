@@ -17,10 +17,10 @@
           <label for="ganttSearchDate" class="search-date-label">Buscar fecha:</label>
           <div class="search-dt-row">
             <input id="ganttSearchDate" type="date" :value="ganttDatePart" @input="e => onGanttDateChange(e.target.value)" class="date-input" />
-            <select :value="ganttHourPart" @change="e => onGanttHourChange(e.target.value)" class="date-input time-sel">
+            <select id="gantt-hour" :value="ganttHourPart" @change="e => onGanttHourChange(e.target.value)" class="date-input time-sel" aria-label="Hora">
               <option v-for="h in GANTT_HOURS" :key="h" :value="h">{{ h }}</option>
             </select>
-            <select :value="ganttMinutePart" @change="e => onGanttMinuteChange(e.target.value)" class="date-input time-sel">
+            <select id="gantt-minute" :value="ganttMinutePart" @change="e => onGanttMinuteChange(e.target.value)" class="date-input time-sel" aria-label="Minuto">
               <option v-for="m in GANTT_MINUTES" :key="m" :value="m">{{ m }}</option>
             </select>
           </div>
