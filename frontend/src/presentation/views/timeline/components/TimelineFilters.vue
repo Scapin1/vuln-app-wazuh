@@ -118,7 +118,7 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import VueDatePicker from '@vuepic/vue-datepicker'
+import { VueDatePicker } from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 
 const props = defineProps({
