@@ -2,8 +2,8 @@
   <div class="fade-in timeline-view">
     <div class="header-actions">
       <div>
-        <h1 class="title">Linea del tiempo</h1>
-        <p class="subtitle">Vista infografica con linea continua y slots con o sin cambios.</p>
+        <h1 class="title">Vulnerabilidades</h1>
+        <p class="subtitle">Listado de vulnerabilidades detectadas con filtros y tabla ordenable.</p>
       </div>
     </div>
 
@@ -64,7 +64,7 @@
       <h3>Sin datos para mostrar</h3>
       <p>No se encontraron vulnerabilidades para los filtros seleccionados.</p>
     </div>
-    <VulnTable v-else :vulns="filteredVulnsData" :loading="false" />
+    <VulnTable v-else :vulns="filteredVulnsData" :loading="false" :connection-name="getConnectionName()" />
   </div>
 </template>
 
