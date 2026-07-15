@@ -643,6 +643,48 @@ const formatDate = (d) => {
   font-size: 14px;
 }
 
+/* Compact calendar popup */
+.search-date :deep(.dp__menu) {
+  font-size: 11px;
+  padding: 6px;
+}
+
+.search-date :deep(.dp__calendar) {
+  max-width: 220px;
+}
+
+.search-date :deep(.dp__cell_inner) {
+  font-size: 10px;
+  height: 24px;
+  width: 24px;
+}
+
+.search-date :deep(.dp__day) {
+  font-size: 10px;
+  height: 24px;
+  width: 24px;
+}
+
+.search-date :deep(.dp__month_year_item) {
+  font-size: 10px;
+  height: 28px;
+  width: 28px;
+}
+
+.search-date :deep(.dp__time_input) {
+  font-size: 11px;
+}
+
+.search-date :deep(.dp__time_col) {
+  padding: 2px;
+}
+
+.search-date :deep(.dp__time_btn) {
+  font-size: 10px;
+  height: 22px;
+  width: 36px;
+}
+
 .search-date-label {
   font-size: 11px;
   color: #64748b;

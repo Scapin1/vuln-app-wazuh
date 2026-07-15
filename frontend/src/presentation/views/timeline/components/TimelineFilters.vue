@@ -260,6 +260,48 @@ const toggleSeverity = (sev) => {
   font-size: 14px;
 }
 
+/* Compact calendar popup */
+.day-datetime-group :deep(.dp__menu) {
+  font-size: 11px;
+  padding: 6px;
+}
+
+.day-datetime-group :deep(.dp__calendar) {
+  max-width: 220px;
+}
+
+.day-datetime-group :deep(.dp__cell_inner) {
+  font-size: 10px;
+  height: 24px;
+  width: 24px;
+}
+
+.day-datetime-group :deep(.dp__day) {
+  font-size: 10px;
+  height: 24px;
+  width: 24px;
+}
+
+.day-datetime-group :deep(.dp__month_year_item) {
+  font-size: 10px;
+  height: 28px;
+  width: 28px;
+}
+
+.day-datetime-group :deep(.dp__time_input) {
+  font-size: 11px;
+}
+
+.day-datetime-group :deep(.dp__time_col) {
+  padding: 2px;
+}
+
+.day-datetime-group :deep(.dp__time_btn) {
+  font-size: 10px;
+  height: 22px;
+  width: 36px;
+}
+
 @media (max-width: 1400px) {
   .filter-row { grid-template-columns: 1fr 1fr; }
   .f-group { border-right: none; border-bottom: 1px solid var(--border); }
