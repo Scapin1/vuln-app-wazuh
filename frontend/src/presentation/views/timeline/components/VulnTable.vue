@@ -200,6 +200,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { parseServerDate } from '../timelineFormatters'
 
 const props = defineProps({
   vulns: { type: Array, required: true },
@@ -232,8 +233,8 @@ const compareValues = (a, b, key) => {
   let bVal = b[key]
 
   if (key === 'first_seen' || key === 'last_seen') {
-    aVal = aVal ? new Date(aVal).getTime() : 0
-    bVal = bVal ? new Date(bVal).getTime() : 0
+    aVal = aVal ? parseServerDate(aVal).getTime() : 0
+    bVal = bVal ? parseServerDate(bVal).getTime() : 0
     return aVal - bVal
   } else if (key === 'severity') {
     aVal = getSeverityLevel(aVal)
@@ -251,8 +252,8 @@ const compareValues = (a, b, key) => {
 
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A'
-  const d = new Date(dateString)
-  return d.toLocaleDateString('es-ES', {
+  const d = parseServerDate(dateString)
+  return d.toLocaleDateString('es-CL', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit'
   })
@@ -277,15 +278,15 @@ const getSeverityBadgeClass = (severity) => {
 const isRecentlySeen = (lastSeenDate) => {
   if (!lastSeenDate) return false
   const now = new Date()
-  const lastSeen = new Date(lastSeenDate)
+  const lastSeen = parseServerDate(lastSeenDate)
   const diffMinutes = Math.floor((now - lastSeen) / (1000 * 60))
   return diffMinutes <= 60
 }
 
 const getTimelineProgress = (vuln) => {
   if (!vuln.first_seen || !vuln.last_seen) return 0
-  const first = new Date(vuln.first_seen).getTime()
-  const last = new Date(vuln.last_seen).getTime()
+  const first = parseServerDate(vuln.first_seen).getTime()
+  const last = parseServerDate(vuln.last_seen).getTime()
   const now = Date.now()
 
   if (last === first) return 0
@@ -298,7 +299,7 @@ const getTimelineProgress = (vuln) => {
 
 const timeAgo = (date) => {
   if (!date) return 'N/A'
-  const seconds = Math.floor((Date.now() - new Date(date)) / 1000)
+  const seconds = Math.floor((Date.now() - parseServerDate(date)) / 1000)
 
   let interval = seconds / 31536000
   if (interval > 1) return `Hace ${Math.floor(interval)} años`

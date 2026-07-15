@@ -101,6 +101,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
+import { parseServerDate } from '../timelineFormatters'
 
 const props = defineProps({
   ganttData: { type: Array, default: () => null }
@@ -109,22 +110,11 @@ const props = defineProps({
 const ITEMS_PER_PAGE = 20
 const currentPage = ref(1)
 
-// Preserve full datetime — do NOT strip time component
+// Preserve full datetime — use parseServerDate for correct UTC handling
 const toLocalDate = (d) => {
   if (!d) return new Date()
   if (d instanceof Date) return d
-  const dateStr = d.split('T')[0]
-  const parts = dateStr.split('-')
-  const base = new Date(Number.parseInt(parts[0]), Number.parseInt(parts[1]) - 1, Number.parseInt(parts[2]))
-  if (d.includes('T')) {
-    const timePart = d.split('T')[1]
-    if (timePart) {
-      const [hms] = timePart.split(/[Z+-]/)
-      const [h, m, s] = hms.split(':').map(Number)
-      base.setHours(h || 0, m || 0, s || 0, 0)
-    }
-  }
-  return base
+  return parseServerDate(d) || new Date()
 }
 
 // ── DEMO SNAPSHOTS (replaces old DEMO_DATA) ──

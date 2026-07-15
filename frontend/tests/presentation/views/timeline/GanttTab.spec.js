@@ -203,8 +203,9 @@ describe('GanttTab.vue', () => {
       const wrapper = emptyWrapper()
       const result = wrapper.vm.toLocalDate('2026-03-15T14:30:00Z')
       expect(result).toBeInstanceOf(Date)
-      expect(result.getHours()).toBe(14)
-      expect(result.getMinutes()).toBe(30)
+      // parseServerDate correctly converts UTC string to Date object
+      // getTime() is timezone-independent, so we compare absolute timestamps
+      expect(result.getTime()).toBe(new Date('2026-03-15T14:30:00Z').getTime())
     })
 
     it('handles ISO date string without time', () => {

@@ -21,6 +21,7 @@
       :periods="periods"
       :custom-date="customDate"
       :loading="loading"
+      compact
       @update:selected-connection="selectedConnection = $event"
       @update:selected-agents="selectedAgents = $event"
       @update:selected-vulns="selectedVulns = $event"
