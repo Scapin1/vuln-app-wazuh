@@ -15,36 +15,15 @@
         <div class="gantt-controls">
           <div class="search-date">
             <label for="ganttSearchDate" class="search-date-label">Buscar fecha:</label>
-            <button class="date-trigger" @click="toggleDatePicker">
-              <span>{{ formattedSearchDate || 'Seleccionar...' }}</span>
-              <span class="cal-icon">📅</span>
-            </button>
-            <div v-if="showDatePicker" class="date-popup" ref="datePopupRef">
-              <div class="popup-row">
-                <select v-model="pickerYear" class="popup-sel" @click.stop>
-                  <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
-                </select>
-                <select v-model="pickerMonth" class="popup-sel" @click.stop>
-                  <option v-for="(m, i) in MONTHS" :key="i" :value="i">{{ m }}</option>
-                </select>
-                <select v-model="pickerDay" class="popup-sel" @click.stop>
-                  <option v-for="d in daysInMonth" :key="d" :value="d">{{ String(d).padStart(2, '0') }}</option>
-                </select>
-              </div>
-              <div class="popup-row">
-                <select v-model="pickerHour" class="popup-sel time-sel" @click.stop>
-                  <option v-for="h in 24" :key="h-1" :value="String(h-1).padStart(2, '0')">{{ String(h-1).padStart(2, '0') }}</option>
-                </select>
-                <span class="time-sep">:</span>
-                <select v-model="pickerMinute" class="popup-sel time-sel" @click.stop>
-                  <option v-for="m in 60" :key="m-1" :value="String(m-1).padStart(2, '0')">{{ String(m-1).padStart(2, '0') }}</option>
-                </select>
-              </div>
-              <div class="popup-actions">
-                <button class="popup-btn cancel" @click="showDatePicker = false">Cancelar</button>
-                <button class="popup-btn apply" @click="applyPickerDate">Aplicar</button>
-              </div>
-            </div>
+            <VueDatePicker
+              v-model="ganttDateModel"
+              :enable-time-picker="true"
+              :time-picker-inline="true"
+              format="dd/MM/yyyy HH:mm"
+              :teleport="true"
+              auto-apply
+              @update:model-value="onGanttDatePickerChange"
+            />
             <button class="search-btn" @click="scrollToDate">Ir</button>
           </div>
           <div class="zoom-controls">
@@ -117,7 +96,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
+import { VueDatePicker } from '@vuepic/vue-datepicker'
+import '@vuepic/vue-datepicker/dist/main.css'
 import { parseServerDate } from '../timelineFormatters'
 
 const props = defineProps({
@@ -299,77 +280,26 @@ watch(() => props.ganttData, () => {
 // ── Scroll / Search ──
 const scrollWrapper = ref(null)
 const searchDate = ref('')
-const showDatePicker = ref(false)
-const datePopupRef = ref(null)
 
-const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-
-const now = new Date()
-const pickerYear = ref(now.getFullYear())
-const pickerMonth = ref(now.getMonth())
-const pickerDay = ref(now.getDate())
-const pickerHour = ref('00')
-const pickerMinute = ref('00')
-
-const years = computed(() => {
-  const y = []
-  for (let i = now.getFullYear() - 5; i <= now.getFullYear() + 2; i++) y.push(i)
-  return y
+const ganttDateModel = computed({
+  get: () => {
+    if (!searchDate.value) return null
+    const d = new Date(searchDate.value)
+    return isNaN(d.getTime()) ? null : d
+  },
+  set: () => {}
 })
 
-const daysInMonth = computed(() => {
-  const days = new Date(pickerYear.value, pickerMonth.value + 1, 0).getDate()
-  return Array.from({ length: days }, (_, i) => i + 1)
-})
-
-const formattedSearchDate = computed(() => {
-  if (!searchDate.value) return ''
-  const d = new Date(searchDate.value)
-  if (isNaN(d.getTime())) return searchDate.value
-  const dd = String(d.getDate()).padStart(2, '0')
+const onGanttDatePickerChange = (date) => {
+  if (!date) return
+  const d = date instanceof Date ? date : new Date(date)
+  const yyyy = d.getFullYear()
   const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
   const hh = String(d.getHours()).padStart(2, '0')
   const min = String(d.getMinutes()).padStart(2, '0')
-  return `${dd}/${mm}/${d.getFullYear()} ${hh}:${min}`
-})
-
-const toggleDatePicker = () => {
-  if (showDatePicker.value) {
-    showDatePicker.value = false
-    return
-  }
-  // Parse current searchDate into picker values
-  if (searchDate.value) {
-    const d = new Date(searchDate.value)
-    if (!isNaN(d.getTime())) {
-      pickerYear.value = d.getFullYear()
-      pickerMonth.value = d.getMonth()
-      pickerDay.value = d.getDate()
-      pickerHour.value = String(d.getHours()).padStart(2, '0')
-      pickerMinute.value = String(d.getMinutes()).padStart(2, '0')
-    }
-  }
-  showDatePicker.value = true
+  searchDate.value = `${yyyy}-${mm}-${dd}T${hh}:${min}`
 }
-
-const applyPickerDate = () => {
-  const hh = pickerHour.value.padStart(2, '0')
-  const min = pickerMinute.value.padStart(2, '0')
-  const mm = String(pickerMonth.value + 1).padStart(2, '0')
-  const dd = String(pickerDay.value).padStart(2, '0')
-  searchDate.value = `${pickerYear.value}-${mm}-${dd}T${hh}:${min}`
-  showDatePicker.value = false
-}
-
-// Close picker when clicking outside
-const handleClickOutside = (e) => {
-  if (datePopupRef.value && !datePopupRef.value.contains(e.target) && !e.target.closest('.date-trigger')) {
-    showDatePicker.value = false
-  }
-}
-
-onMounted(() => document.addEventListener('click', handleClickOutside))
-onUnmounted(() => document.removeEventListener('click', handleClickOutside))
 
 const scrollToDate = () => {
   if (!searchDate.value || !scrollWrapper.value || !timeLabels.value.length) return
@@ -688,105 +618,86 @@ const formatDate = (d) => {
   display: flex;
   gap: 4px;
   align-items: center;
-  position: relative;
 }
 
-.date-trigger {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
+.search-date :deep(.dp__input) {
+  padding: 2px 4px;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
   font-size: 11px;
   background: white;
   color: #334155;
-  cursor: pointer;
-  height: 26px;
-  min-width: 120px;
+  outline: none;
+  width: 130px;
+  height: 24px;
 }
 
-.date-trigger:hover {
+.search-date :deep(.dp__input:focus) {
   border-color: #3d6a00;
+  box-shadow: 0 0 0 2px rgba(61, 106, 0, 0.15);
 }
 
-.cal-icon {
+.search-date :deep(.dp__input_icons) {
+  color: #64748b;
   font-size: 12px;
 }
 
-.date-popup {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 100;
-  background: white;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-  padding: 8px;
-  min-width: 200px;
+/* Ultra-compact popup */
+.search-date :deep(.dp__menu) {
+  font-size: 10px;
+  padding: 4px;
 }
 
-.popup-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 6px;
+.search-date :deep(.dp__calendar) {
+  max-width: 180px;
 }
 
-.popup-sel {
-  padding: 3px 4px;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  font-size: 11px;
-  background: white;
-  color: #334155;
-  cursor: pointer;
-  height: 26px;
+.search-date :deep(.dp__calendar_header) {
+  padding: 2px 4px;
+  gap: 2px;
 }
 
-.popup-sel.time-sel {
-  width: 50px;
-}
-
-.time-sep {
+.search-date :deep(.dp__calendar_nav) {
   font-size: 12px;
-  font-weight: 700;
-  color: #64748b;
 }
 
-.popup-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  border-top: 1px solid #e2e8f0;
-  padding-top: 6px;
-  margin-top: 2px;
+.search-date :deep(.dp__cell_inner) {
+  font-size: 9px;
+  height: 20px;
+  width: 20px;
 }
 
-.popup-btn {
-  padding: 3px 10px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid #cbd5e1;
-  background: white;
-  color: #64748b;
+.search-date :deep(.dp__day) {
+  font-size: 9px;
+  height: 20px;
+  width: 20px;
 }
 
-.popup-btn.cancel:hover {
-  background: #f1f5f9;
+.search-date :deep(.dp__month_year_item) {
+  font-size: 9px;
+  height: 22px;
+  width: 22px;
 }
 
-.popup-btn.apply {
-  background: #3d6a00;
-  border-color: #3d6a00;
-  color: white;
+.search-date :deep(.dp__time_input) {
+  font-size: 10px;
+  padding: 2px;
 }
 
-.popup-btn.apply:hover {
-  background: #2d5000;
+.search-date :deep(.dp__time_col) {
+  padding: 0 2px;
+}
+
+.search-date :deep(.dp__time_btn) {
+  font-size: 9px;
+  height: 18px;
+  width: 28px;
+}
+
+.search-date :deep(.dp__inc_dec_buttons) {
+  font-size: 10px;
+  width: 18px;
+  height: 18px;
 }
 
 .search-date-label {
