@@ -500,6 +500,41 @@ describe('VulnTable.vue', () => {
     })
   })
 
+  describe('connectionName prop', () => {
+    it('renders connectionName prop value when vuln.connection_name is null', () => {
+      const vulns = [makeVuln({ connection_name: null })]
+      const wrapper = mount(VulnTable, {
+        props: { vulns, loading: false, connectionName: 'Test Connection' }
+      })
+      expect(wrapper.text()).toContain('Test Connection')
+    })
+
+    it('prefers vuln.connection_name over connectionName prop', () => {
+      const vulns = [makeVuln({ connection_name: 'Vuln Connection' })]
+      const wrapper = mount(VulnTable, {
+        props: { vulns, loading: false, connectionName: 'Prop Connection' }
+      })
+      expect(wrapper.text()).toContain('Vuln Connection')
+      expect(wrapper.text()).not.toContain('Prop Connection')
+    })
+
+    it('falls back to connectionName prop when vuln.connection_name is missing', () => {
+      const vulns = [makeVuln({ connection_name: undefined })]
+      const wrapper = mount(VulnTable, {
+        props: { vulns, loading: false, connectionName: 'Fallback Connection' }
+      })
+      expect(wrapper.text()).toContain('Fallback Connection')
+    })
+
+    it('falls back to dash when neither connection_name nor connectionName prop is provided', () => {
+      const vulns = [makeVuln({ connection_name: null })]
+      const wrapper = mount(VulnTable, {
+        props: { vulns, loading: false }
+      })
+      expect(wrapper.text()).toContain('-')
+    })
+  })
+
   describe('edge cases', () => {
     it('handles null scores', () => {
       const vulns = [makeVuln({ score_base: null })]

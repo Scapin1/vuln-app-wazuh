@@ -100,7 +100,7 @@
         </thead>
         <tbody>
           <tr v-for="vuln in paginatedVulns" :key="vuln.id">
-            <td>{{ vuln.connection_name || '-' }}</td>
+            <td>{{ vuln.connection_name || connectionName || '-' }}</td>
             <td>
               <span :class="getSeverityClass(vuln.severity)">
                 {{ (vuln.severity || 'UNKNOWN').toUpperCase() }}
@@ -203,7 +203,8 @@ import { ref, computed, watch } from 'vue'
 
 const props = defineProps({
   vulns: { type: Array, required: true },
-  loading: { type: Boolean, default: false }
+  loading: { type: Boolean, default: false },
+  connectionName: { type: String, default: '' }
 })
 
 // Sorting state
