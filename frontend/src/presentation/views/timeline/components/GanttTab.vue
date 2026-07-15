@@ -15,18 +15,17 @@
         <div class="gantt-controls">
           <div class="search-date">
             <label for="ganttSearchDate" class="search-date-label">Buscar fecha:</label>
-            <div class="search-dt-row">
-              <input id="ganttSearchDate" type="date" :value="ganttDatePart"
-                @input="e => onGanttDateChange(e.target.value)" class="date-input" />
-              <select id="gantt-hour" :value="ganttHourPart" @change="e => onGanttHourChange(e.target.value)"
-                class="date-input time-sel" aria-label="Hora">
-                <option v-for="h in GANTT_HOURS" :key="h" :value="h">{{ h }}</option>
-              </select>
-              <select id="gantt-minute" :value="ganttMinutePart" @change="e => onGanttMinuteChange(e.target.value)"
-                class="date-input time-sel" aria-label="Minuto">
-                <option v-for="m in GANTT_MINUTES" :key="m" :value="m">{{ m }}</option>
-              </select>
-            </div>
+            <VueDatePicker
+              v-model="ganttDateModel"
+              :enable-time-picker="true"
+              :time-picker-inline="true"
+              format="dd/MM/yyyy HH:mm"
+              preview-format="dd/MM/yyyy HH:mm"
+              :teleport="true"
+              :dark="true"
+              auto-apply
+              @update:model-value="onGanttDatePickerChange"
+            />
             <button class="search-btn" @click="scrollToDate">Ir</button>
           </div>
           <div class="zoom-controls">
@@ -100,6 +99,8 @@
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
+import { VueDatePicker } from '@vuepic/vue-datepicker'
+import '@vuepic/vue-datepicker/dist/main.css'
 import { parseServerDate } from '../timelineFormatters'
 
 const props = defineProps({
@@ -279,22 +280,28 @@ watch(() => props.ganttData, () => {
 })
 
 // ── Scroll / Search ──
-const GANTT_HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
-const GANTT_MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
-
 const scrollWrapper = ref(null)
 const searchDate = ref('')
 
-const ganttDatePart = computed(() => searchDate.value?.split('T')[0] || '')
-const ganttHourPart = computed(() => searchDate.value?.split('T')[1]?.split(':')[0] || '00')
-const ganttMinutePart = computed(() => searchDate.value?.split('T')[1]?.split(':')[1] || '00')
+const ganttDateModel = computed({
+  get: () => {
+    if (!searchDate.value) return null
+    const d = new Date(searchDate.value)
+    return isNaN(d.getTime()) ? null : d
+  },
+  set: () => {} // handled by onGanttDatePickerChange
+})
 
-const updateSearchDate = (date, hour, minute) => {
-  searchDate.value = `${date || ganttDatePart.value}T${hour || ganttHourPart.value}:${minute || ganttMinutePart.value}`
+const onGanttDatePickerChange = (date) => {
+  if (!date) return
+  const d = date instanceof Date ? date : new Date(date)
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  searchDate.value = `${yyyy}-${mm}-${dd}T${hh}:${min}`
 }
-const onGanttDateChange = (d) => updateSearchDate(d)
-const onGanttHourChange = (h) => updateSearchDate(null, h)
-const onGanttMinuteChange = (m) => updateSearchDate(null, null, m)
 
 const scrollToDate = () => {
   if (!searchDate.value || !scrollWrapper.value || !timeLabels.value.length) return
@@ -615,19 +622,7 @@ const formatDate = (d) => {
   align-items: center;
 }
 
-.search-dt-row {
-  display: flex;
-  gap: 2px;
-  align-items: stretch;
-}
-
-.time-sel {
-  flex: 0 0 58px;
-  cursor: pointer;
-  appearance: auto;
-}
-
-.date-input {
+.search-date :deep(.dp__input) {
   padding: 4px 6px;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
@@ -635,12 +630,16 @@ const formatDate = (d) => {
   background: white;
   color: #334155;
   outline: none;
-  width: 200px;
+  width: 180px;
 }
 
-.date-input:focus {
+.search-date :deep(.dp__input:focus) {
   border-color: #3d6a00;
   box-shadow: 0 0 0 2px rgba(61, 106, 0, 0.15);
+}
+
+.search-date :deep(.dp__input_icons) {
+  color: #64748b;
 }
 
 .search-date-label {
