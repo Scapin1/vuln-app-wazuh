@@ -1,16 +1,19 @@
 services:
   db-api:
-    image: postgres:15
+    image: timescale/timescaledb:latest-pg15
     container_name: db-api
     restart: unless-stopped
     env_file:
       - .env
+    ports:
+      - "${DB_PORT}:5432"
     volumes:
-      - postgres_api_data:/var/lib/postgresql/data
+      - timescaledb_data:/var/lib/postgresql/data
+      - ./vuln-api/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - app-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -19,7 +22,7 @@ services:
     build: ./vuln-api
     container_name: api
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db-api:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db-api:${DB_PORT}/${DB_NAME}
     depends_on:
       db-api:
         condition: service_healthy

@@ -17,6 +17,12 @@ export const fmtHour = ms => {
   return `${pad2(date.getHours())}:00`
 }
 
+/** Devuelve string en formato YYYY-MM-DDTHH:MM (local) para input datetime-local */
+export const toLocalDatetimeString = (date) => {
+  const d = date || new Date()
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
+
 export const fmtDateTime = value => {
   const date = new Date(value)
   return date.toLocaleString('es-CL', {

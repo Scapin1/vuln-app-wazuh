@@ -1,8 +1,8 @@
 import { computed, ref } from 'vue'
-import vulnService from '../../../application/services/vulnService'
+import { useVulnStore } from '../../../application/stores/vulnStore'
 import { DAY_MS, HOUR_MS, alignHour, fmtDDMM, fmtHour, fmtYear } from './timelineFormatters'
 
-const LIMIT = 2000
+const TICK_INTERVAL_MS = 1000
 
 const startOfLocalDay = ms => {
   const date = new Date(ms)
@@ -37,6 +37,35 @@ export default function useTimelineData({
   const warningMessage = ref('')
   const snapshotCache = ref(new Map())
 
+  // ── Loading progress state ──
+  const loadingMessage = ref('')
+  const elapsedSeconds = ref(0)
+  const fetchProgress = ref({ current: 0 })
+  let abortController = null
+  let timerInterval = null
+
+  const startTimer = () => {
+    elapsedSeconds.value = 0
+    clearInterval(timerInterval)
+    timerInterval = setInterval(() => { elapsedSeconds.value++ }, TICK_INTERVAL_MS)
+  }
+
+  const stopTimer = () => {
+    clearInterval(timerInterval)
+    timerInterval = null
+  }
+
+  const cancelBuild = () => {
+    if (abortController) {
+      abortController.abort()
+      abortController = null
+    }
+    stopTimer()
+    loading.value = false
+    loadingMessage.value = 'Operación cancelada'
+    fetchProgress.value = { current: 0 }
+  }
+
   const computeRange = vulns => {
     const now = new Date()
     let start = new Date(0)
@@ -47,8 +76,8 @@ export default function useTimelineData({
     if (period.value === '30d') start = new Date(now.getTime() - 30 * DAY_MS)
 
     if (period.value === 'day') {
-      start = new Date(`${customDate.value}T00:00:00`)
-      end = new Date(`${customDate.value}T23:59:59`)
+      start = new Date(customDate.value)
+      end = new Date(start.getTime() + DAY_MS - 1)
     }
 
     if (period.value === 'all' && vulns.length > 0) {
@@ -227,8 +256,8 @@ export default function useTimelineData({
     if (!hasBuilt.value || !rangeStartMs.value || !rangeEndMs.value) return []
 
     const slots = []
-    const slotMs = activeZoom.value.slotHours * HOUR_MS
-    const isDayGranularity = activeZoom.value.slotHours >= 24
+    const slotMs = (activeZoom?.value?.slotHours ?? 24) * HOUR_MS
+    const isDayGranularity = (activeZoom?.value?.slotHours ?? 24) >= 24
     const baseStartMs = isDayGranularity ? startOfLocalDay(rangeStartMs.value) : rangeStartMs.value
     const totalSlotCount = Math.max(1, Math.ceil((rangeEndMs.value - baseStartMs + 1) / slotMs))
 
@@ -241,7 +270,7 @@ export default function useTimelineData({
       // Solo crear slot si hay eventos reales (detecciones o resoluciones)
       if (painted) {
         const snapshot = snapshotAt(endMs)
-        slots.push(createSlot(startMs, endMs, summary, snapshot, activeZoom.value.slotHours))
+        slots.push(createSlot(startMs, endMs, summary, snapshot, (activeZoom?.value?.slotHours ?? 24)))
       }
     }
 
@@ -250,19 +279,11 @@ export default function useTimelineData({
 
   const paintedCount = computed(() => allSlots.value.filter(slot => slot.painted).length)
 
-  const fetchConnectionVulns = async () => {
-    const response = await vulnService.getVulns({
-      connectionId: selectedConnection.value,
-      limit: LIMIT
-    })
-
-    const data = Array.isArray(response.data) ? response.data : []
-
-    if (data.length >= LIMIT) {
-      warningMessage.value = `Se alcanzaron ${LIMIT} registros. El analisis puede estar truncado.`
-    }
-
-    return data
+  const fetchConnectionVulns = async (signal) => {
+    const store = useVulnStore()
+    const connId = selectedConnection.value || undefined
+    const allData = await store.fetchAllVulns(connId, signal)
+    return { data: allData, pages: Math.ceil(allData.length / 10000) || 1 }
   }
 
   const resetBuildState = () => {
@@ -322,33 +343,78 @@ export default function useTimelineData({
   }
 
   const build = async () => {
-    if (!selectedConnection.value) return { initialZoom: 0 }
-
     resetBuildState()
+    startTimer()
+
+    abortController = new AbortController()
+    const signal = abortController.signal
 
     try {
-      const data = await fetchConnectionVulns()
+      loadingMessage.value = 'Obteniendo datos de vulnerabilidades...'
+      const result = await fetchConnectionVulns(signal)
+      let data = result.data
+
+      // Apply period filter client-side
+      const store = useVulnStore()
+      data = store.filterByPeriod(data, period.value, customDate.value)
+
+      // Marcar fetch como completado antes de pasar a procesamiento
+      fetchProgress.value = { current: result.pages, done: true }
+
+      if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+
+      loadingMessage.value = 'Filtrando datos...'
       const filteredVulns = filterVulnerabilities(data)
+
+      loadingMessage.value = 'Procesando vulnerabilidades...'
       const processedVulns = processVulnerabilities(filteredVulns)
+
+      if (!processedVulns.length) {
+        warningMessage.value = 'No se encontraron vulnerabilidades para los filtros seleccionados.'
+        stopTimer()
+        loading.value = false
+        loadingMessage.value = ''
+        return { initialZoom: 0 }
+      }
 
       filteredVulnsData.value = processedVulns
 
+      loadingMessage.value = 'Calculando rango de tiempo...'
       const { start, end } = computeRange(filteredVulnsData.value)
       rangeStartMs.value = alignHour(start.getTime())
       rangeEndMs.value = end.getTime()
 
+      loadingMessage.value = 'Construyendo eventos...'
       const events = buildChangeEvents(filteredVulnsData.value)
+
+      loadingMessage.value = 'Finalizando...'
       return finalizeBuild(events)
     } catch (error) {
+      if (error.name === 'AbortError') {
+        loadingMessage.value = 'Operación cancelada'
+        return { initialZoom: 0 }
+      }
       errorMessage.value = 'No se pudo generar la linea de tiempo. Intenta nuevamente.'
       throw error
     } finally {
+      stopTimer()
       loading.value = false
+      abortController = null
     }
   }
 
+  const ganttData = computed(() => {
+    if (!hasBuilt.value || !filteredVulnsData.value.length) return []
+    // Return full enriched vuln records for the GanttTab to group by CVE
+    // and compute sync snapshots from timestamps
+    return filteredVulnsData.value
+  })
+
   return {
     loading,
+    loadingMessage,
+    elapsedSeconds,
+    fetchProgress,
     hasBuilt,
     allSlots,
     paintedCount,
@@ -356,7 +422,10 @@ export default function useTimelineData({
     errorMessage,
     warningMessage,
     build,
+    cancelBuild,
     fetchConnectionVulns,
-    snapshotAt
+    snapshotAt,
+    filteredVulnsData,
+    ganttData
   }
 }

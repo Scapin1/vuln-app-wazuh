@@ -210,7 +210,7 @@ describe('TimelineDetailModal.vue', () => {
     })
 
     await wrapper.find('.modal-close').trigger('click')
-    expect(wrapper.emitted('close')).toBeTruthy()
+    expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
   it('emits close when clicking overlay', async () => {
@@ -222,7 +222,7 @@ describe('TimelineDetailModal.vue', () => {
     })
 
     await wrapper.find('.modal-overlay').trigger('click')
-    expect(wrapper.emitted('close')).toBeTruthy()
+    expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
   it('shows empty state when no results match search', async () => {

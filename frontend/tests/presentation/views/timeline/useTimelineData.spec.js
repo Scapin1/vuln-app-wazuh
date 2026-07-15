@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref } from 'vue'
+import { setActivePinia, createPinia } from 'pinia'
 import useTimelineData from '@/presentation/views/timeline/useTimelineData'
 import vulnService from '@/application/services/vulnService'
 
@@ -15,6 +16,7 @@ describe('useTimelineData', () => {
   let defaultProps
 
   beforeEach(() => {
+    setActivePinia(createPinia())
     vi.clearAllMocks()
 
     // El hook calcula rangos usando `new Date()` (now). Congelamos el tiempo
@@ -53,7 +55,7 @@ describe('useTimelineData', () => {
       selectedAgents: ref([]),
       selectedVulns: ref([]),
       period: ref('7d'),
-      customDate: ref('2026-03-08'),
+      customDate: ref('2026-03-07'),
       activeZoom: ref({ slotHours: 24 }),
       getConnectionName: () => 'Demo Connection'
     }
@@ -78,6 +80,8 @@ describe('useTimelineData', () => {
     })
 
     it('handles empty connection gracefully', async () => {
+      vulnService.getVulns.mockResolvedValueOnce({ data: [] })
+
       const emptyTimeline = useTimelineData({
         ...defaultProps,
         selectedConnection: ref('')
@@ -249,7 +253,7 @@ describe('useTimelineData', () => {
         slot.startMs <= startMs && slot.endMs >= endMs
       )
 
-      expect(relevantSlot).toBeDefined()
+      expect(relevantSlot.details.length).toBeGreaterThan(0)
       const vulnDetail = relevantSlot.details.find(d => d.id === vuln.id)
 
       expect(vulnDetail.timeline_event_at).toBe(vuln.first_seen)
@@ -369,6 +373,7 @@ describe('useTimelineData', () => {
         agent_name: 'srv-01',
         cve_id: 'CVE-2023-1234',
         first_seen: 'invalid-date',
+        last_seen: '2026-03-07T10:00:00Z',
         history: []
       }]
 
@@ -396,7 +401,7 @@ describe('useTimelineData', () => {
   })
 
   describe('fetchConnectionVulns function', () => {
-    it('sets warning when limit is reached', async () => {
+    it('handles large dataset correctly', async () => {
       const largeData = Array.from({ length: 2000 }, (_, i) => ({
         id: i,
         first_seen: '2026-03-07T10:00:00Z',
@@ -405,17 +410,18 @@ describe('useTimelineData', () => {
 
       vulnService.getVulns.mockResolvedValueOnce({ data: largeData })
 
-      await timeline.fetchConnectionVulns()
+      const result = await timeline.fetchConnectionVulns()
 
-      expect(timeline.warningMessage.value).toContain('2000')
-      expect(timeline.warningMessage.value).toContain('truncado')
+      expect(result.data.length).toBe(2000)
+      expect(result.pages).toBe(1)
     })
 
     it('handles API response without data array', async () => {
       vulnService.getVulns.mockResolvedValueOnce({ data: null })
 
       const result = await timeline.fetchConnectionVulns()
-      expect(result).toEqual([])
+      expect(result.data).toEqual([])
+      expect(result.pages).toBe(1) // una página procesada (vació)
     })
   })
 

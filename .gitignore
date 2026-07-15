@@ -3,8 +3,32 @@ __pycache__/
 
 reports/
 
-vuln-api/coverage.xml
+# Dependencies & Build output
+vuln-app-wazuh/coverage.xml
 frontend/coverage/
+frontend/dist/
+
+# Frontend deps
 frontend/node_modules/
+frontend/node_modules/.pnpm/
+frontend/node_modules/.modules.yaml
+frontend/node_modules/.pnpm-workspace-state-v1.json
+
+# Nginx local SSL artifacts (should never be committed)
+nginx/ssl/*.crt
+nginx/ssl/*.key
+nginx/ssl/*.pem
+nginx/ssl/*.csr
+
 certbot/*
 .idea/
+
+# Agent and skill configuration
+.atl/
+.agents/
+.config/
+# Frontend skill-related files
+frontend/skills-lock.json
+# Hidden Claude config directories
+.claude/
+frontend/.claude/

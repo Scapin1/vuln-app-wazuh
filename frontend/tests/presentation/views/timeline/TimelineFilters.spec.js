@@ -36,7 +36,7 @@ describe('TimelineFilters.vue', () => {
     expect(select.exists()).toBe(true)
 
     await select.setValue('1')
-    expect(wrapper.emitted('update:selectedConnection')).toBeTruthy()
+    expect(wrapper.emitted('update:selectedConnection')).toHaveLength(1)
     expect(wrapper.emitted('update:selectedConnection')[0]).toEqual([1])
   })
 
@@ -101,7 +101,7 @@ describe('TimelineFilters.vue', () => {
 
     // Click '7d' chip
     await chips[1].trigger('click')
-    expect(wrapper.emitted('set-period')).toBeTruthy()
+    expect(wrapper.emitted('set-period')).toHaveLength(1)
     expect(wrapper.emitted('set-period')[0]).toContain('7d')
   })
 
@@ -110,13 +110,16 @@ describe('TimelineFilters.vue', () => {
       props: {
         ...defaultProps,
         period: 'day',
-        customDate: '2026-03-08'
+        customDate: '2026-03-08T10:00'
       }
     })
 
     const dateInput = wrapper.find('input[type="date"]')
     expect(dateInput.exists()).toBe(true)
     expect(dateInput.element.value).toBe('2026-03-08')
+    const hourSel = wrapper.find('.dt-row select:first-of-type')
+    expect(hourSel.exists()).toBe(true)
+    expect(hourSel.element.value).toBe('10')
   })
 
   it('emits vuln selection changes', async () => {
@@ -145,7 +148,7 @@ describe('TimelineFilters.vue', () => {
     })
 
     await wrapper.find('.btn-primary').trigger('click')
-    expect(wrapper.emitted('build')).toBeTruthy()
+    expect(wrapper.emitted('build')).toHaveLength(1)
   })
 
   it('disables build button when no connection selected', () => {
@@ -154,7 +157,7 @@ describe('TimelineFilters.vue', () => {
     })
 
     const buildButton = wrapper.find('.btn-primary')
-    expect(buildButton.attributes('disabled')).toBeDefined()
+    expect(buildButton.element.disabled).toBe(true)
   })
 
   it('disables build button when loading', () => {
@@ -167,7 +170,7 @@ describe('TimelineFilters.vue', () => {
     })
 
     const buildButton = wrapper.find('.btn-primary')
-    expect(buildButton.attributes('disabled')).toBeDefined()
+    expect(buildButton.element.disabled).toBe(true)
     expect(buildButton.text()).toContain('Analizando...')
   })
 
@@ -214,7 +217,7 @@ describe('TimelineFilters.vue', () => {
     const todosButton = ddActions.findAll('span')[0]
     await todosButton.trigger('click')
 
-    expect(wrapper.emitted('update:selectedAgents')).toBeTruthy()
+    expect(wrapper.emitted('update:selectedAgents')).toHaveLength(1)
     expect(wrapper.emitted('update:selectedAgents')[0][0]).toHaveLength(3)
   })
 
@@ -237,7 +240,7 @@ describe('TimelineFilters.vue', () => {
     const clearButton = ddActions.findAll('span')[1]
     await clearButton.trigger('click')
 
-    expect(wrapper.emitted('update:selectedAgents')).toBeTruthy()
+    expect(wrapper.emitted('update:selectedAgents')).toHaveLength(1)
     expect(wrapper.emitted('update:selectedAgents')[0][0]).toHaveLength(0)
   })
 
@@ -255,7 +258,7 @@ describe('TimelineFilters.vue', () => {
     const todosButton = wrapper.findAll('.dd-panel .dd-actions span')[0]
     await todosButton.trigger('click')
 
-    expect(wrapper.emitted('update:selectedVulns')).toBeTruthy()
+    expect(wrapper.emitted('update:selectedVulns')).toHaveLength(1)
     expect(wrapper.emitted('update:selectedVulns')[0][0]).toHaveLength(defaultProps.vulnOptions.length)
   })
 
@@ -276,18 +279,113 @@ describe('TimelineFilters.vue', () => {
     expect(wrapper.vm.filteredVulns).toEqual(['CVE-2023-002'])
   })
 
-  it('updates custom date when input changes', async () => {
+  it('accordion — opening agents closes vulns', async () => {
     const wrapper = mount(TimelineFilters, {
       props: {
         ...defaultProps,
-        period: 'day'
+        selectedConnection: '1'
+      }
+    })
+
+    const ddButtons = wrapper.findAll('.dd-btn')
+
+    // Open vulns dropdown first
+    await ddButtons[1].trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.findAll('.dd-panel')).toHaveLength(1)
+
+    // Now open agents — should close vulns
+    await ddButtons[0].trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.findAll('.dd-panel')).toHaveLength(1)
+  })
+
+  it('accordion — opening vulns closes agents', async () => {
+    const wrapper = mount(TimelineFilters, {
+      props: {
+        ...defaultProps,
+        selectedConnection: '1'
+      }
+    })
+
+    const ddButtons = wrapper.findAll('.dd-btn')
+
+    // Open agents dropdown first
+    await ddButtons[0].trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.findAll('.dd-panel')).toHaveLength(1)
+
+    // Now open vulns — should close agents
+    await ddButtons[1].trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.findAll('.dd-panel')).toHaveLength(1)
+  })
+
+  it('click outside closes active dropdown', async () => {
+    const wrapper = mount(TimelineFilters, {
+      props: {
+        ...defaultProps,
+        selectedConnection: '1'
+      }
+    })
+
+    // Open agents dropdown
+    const ddButtons = wrapper.findAll('.dd-btn')
+    await ddButtons[0].trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.findAll('.dd-panel')).toHaveLength(1)
+
+    // Click outside the dropdown
+    document.body.click()
+    await wrapper.vm.$nextTick()
+    expect(wrapper.findAll('.dd-panel')).toHaveLength(0)
+  })
+
+  it('updates custom date when date changes', async () => {
+    const wrapper = mount(TimelineFilters, {
+      props: {
+        ...defaultProps,
+        period: 'day',
+        customDate: '2026-03-08T10:00'
       }
     })
 
     const dateInput = wrapper.find('input[type="date"]')
     await dateInput.setValue('2026-03-10')
 
-    expect(wrapper.emitted('update:customDate')).toBeTruthy()
-    expect(wrapper.emitted('update:customDate')[0]).toEqual(['2026-03-10'])
+    expect(wrapper.emitted('update:customDate')).toHaveLength(1)
+    expect(wrapper.emitted('update:customDate')[0]).toEqual(['2026-03-10T10:00'])
+  })
+
+  it('updates custom date when hour changes', async () => {
+    const wrapper = mount(TimelineFilters, {
+      props: {
+        ...defaultProps,
+        period: 'day',
+        customDate: '2026-03-08T10:00'
+      }
+    })
+
+    const hourSel = wrapper.find('.dt-row select:first-of-type')
+    await hourSel.setValue('14')
+
+    expect(wrapper.emitted('update:customDate')).toHaveLength(1)
+    expect(wrapper.emitted('update:customDate')[0]).toEqual(['2026-03-08T14:00'])
+  })
+
+  it('updates custom date when minute changes', async () => {
+    const wrapper = mount(TimelineFilters, {
+      props: {
+        ...defaultProps,
+        period: 'day',
+        customDate: '2026-03-08T10:00'
+      }
+    })
+
+    const minuteSel = wrapper.find('.dt-row select:last-of-type')
+    await minuteSel.setValue('30')
+
+    expect(wrapper.emitted('update:customDate')).toHaveLength(1)
+    expect(wrapper.emitted('update:customDate')[0]).toEqual(['2026-03-08T10:30'])
   })
 })

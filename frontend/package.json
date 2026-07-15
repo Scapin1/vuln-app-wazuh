@@ -12,8 +12,14 @@
   },
   "dependencies": {
     "axios": "^1.13.6",
+    "chart.js": "^4.4.8",
+    "d3": "^7.9.0",
+    "pinia": "^3.0.4",
     "sweetalert2": "^11.26.21",
+    "vis-data": "^8.0.4",
+    "vis-timeline": "^8.5.1",
     "vue": "^3.5.25",
+    "vue-chartjs": "^5.3.2",
     "vue-router": "^5.0.3"
   },
   "devDependencies": {
