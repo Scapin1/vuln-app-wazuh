@@ -1,12 +1,25 @@
 <template>
   <div class="card filter-panel" :class="{ compact }">
     <div class="filter-row">
-      <div class="f-group">
-        <label for="connection-select">Conexión Wazuh</label>
-        <select id="connection-select" v-model="connectionModel" @change="emit('connection-change')" class="filter-input">
-          <option value="" disabled>Selecciona servidor...</option>
-          <option v-for="conn in connections" :key="conn.id" :value="conn.id">{{ conn.name }}</option>
-        </select>
+      <div class="f-group popover-wrap" v-click-outside="() => (activeDropdown = '')">
+        <label>Conexión Wazuh</label>
+        <button class="filter-input dd-btn" @click="activeDropdown = activeDropdown === 'connections' ? '' : 'connections'">
+          <span>{{ selectedConnectionName || 'Selecciona servidor...' }}</span>
+          <span>▼</span>
+        </button>
+        <div v-if="activeDropdown === 'connections'" class="dd-panel fade-in">
+          <div class="dd-list custom-scroll">
+            <button 
+              v-for="conn in connections" 
+              :key="conn.id" 
+              class="dd-item dd-item-btn"
+              :class="{ 'dd-item-selected': String(conn.id) === String(connectionModel) }"
+              @click="selectConnection(conn.id)"
+            >
+              {{ conn.name }}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="f-group popover-wrap" v-click-outside="() => (activeDropdown = '')">
@@ -147,6 +160,17 @@ const selectedVulnsModel = computed({
   set: value => emit('update:selectedVulns', value)
 })
 
+const selectedConnectionName = computed(() => {
+  const found = props.connections.find(c => String(c.id) === String(props.selectedConnection))
+  return found?.name || ''
+})
+
+const selectConnection = (connId) => {
+  connectionModel.value = connId
+  activeDropdown.value = ''
+  emit('connection-change')
+}
+
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
 const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
 
@@ -204,6 +228,8 @@ const toggleSeverity = (sev) => {
 .dd-list { max-height: 220px; overflow-y: auto; }
 .dd-item { display: flex; gap: 0.6rem; padding: 0.4rem 0.9rem; font-size: 0.82rem; }
 .dd-item:hover { background: var(--bg-hover); }
+.dd-item-btn { width: 100%; text-align: left; background: none; border: none; color: var(--text-main); cursor: pointer; }
+.dd-item-selected { background: var(--primary-bg); color: var(--primary); font-weight: 600; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 .chip { padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-dark); font-size: 0.72rem; font-weight: 700; color: var(--text-muted); cursor: pointer; }
 .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }

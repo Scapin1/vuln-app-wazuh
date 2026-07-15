@@ -86,7 +86,6 @@ const periods = [
   { l: '24H', v: '24h' },
   { l: '7D', v: '7d' },
   { l: '30D', v: '30d' },
-  { l: 'Dia', v: 'day' },
   { l: 'Todo', v: 'all' }
 ]
 

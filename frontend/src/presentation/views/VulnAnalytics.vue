@@ -134,7 +134,6 @@ const periods = [
   { l: '24H', v: '24h' },
   { l: '7D', v: '7d' },
   { l: '30D', v: '30d' },
-  { l: 'Dia', v: 'day' },
   { l: 'Todo', v: 'all' }
 ]
 
@@ -396,8 +395,8 @@ onMounted(async () => {
     if (connections.value.length > 0) {
       selectedConnection.value = connections.value[0].id
     }
-    // Auto-load analytics data
-    await buildAnalytics()
+    // Load filter options + analytics data via onConnectionChange
+    await onConnectionChange()
   } catch (error) {
     console.error(error)
     errorBanner.value = 'No se pudieron cargar las conexiones Wazuh.'

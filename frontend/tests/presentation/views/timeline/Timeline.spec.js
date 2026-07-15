@@ -130,12 +130,11 @@ describe('Timeline.vue', () => {
     const wrapper = mount(Timeline)
 
     const periods = wrapper.vm.periods
-    expect(periods).toHaveLength(5)
+    expect(periods).toHaveLength(4)
     expect(periods[0]).toEqual({ v: '24h', l: '24H' })
     expect(periods[1]).toEqual({ v: '7d', l: '7D' })
     expect(periods[2]).toEqual({ v: '30d', l: '30D' })
-    expect(periods[3]).toEqual({ v: 'day', l: 'Dia' })
-    expect(periods[4]).toEqual({ v: 'all', l: 'Todo' })
+    expect(periods[3]).toEqual({ v: 'all', l: 'Todo' })
   })
 
   it('updates agent and vuln options when connection changes', async () => {

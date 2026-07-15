@@ -10,91 +10,90 @@
     </div>
 
     <template v-else>
-    <div class="gantt-header">
-      <h3 class="gantt-title">Seguimiento de CVEs</h3>
-      <div class="gantt-controls">
-        <div class="search-date">
-          <label for="ganttSearchDate" class="search-date-label">Buscar fecha:</label>
-          <div class="search-dt-row">
-            <input id="ganttSearchDate" type="date" :value="ganttDatePart" @input="e => onGanttDateChange(e.target.value)" class="date-input" />
-            <select id="gantt-hour" :value="ganttHourPart" @change="e => onGanttHourChange(e.target.value)" class="date-input time-sel" aria-label="Hora">
-              <option v-for="h in GANTT_HOURS" :key="h" :value="h">{{ h }}</option>
-            </select>
-            <select id="gantt-minute" :value="ganttMinutePart" @change="e => onGanttMinuteChange(e.target.value)" class="date-input time-sel" aria-label="Minuto">
-              <option v-for="m in GANTT_MINUTES" :key="m" :value="m">{{ m }}</option>
-            </select>
-          </div>
-          <button class="search-btn" @click="scrollToDate">Ir</button>
-        </div>
-        <div class="zoom-controls">
-          <button class="zoom-btn" @click="zoomOut" title="Alejar">-</button>
-          <span class="zoom-level">{{ zoomLabel }}</span>
-          <button class="zoom-btn" @click="zoomIn" title="Acercar">+</button>
-        </div>
-        <div class="gantt-legend">
-          <div class="legend-item"><span class="legend-dot snap-detected"></span> Activo</div>
-          <div class="legend-item"><span class="legend-dot snap-reopened"></span> Reabierto</div>
-          <div class="legend-item"><span class="legend-dot snap-resolved"></span> Resuelto</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="gantt-scroll-wrapper" ref="scrollWrapper">
-      <div class="gantt-header-row">
-        <div class="gantt-sidebar-header">CVE / DETALLE</div>
-        <div class="gantt-timeline-header" :style="{ minWidth: timelineWidth + 'px' }">
-          <div v-for="label in timeLabels" :key="label.label" class="month-label"
-            :style="{ width: MONTH_WIDTH + 'px' }">
-            {{ label.label }}
-          </div>
-        </div>
-      </div>
-
-      <div class="gantt-body">
-        <div v-for="cve in paginatedCveSnapshots" :key="cve.cve_id" class="gantt-row cve-row">
-          <div class="gantt-sidebar-cell">
-            <div class="cve-top">
-              <span class="cve-id">{{ cve.cve_id }}</span>
-              <span class="sev-badge" :class="cve.severity.toLowerCase()">{{ cve.severity }}</span>
+      <div class="gantt-header">
+        <h3 class="gantt-title">Seguimiento de CVEs</h3>
+        <div class="gantt-controls">
+          <div class="search-date">
+            <label for="ganttSearchDate" class="search-date-label">Buscar fecha:</label>
+            <div class="search-dt-row">
+              <input id="ganttSearchDate" type="date" :value="ganttDatePart"
+                @input="e => onGanttDateChange(e.target.value)" class="date-input" />
+              <select id="gantt-hour" :value="ganttHourPart" @change="e => onGanttHourChange(e.target.value)"
+                class="date-input time-sel" aria-label="Hora">
+                <option v-for="h in GANTT_HOURS" :key="h" :value="h">{{ h }}</option>
+              </select>
+              <select id="gantt-minute" :value="ganttMinutePart" @change="e => onGanttMinuteChange(e.target.value)"
+                class="date-input time-sel" aria-label="Minuto">
+                <option v-for="m in GANTT_MINUTES" :key="m" :value="m">{{ m }}</option>
+              </select>
             </div>
-            <span class="cve-desc">{{ cve.description }}</span>
-            <span class="cve-sync-count">{{ cve.snapshots.length }} sincronizaciones</span>
+            <button class="search-btn" @click="scrollToDate">Ir</button>
           </div>
-          <div class="gantt-chart-cell" :style="{ minWidth: timelineWidth + 'px' }">
-            <div v-for="(snap, idx) in cve.snapshots" :key="idx"
-                 class="gantt-bar snapshot-bar"
-                 :style="getSnapshotBarStyle(cve, idx)"
-                 :class="getSnapshotBarClass(cve, idx)"
-                 @mouseenter="handleBarMouseEnter(snap, cve, $event)"
-                 @mousemove="handleBarMouseMove($event)"
-                 @mouseleave="handleBarMouseLeave">
-              <span class="bar-label">{{ getSnapshotStatusLabel(cve, idx) }}</span>
+          <div class="zoom-controls">
+            <button class="zoom-btn" @click="zoomOut" title="Alejar">-</button>
+            <span class="zoom-level">{{ zoomLabel }}</span>
+            <button class="zoom-btn" @click="zoomIn" title="Acercar">+</button>
+          </div>
+          <div class="gantt-legend">
+            <div class="legend-item"><span class="legend-dot snap-detected"></span> Activo</div>
+            <div class="legend-item"><span class="legend-dot snap-reopened"></span> Reabierto</div>
+            <div class="legend-item"><span class="legend-dot snap-resolved"></span> Resuelto</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="gantt-scroll-wrapper" ref="scrollWrapper">
+        <div class="gantt-header-row">
+          <div class="gantt-sidebar-header">CVE / DETALLE</div>
+          <div class="gantt-timeline-header" :style="{ minWidth: timelineWidth + 'px' }">
+            <div v-for="label in timeLabels" :key="label.label" class="month-label"
+              :style="{ width: MONTH_WIDTH + 'px' }">
+              {{ label.label }}
             </div>
           </div>
         </div>
-      </div>
-    </div>
 
-    <div v-if="totalPages > 1" class="gantt-pagination">
-      <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">Anterior</button>
-      <span class="page-info">Pagina {{ currentPage }} de {{ totalPages }} ({{ cveSnapshots.length }} CVEs)</span>
-      <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">Siguiente</button>
-    </div>
-
-    <!-- Tooltip -->
-    <div v-if="isHovering && hoveredSnapshot"
-         ref="tooltipRef"
-         class="gantt-tooltip"
-         :style="{ left: tooltipPos.x + 'px', top: tooltipPos.y + 'px' }">
-      <div class="tooltip-header">{{ hoveredSnapshot.cve_id }}</div>
-      <div class="tooltip-sync">Sincronización: {{ formatDate(hoveredSnapshot.syncTimestamp) }}</div>
-      <div class="tooltip-agents">
-        <div v-for="agent in hoveredSnapshot.agents" :key="agent" class="tooltip-agent">
-          {{ agent }}
+        <div class="gantt-body">
+          <div v-for="cve in paginatedCveSnapshots" :key="cve.cve_id" class="gantt-row cve-row">
+            <div class="gantt-sidebar-cell">
+              <div class="cve-top">
+                <span class="cve-id">{{ cve.cve_id }}</span>
+                <span class="sev-badge" :class="cve.severity.toLowerCase()">{{ cve.severity }}</span>
+              </div>
+              <span class="cve-desc">{{ cve.description }}</span>
+              <span class="cve-sync-count">{{ cve.snapshots.length }} sincronizaciones</span>
+            </div>
+            <div class="gantt-chart-cell" :style="{ minWidth: timelineWidth + 'px' }">
+              <div v-for="(snap, idx) in cve.snapshots" :key="idx" class="gantt-bar snapshot-bar"
+                :style="getSnapshotBarStyle(cve, idx)" :class="getSnapshotBarClass(cve, idx)"
+                @mouseenter="handleBarMouseEnter(snap, cve, $event)" @mousemove="handleBarMouseMove($event)"
+                @mouseleave="handleBarMouseLeave">
+                <span class="bar-label">{{ getSnapshotStatusLabel(cve, idx) }}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="tooltip-count">{{ hoveredSnapshot.agentCount }} agente{{ hoveredSnapshot.agentCount > 1 ? 's' : '' }} afectado{{ hoveredSnapshot.agentCount > 1 ? 's' : '' }}</div>
-    </div>
+
+      <div v-if="totalPages > 1" class="gantt-pagination">
+        <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">Anterior</button>
+        <span class="page-info">Pagina {{ currentPage }} de {{ totalPages }} ({{ cveSnapshots.length }} CVEs)</span>
+        <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">Siguiente</button>
+      </div>
+
+      <!-- Tooltip -->
+      <div v-if="isHovering && hoveredSnapshot" ref="tooltipRef" class="gantt-tooltip"
+        :style="{ left: tooltipPos.x + 'px', top: tooltipPos.y + 'px' }">
+        <div class="tooltip-header">{{ hoveredSnapshot.cve_id }}</div>
+        <div class="tooltip-sync">Sincronización: {{ formatDate(hoveredSnapshot.syncTimestamp) }}</div>
+        <div class="tooltip-agents">
+          <div v-for="agent in hoveredSnapshot.agents" :key="agent" class="tooltip-agent">
+            {{ agent }}
+          </div>
+        </div>
+        <div class="tooltip-count">{{ hoveredSnapshot.agentCount }} agente{{ hoveredSnapshot.agentCount > 1 ? 's' : ''
+        }} afectado{{ hoveredSnapshot.agentCount > 1 ? 's' : '' }}</div>
+      </div>
     </template>
   </div>
 </template>
@@ -672,7 +671,9 @@ const formatDate = (d) => {
 }
 
 @keyframes gantt-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .search-btn {
