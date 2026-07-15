@@ -80,12 +80,19 @@
 
       <!-- Tooltip -->
       <div v-if="isHovering && hoveredSnapshot" ref="tooltipRef" class="gantt-tooltip"
-        :style="{ left: tooltipPos.x + 'px', top: tooltipPos.y + 'px' }">
-        <div class="tooltip-header">{{ hoveredSnapshot.cve_id }}</div>
+        :style="{ left: tooltipPos.x + 'px', top: tooltipPos.y + 'px' }"
+        @click.stop="handleTooltipClick">
+        <div class="tooltip-header">
+          {{ hoveredSnapshot.cve_id }}
+          <span class="tooltip-click-hint">→ Click para ver detalle</span>
+        </div>
         <div class="tooltip-sync">Sincronización: {{ formatDate(hoveredSnapshot.syncTimestamp) }}</div>
         <div class="tooltip-agents">
-          <div v-for="agent in hoveredSnapshot.agents" :key="agent" class="tooltip-agent">
+          <div v-for="agent in displayedAgents" :key="agent" class="tooltip-agent">
             {{ agent }}
+          </div>
+          <div v-if="hoveredSnapshot.agentCount > 5" class="tooltip-more">
+            ... y {{ hoveredSnapshot.agentCount - 5 }} más
           </div>
         </div>
         <div class="tooltip-count">{{ hoveredSnapshot.agentCount }} agente{{ hoveredSnapshot.agentCount > 1 ? 's' : ''
@@ -97,9 +104,12 @@
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 import { parseServerDate } from '../timelineFormatters'
+
+const router = useRouter()
 
 const props = defineProps({
   ganttData: { type: Array, default: () => null }
@@ -549,6 +559,22 @@ const handleBarMouseLeave = () => {
   isHovering.value = false
   hoveredSnapshot.value = null
 }
+
+const handleBarClick = (snapshot, cve) => {
+  router.push({ path: '/timeline', query: { cve: cve.cve_id } })
+}
+
+const handleTooltipClick = () => {
+  if (hoveredSnapshot.value && hoveredSnapshot.value.cve_id) {
+    router.push({ path: '/timeline', query: { cve: hoveredSnapshot.value.cve_id } })
+  }
+}
+
+const displayedAgents = computed(() => {
+  if (!hoveredSnapshot.value) return []
+  const agents = hoveredSnapshot.value.agents || []
+  return agents.slice(0, 5)
+})
 
 const updateTooltipPos = (event) => {
   tooltipPos.value = { x: event.clientX + 12, y: event.clientY - 10 }
@@ -1058,8 +1084,13 @@ const formatDate = (d) => {
   line-height: 1.5;
   max-width: 260px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-  pointer-events: none;
+  pointer-events: auto;
   border: 1px solid var(--border, #e5e7eb);
+  cursor: pointer;
+}
+
+.gantt-tooltip:hover {
+  background: #f8fafc;
 }
 
 .tooltip-header {
@@ -1068,6 +1099,18 @@ const formatDate = (d) => {
   margin-bottom: 4px;
   color: var(--text-main, #111827);
   font-family: monospace;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.tooltip-click-hint {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--primary, #3d6a00);
+  font-family: sans-serif;
+  white-space: nowrap;
 }
 
 .tooltip-sync {
@@ -1087,6 +1130,13 @@ const formatDate = (d) => {
   font-size: 11px;
   color: var(--text-main, #111827);
   padding: 1px 0;
+}
+
+.tooltip-more {
+  font-size: 10px;
+  color: var(--text-muted, #6b7280);
+  font-style: italic;
+  padding: 2px 0;
 }
 
 .tooltip-agent::before {

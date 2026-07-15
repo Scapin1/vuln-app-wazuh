@@ -72,6 +72,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useVulnStore } from '../../application/stores/vulnStore'
 import wazuhService from '../../application/services/wazuhService'
 import { toLocalDatetimeString } from './timeline/timelineFormatters'
@@ -80,6 +81,8 @@ import TimelineFilters from './timeline/components/TimelineFilters.vue'
 import TimelineKpiStrip from './timeline/components/TimelineKpiStrip.vue'
 import VulnTable from './timeline/components/VulnTable.vue'
 
+const route = useRoute()
+const router = useRouter()
 const store = useVulnStore()
 
 const periods = [
@@ -147,6 +150,14 @@ const onConnectionChange = async () => {
       const filterOptions = await store.fetchFilterOptions(selectedConnection.value)
       agentOpts.value = filterOptions.agents || []
       vulnOpts.value = filterOptions.cves || []
+
+      // Apply CVE filter from query param if present
+      const cveFromQuery = route.query.cve
+      if (cveFromQuery && vulnOpts.value.includes(cveFromQuery)) {
+        selectedVulns.value = [cveFromQuery]
+        // Clean URL after applying filter
+        router.replace({ query: {} })
+      }
     } catch (error) {
       console.error(error)
       errorBanner.value = 'No se pudieron cargar agentes y CVEs para la conexion seleccionada.'
