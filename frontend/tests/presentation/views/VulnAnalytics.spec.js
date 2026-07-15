@@ -3,10 +3,12 @@ import { mount, flushPromises } from '@vue/test-utils'
 import VulnAnalytics from '@/presentation/views/VulnAnalytics.vue'
 import vulnService from '@/application/services/vulnService'
 import wazuhService from '@/application/services/wazuhService'
+import { useVulnStore } from '@/application/stores/vulnStore'
 
 vi.mock('@/application/services/vulnService', () => ({
     default: {
         getVulns: vi.fn(),
+        syncVulns: vi.fn(),
         getFilterOptions: vi.fn(),
         getDashboardSummary: vi.fn(),
         getTimeline: vi.fn(),
@@ -462,5 +464,91 @@ describe('VulnAnalytics.vue', () => {
         expect(wrapper.vm.loading).toBe(false)
         expect(wrapper.vm.hasBuilt).toBe(false)
         expect(wrapper.vm.errorBanner).toBeTruthy()
+    })
+
+    describe('sync button', () => {
+        it('renders sync button in header-actions', async () => {
+            const wrapper = mount(VulnAnalytics)
+            await flushPromises()
+
+            const button = wrapper.find('.header-actions button')
+            expect(button.exists()).toBe(true)
+            expect(button.text()).toContain('Forzar Sincronización')
+        })
+
+        it('calls syncVulns, invalidateCache, and buildAnalytics when clicked', async () => {
+            vulnService.syncVulns.mockResolvedValue({})
+            vulnService.getVulns.mockResolvedValue({ data: [] })
+            wazuhService.getConnections.mockResolvedValue({
+                data: [{ id: 'conn-1', name: 'Conn A' }]
+            })
+
+            const store = useVulnStore()
+            const invalidateCacheSpy = vi.spyOn(store, 'invalidateCache')
+            const wrapper = mount(VulnAnalytics)
+            await flushPromises()
+
+            const button = wrapper.find('.header-actions button')
+            await button.trigger('click')
+            await flushPromises()
+
+            expect(vulnService.syncVulns).toHaveBeenCalledTimes(1)
+            expect(invalidateCacheSpy).toHaveBeenCalledTimes(1)
+            expect(wrapper.vm.hasBuilt).toBe(true)
+        })
+
+        it('disables sync button while syncing', async () => {
+            let resolveSync
+            vulnService.syncVulns.mockImplementation(() => new Promise(resolve => { resolveSync = resolve }))
+            vulnService.getVulns.mockResolvedValue({ data: [] })
+            wazuhService.getConnections.mockResolvedValue({ data: [{ id: 'conn-1', name: 'Conn A' }] })
+
+            const wrapper = mount(VulnAnalytics)
+            await flushPromises()
+
+            const button = wrapper.find('.header-actions button')
+            const clickPromise = button.trigger('click')
+            await wrapper.vm.$nextTick()
+
+            expect(wrapper.vm.syncing).toBe(true)
+            expect(button.attributes('disabled')).toBeDefined()
+
+            resolveSync()
+            await clickPromise
+            await flushPromises()
+
+            expect(wrapper.vm.syncing).toBe(false)
+        })
+
+        it('shows error banner when sync fails', async () => {
+            vulnService.syncVulns.mockRejectedValue(new Error('Sync failed'))
+            wazuhService.getConnections.mockResolvedValue({ data: [{ id: 'conn-1', name: 'Conn A' }] })
+
+            const wrapper = mount(VulnAnalytics)
+            await flushPromises()
+
+            const button = wrapper.find('.header-actions button')
+            await button.trigger('click')
+            await flushPromises()
+
+            expect(wrapper.vm.errorBanner).toContain('Error durante la sincronización')
+            expect(wrapper.vm.syncing).toBe(false)
+        })
+
+        it('does not call syncVulns when no connection is selected', async () => {
+            vulnService.syncVulns.mockResolvedValue({})
+            wazuhService.getConnections.mockResolvedValue({ data: [] })
+
+            const wrapper = mount(VulnAnalytics)
+            await flushPromises()
+
+            expect(wrapper.vm.selectedConnection).toBe('')
+
+            const button = wrapper.find('.header-actions button')
+            await button.trigger('click')
+            await flushPromises()
+
+            expect(vulnService.syncVulns).not.toHaveBeenCalled()
+        })
     })
 })
