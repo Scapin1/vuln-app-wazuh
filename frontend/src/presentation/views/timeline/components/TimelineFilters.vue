@@ -2,7 +2,7 @@
   <div class="card filter-panel" :class="{ compact }">
     <div class="filter-row">
       <div class="f-group">
-        <label for="connection-select">Conexion Wazuh</label>
+        <label for="connection-select">Conexión Wazuh</label>
         <select id="connection-select" v-model="connectionModel" @change="emit('connection-change')" class="filter-input">
           <option value="" disabled>Selecciona servidor...</option>
           <option v-for="conn in connections" :key="conn.id" :value="conn.id">{{ conn.name }}</option>

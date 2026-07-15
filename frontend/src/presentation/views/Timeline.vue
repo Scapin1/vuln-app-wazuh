@@ -31,7 +31,8 @@
     />
 
     <TimelineKpiStrip
-      :has-built="hasBuilt || loading"
+      v-if="hasBuilt"
+      :has-built="hasBuilt"
       :painted-count="paintedCount"
       :latest-snap="latestSnap"
     />
@@ -173,8 +174,8 @@ onMounted(async () => {
     if (connections.value.length > 0) {
       selectedConnection.value = connections.value[0].id
     }
-    // Auto-load timeline data
-    await buildTimeline()
+    // Load filter options + timeline data via onConnectionChange
+    await onConnectionChange()
   } catch (error) {
     console.error(error)
     errorBanner.value = 'No se pudieron cargar las conexiones Wazuh.'
