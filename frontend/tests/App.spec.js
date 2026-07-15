@@ -72,7 +72,7 @@ describe('App.vue', () => {
         })
 
         // Simulate clicking dashboard in sidebar
-        const dashboardLink = wrapper.findAll('.nav-item').find(el => el.text().includes('Dashboard'))
+        const dashboardLink = wrapper.findAll('.nav-item').find(el => el.text().includes('Analítica de Vulnerabilidades'))
         await dashboardLink.trigger('click')
 
         expect(Swal.fire).toHaveBeenCalled()
@@ -86,7 +86,7 @@ describe('App.vue', () => {
             }
         })
 
-        const dashboardLink = wrapper.findAll('.nav-item').find(el => el.text().includes('Dashboard'))
+        const dashboardLink = wrapper.findAll('.nav-item').find(el => el.text().includes('Analítica de Vulnerabilidades'))
         await dashboardLink.trigger('click')
 
         expect(Swal.fire).not.toHaveBeenCalled()
@@ -118,7 +118,7 @@ describe('App.vue', () => {
     })
 
     const timelineLink = wrapper.findAll('.nav-item').find(el =>
-      el.text().includes('Línea de Tiempo')
+      el.text().trim() === 'Vulnerabilidades'
     )
 
     await timelineLink.trigger('click')
@@ -205,7 +205,83 @@ describe('App.vue', () => {
       }
     })
 
-    expect(wrapper.find('.header-title').text()).toBe('Linea de tiempo')
+    expect(wrapper.find('.header-title').text()).toBe('Vulnerabilidades')
+  })
+
+  it('shows route title for VulnAnalytics at dashboard path', () => {
+    mockRoute.name = 'VulnAnalytics'
+    mockRoute.path = '/dashboard'
+
+    const wrapper = mount(App, {
+      global: {
+        stubs: ['router-view', 'router-link']
+      }
+    })
+
+    expect(wrapper.find('.header-title').text()).toBe('Analítica de Vulnerabilidades')
+  })
+
+  it('does not map Dashboard route name', () => {
+    mockRoute.name = 'Dashboard'
+    mockRoute.path = '/dashboard'
+
+    const wrapper = mount(App, {
+      global: {
+        stubs: ['router-view', 'router-link']
+      }
+    })
+
+    expect(wrapper.find('.header-title').text()).toBe('')
+  })
+
+  it('renders two vulnerability nav items and no /vuln-analytics entry', () => {
+    const wrapper = mount(App, {
+      global: {
+        stubs: ['router-view', 'router-link']
+      }
+    })
+
+    const navItems = wrapper.findAll('.sidebar-nav .nav-item')
+    const vulnItems = navItems.filter(el =>
+      el.text().trim() === 'Analítica de Vulnerabilidades' ||
+      el.text().trim() === 'Vulnerabilidades'
+    )
+    expect(vulnItems).toHaveLength(2)
+    expect(wrapper.text()).not.toContain('Analíticas de Vulnerabilidades')
+  })
+
+  it('marks dashboard nav item as active on /dashboard', async () => {
+    mockRoute.path = '/dashboard'
+    mockRoute.name = 'VulnAnalytics'
+
+    const wrapper = mount(App, {
+      global: {
+        stubs: ['router-view', 'router-link']
+      }
+    })
+    await nextTick()
+
+    const dashboardLink = wrapper.findAll('.sidebar-nav .nav-item').find(el =>
+      el.text().includes('Analítica de Vulnerabilidades')
+    )
+    expect(dashboardLink.classes()).toContain('router-link-active')
+  })
+
+  it('marks timeline nav item as active on /timeline', async () => {
+    mockRoute.path = '/timeline'
+    mockRoute.name = 'Timeline'
+
+    const wrapper = mount(App, {
+      global: {
+        stubs: ['router-view', 'router-link']
+      }
+    })
+    await nextTick()
+
+    const timelineLink = wrapper.findAll('.sidebar-nav .nav-item').find(el =>
+      el.text().trim() === 'Vulnerabilidades'
+    )
+    expect(timelineLink.classes()).toContain('router-link-active')
   })
 
   it('shows route title for ConfigWazuh', () => {
