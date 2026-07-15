@@ -101,7 +101,6 @@
           format="dd/MM/yyyy HH:mm"
           preview-format="dd/MM/yyyy HH:mm"
           :teleport="true"
-          :dark="true"
           auto-apply
           @update:model-value="onDatePickerChange"
         />
@@ -244,19 +243,21 @@ const toggleSeverity = (sev) => {
 .chip { padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-dark); font-size: 0.72rem; font-weight: 700; color: var(--text-muted); cursor: pointer; }
 .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
 .sel-badge { background: var(--primary-bg); color: var(--primary); border-radius: 999px; padding: 0.1rem 0.45rem; font-size: 0.72rem; font-weight: 700; }
-.day-datetime-group { min-width: 280px; }
+.day-datetime-group { min-width: 240px; }
 .day-datetime-group :deep(.dp__input) {
   width: 100%;
-  padding: 0.55rem 0.8rem;
+  padding: 0.45rem 0.7rem;
   border: 1px solid var(--border);
   background: var(--bg-dark);
   border-radius: var(--radius-sm);
   color: var(--text-main);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   cursor: pointer;
+  height: 34px;
 }
 .day-datetime-group :deep(.dp__input_icons) {
   color: var(--text-muted);
+  font-size: 14px;
 }
 
 @media (max-width: 1400px) {

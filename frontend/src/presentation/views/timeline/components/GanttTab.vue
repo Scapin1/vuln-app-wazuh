@@ -22,7 +22,6 @@
               format="dd/MM/yyyy HH:mm"
               preview-format="dd/MM/yyyy HH:mm"
               :teleport="true"
-              :dark="true"
               auto-apply
               @update:model-value="onGanttDatePickerChange"
             />
@@ -623,14 +622,15 @@ const formatDate = (d) => {
 }
 
 .search-date :deep(.dp__input) {
-  padding: 4px 6px;
+  padding: 3px 6px;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
   font-size: 11px;
   background: white;
   color: #334155;
   outline: none;
-  width: 180px;
+  width: 160px;
+  height: 26px;
 }
 
 .search-date :deep(.dp__input:focus) {
@@ -640,6 +640,7 @@ const formatDate = (d) => {
 
 .search-date :deep(.dp__input_icons) {
   color: #64748b;
+  font-size: 14px;
 }
 
 .search-date-label {
