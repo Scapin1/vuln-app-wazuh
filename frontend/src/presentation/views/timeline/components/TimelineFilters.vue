@@ -93,16 +93,18 @@
       </div>
 
       <div class="f-group day-datetime-group" v-if="period === 'day'">
-        <label for="custom-date">Dia</label>
-        <div class="dt-row">
-          <input id="custom-date" type="date" :value="datePart" @input="onDateChange" class="filter-input">
-          <select id="filter-hour" :value="hourPart" @change="onHourChange" class="filter-input time-sel" aria-label="Hora">
-            <option v-for="h in HOURS" :key="h" :value="h">{{ h }}</option>
-          </select>
-          <select id="filter-minute" :value="minutePart" @change="onMinuteChange" class="filter-input time-sel" aria-label="Minuto">
-            <option v-for="m in MINUTES" :key="m" :value="m">{{ m }}</option>
-          </select>
-        </div>
+        <label for="custom-date">Dia y Hora</label>
+        <VueDatePicker
+          v-model="dateModel"
+          :enable-time-picker="true"
+          :time-picker-inline="true"
+          format="dd/MM/yyyy HH:mm"
+          preview-format="dd/MM/yyyy HH:mm"
+          :teleport="true"
+          :dark="true"
+          auto-apply
+          @update:model-value="onDatePickerChange"
+        />
       </div>
 
       <div class="f-group f-action">
@@ -116,6 +118,8 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import VueDatePicker from '@vuepic/vue-datepicker'
+import '@vuepic/vue-datepicker/dist/main.css'
 
 const props = defineProps({
   /** customDate puede ser "YYYY-MM-DD" (solo fecha) o "YYYY-MM-DDTHH:MM" (con hora) */
@@ -171,19 +175,25 @@ const selectConnection = (connId) => {
   emit('connection-change')
 }
 
-const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
-const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
+const dateModel = computed({
+  get: () => {
+    if (!props.customDate) return null
+    const d = new Date(props.customDate)
+    return isNaN(d.getTime()) ? null : d
+  },
+  set: () => {} // handled by onDatePickerChange
+})
 
-const datePart = computed(() => props.customDate?.split('T')[0] || '')
-const hourPart = computed(() => props.customDate?.split('T')[1]?.split(':')[0] || '00')
-const minutePart = computed(() => props.customDate?.split('T')[1]?.split(':')[1] || '00')
-
-const emitDatetime = (date, hour, minute) => {
-  emit('update:customDate', `${date || datePart.value}T${hour || hourPart.value}:${minute || minutePart.value}`)
+const onDatePickerChange = (date) => {
+  if (!date) return
+  const d = date instanceof Date ? date : new Date(date)
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  emit('update:customDate', `${yyyy}-${mm}-${dd}T${hh}:${min}`)
 }
-const onDateChange = (e) => emitDatetime(e.target.value)
-const onHourChange = (e) => emitDatetime(null, e.target.value)
-const onMinuteChange = (e) => emitDatetime(null, null, e.target.value)
 
 const search = reactive({ agent: '', vuln: '' })
 const activeDropdown = ref('')
@@ -234,10 +244,20 @@ const toggleSeverity = (sev) => {
 .chip { padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-dark); font-size: 0.72rem; font-weight: 700; color: var(--text-muted); cursor: pointer; }
 .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
 .sel-badge { background: var(--primary-bg); color: var(--primary); border-radius: 999px; padding: 0.1rem 0.45rem; font-size: 0.72rem; font-weight: 700; }
-.day-datetime-group { min-width: 320px; }
-.dt-row { display: flex; gap: 0.35rem; align-items: stretch; }
-.dt-row .filter-input { flex: 1; min-width: 0; }
-.time-sel { flex: 0 0 70px; cursor: pointer; appearance: auto; }
+.day-datetime-group { min-width: 280px; }
+.day-datetime-group :deep(.dp__input) {
+  width: 100%;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--border);
+  background: var(--bg-dark);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.day-datetime-group :deep(.dp__input_icons) {
+  color: var(--text-muted);
+}
 
 @media (max-width: 1400px) {
   .filter-row { grid-template-columns: 1fr 1fr; }
