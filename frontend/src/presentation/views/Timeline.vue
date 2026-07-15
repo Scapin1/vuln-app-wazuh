@@ -151,11 +151,23 @@ const onConnectionChange = async () => {
       agentOpts.value = filterOptions.agents || []
       vulnOpts.value = filterOptions.cves || []
 
-      // Apply CVE filter from query param if present
+      // Apply filters from query params if present
       const cveFromQuery = route.query.cve
+      const agentsFromQuery = route.query.agents
+
       if (cveFromQuery && vulnOpts.value.includes(cveFromQuery)) {
         selectedVulns.value = [cveFromQuery]
-        // Clean URL after applying filter
+      }
+
+      if (agentsFromQuery) {
+        const agentList = agentsFromQuery.split(',').filter(a => agentOpts.value.includes(a))
+        if (agentList.length > 0) {
+          selectedAgents.value = agentList
+        }
+      }
+
+      // Clean URL after applying filters
+      if (cveFromQuery || agentsFromQuery) {
         router.replace({ query: {} })
       }
     } catch (error) {

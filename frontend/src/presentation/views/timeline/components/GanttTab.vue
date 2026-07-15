@@ -561,12 +561,14 @@ const handleBarMouseLeave = () => {
 }
 
 const handleBarClick = (snapshot, cve) => {
-  router.push({ path: '/timeline', query: { cve: cve.cve_id } })
+  const agents = snapshot.agents ? snapshot.agents.join(',') : ''
+  router.push({ path: '/timeline', query: { cve: cve.cve_id, agents } })
 }
 
 const handleTooltipClick = () => {
   if (hoveredSnapshot.value && hoveredSnapshot.value.cve_id) {
-    router.push({ path: '/timeline', query: { cve: hoveredSnapshot.value.cve_id } })
+    const agents = hoveredSnapshot.value.agents ? hoveredSnapshot.value.agents.join(',') : ''
+    router.push({ path: '/timeline', query: { cve: hoveredSnapshot.value.cve_id, agents } })
   }
 }
 
