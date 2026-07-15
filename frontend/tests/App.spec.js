@@ -72,7 +72,7 @@ describe('App.vue', () => {
         })
 
         // Simulate clicking dashboard in sidebar
-        const dashboardLink = wrapper.findAll('.nav-item').find(el => el.text().includes('Analítica de Vulnerabilidades'))
+        const dashboardLink = wrapper.findAll('.nav-item').find(el => el.text().includes('Dashboard'))
         await dashboardLink.trigger('click')
 
         expect(Swal.fire).toHaveBeenCalled()
@@ -86,7 +86,7 @@ describe('App.vue', () => {
             }
         })
 
-        const dashboardLink = wrapper.findAll('.nav-item').find(el => el.text().includes('Analítica de Vulnerabilidades'))
+        const dashboardLink = wrapper.findAll('.nav-item').find(el => el.text().includes('Dashboard'))
         await dashboardLink.trigger('click')
 
         expect(Swal.fire).not.toHaveBeenCalled()
@@ -218,7 +218,7 @@ describe('App.vue', () => {
       }
     })
 
-    expect(wrapper.find('.header-title').text()).toBe('Analítica de Vulnerabilidades')
+    expect(wrapper.find('.header-title').text()).toBe('Dashboard')
   })
 
   it('does not map Dashboard route name', () => {
@@ -243,7 +243,7 @@ describe('App.vue', () => {
 
     const navItems = wrapper.findAll('.sidebar-nav .nav-item')
     const vulnItems = navItems.filter(el =>
-      el.text().trim() === 'Analítica de Vulnerabilidades' ||
+      el.text().trim() === 'Dashboard' ||
       el.text().trim() === 'Vulnerabilidades'
     )
     expect(vulnItems).toHaveLength(2)
@@ -262,7 +262,7 @@ describe('App.vue', () => {
     await nextTick()
 
     const dashboardLink = wrapper.findAll('.sidebar-nav .nav-item').find(el =>
-      el.text().includes('Analítica de Vulnerabilidades')
+      el.text().includes('Dashboard')
     )
     expect(dashboardLink.classes()).toContain('router-link-active')
   })
