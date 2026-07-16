@@ -205,7 +205,9 @@ import { parseServerDate } from '../timelineFormatters'
 const props = defineProps({
   vulns: { type: Array, required: true },
   loading: { type: Boolean, default: false },
-  connectionName: { type: String, default: '' }
+  connectionName: { type: String, default: '' },
+  syncStart: { type: String, default: null },
+  syncEnd: { type: String, default: null }
 })
 
 // Sorting state
@@ -319,11 +321,31 @@ const timeAgo = (date) => {
   return 'Justo ahora'
 }
 
+// ── Date interval filter (from Gantt click) ──
+
+const isInSyncInterval = (vuln) => {
+  if (!props.syncStart) return true
+
+  const syncStartMs = new Date(props.syncStart).getTime()
+  const syncEndMs = props.syncEnd ? new Date(props.syncEnd).getTime() : Date.now()
+
+  // Filter by last_seen being within the sync interval
+  const lastSeenMs = new Date(vuln.last_seen).getTime()
+  return lastSeenMs >= syncStartMs && lastSeenMs <= syncEndMs
+}
+
 // ── Sorting ──
 
 const sortedVulns = computed(() => {
-  if (!sortKey.value) return [...props.vulns]
-  return [...props.vulns].sort((a, b) => {
+  let result = [...props.vulns]
+
+  // Apply sync interval filter if set (from Gantt click)
+  if (props.syncStart) {
+    result = result.filter(isInSyncInterval)
+  }
+
+  if (!sortKey.value) return result
+  return result.sort((a, b) => {
     const cmp = compareValues(a, b, sortKey.value)
     return sortOrder.value === 'asc' ? cmp : -cmp
   })

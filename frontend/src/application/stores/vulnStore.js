@@ -123,8 +123,7 @@ function processAgentTimestamps(cve) {
       if (!timestampMap.has(ts)) timestampMap.set(ts, new Set())
       timestampMap.get(ts).add(agent.agent_name)
     }
-    addTimestamp(agent.first_seen)
-    addTimestamp(agent.last_seen)
+    addTimestamp(agent.last_seen)  // sync timestamp — Gantt is driven by syncs, not first_seen
     agent.history.forEach(h => addTimestamp(h.timestamp))
   })
   return timestampMap

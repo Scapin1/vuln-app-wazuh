@@ -174,6 +174,9 @@ const selectConnection = (connId) => {
   emit('connection-change')
 }
 
+// Helper to get connection ids for "Todas" action
+const connectionOptions = computed(() => props.connections.map(c => c.id))
+
 const dateModel = computed({
   get: () => {
     if (!props.customDate) return null

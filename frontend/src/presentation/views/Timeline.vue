@@ -66,7 +66,14 @@
       <h3>Sin datos para mostrar</h3>
       <p>No se encontraron vulnerabilidades para los filtros seleccionados.</p>
     </div>
-    <VulnTable v-else :vulns="filteredVulnsData" :loading="false" :connection-name="getConnectionName()" />
+    <VulnTable
+      v-else
+      :vulns="filteredVulnsData"
+      :loading="false"
+      :connection-name="getConnectionName()"
+      :sync-start="tableSyncStart"
+      :sync-end="tableSyncEnd"
+    />
   </div>
 </template>
 
@@ -101,6 +108,8 @@ const selectedVulns = ref([])
 const period = ref('30d')
 const customDate = ref(toLocalDatetimeString())
 const errorBanner = ref('')
+const tableSyncStart = ref(null)
+const tableSyncEnd = ref(null)
 
 const getConnectionName = () => {
   const found = connections.value.find(conn => String(conn.id) === String(selectedConnection.value))
@@ -144,6 +153,8 @@ const onConnectionChange = async () => {
   agentOpts.value = []
   vulnOpts.value = []
   errorBanner.value = ''
+  tableSyncStart.value = null
+  tableSyncEnd.value = null
 
   if (selectedConnection.value) {
     try {
@@ -154,6 +165,8 @@ const onConnectionChange = async () => {
       // Apply filters from query params if present
       const cveFromQuery = route.query.cve
       const agentsFromQuery = route.query.agents
+      const syncStart = route.query.syncStart
+      const syncEnd = route.query.syncEnd
 
       if (cveFromQuery && vulnOpts.value.includes(cveFromQuery)) {
         selectedVulns.value = [cveFromQuery]
@@ -166,8 +179,14 @@ const onConnectionChange = async () => {
         }
       }
 
+      // If coming from Gantt click, pass the exact sync interval to the table
+      if (syncStart) {
+        tableSyncStart.value = syncStart
+        tableSyncEnd.value = syncEnd || null
+      }
+
       // Clean URL after applying filters
-      if (cveFromQuery || agentsFromQuery) {
+      if (cveFromQuery || agentsFromQuery || syncStart) {
         router.replace({ query: {} })
       }
     } catch (error) {

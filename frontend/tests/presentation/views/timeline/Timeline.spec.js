@@ -8,6 +8,12 @@ import TimelineFilters from '@/presentation/views/timeline/components/TimelineFi
 import VulnTable from '@/presentation/views/timeline/components/VulnTable.vue'
 // Note: TimelineDetailModal.vue exists but is no longer rendered directly in Timeline.vue
 
+// Mock vue-router
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ query: {} }),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() })
+}))
+
 // Mock services
 vi.mock('@/application/services/wazuhService', () => ({
   default: {

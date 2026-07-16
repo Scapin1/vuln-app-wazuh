@@ -64,7 +64,7 @@
               <div v-for="(snap, idx) in cve.snapshots" :key="idx" class="gantt-bar snapshot-bar"
                 :style="getSnapshotBarStyle(cve, idx)" :class="getSnapshotBarClass(cve, idx)"
                 @mouseenter="handleBarMouseEnter(snap, cve, $event)" @mousemove="handleBarMouseMove($event)"
-                @mouseleave="handleBarMouseLeave">
+                @mouseleave="handleBarMouseLeave" @click="handleBarClick(cve, idx)">
                 <span class="bar-label">{{ getSnapshotStatusLabel(cve, idx) }}</span>
               </div>
             </div>
@@ -78,13 +78,12 @@
         <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">Siguiente</button>
       </div>
 
-      <!-- Tooltip -->
+      <!-- Tooltip (pointer-events: none so clicks pass through to bar) -->
       <div v-if="isHovering && hoveredSnapshot" ref="tooltipRef" class="gantt-tooltip"
-        :style="{ left: tooltipPos.x + 'px', top: tooltipPos.y + 'px' }"
-        @click.stop="handleTooltipClick">
+        :style="{ left: tooltipPos.x + 'px', top: tooltipPos.y + 'px' }">
         <div class="tooltip-header">
           {{ hoveredSnapshot.cve_id }}
-          <span class="tooltip-click-hint">→ Click para ver detalle</span>
+          <span class="tooltip-click-hint">Click bar para filtrar</span>
         </div>
         <div class="tooltip-sync">Sincronización: {{ formatDate(hoveredSnapshot.syncTimestamp) }}</div>
         <div class="tooltip-agents">
@@ -232,8 +231,7 @@ const buildCveSnapshots = (vulns) => {
         timestampMap.get(ts).add(agent.agent_name)
       }
 
-      addTimestamp(agent.first_seen)
-      addTimestamp(agent.last_seen)  // sync timestamp — shared across machines
+      addTimestamp(agent.last_seen)  // sync timestamp — Gantt is driven by syncs, not first_seen
       agent.history.forEach(h => addTimestamp(h.timestamp))
     })
 
@@ -537,8 +535,14 @@ const hoveredSnapshot = ref(null)
 const tooltipPos = ref({ x: 0, y: 0 })
 const isHovering = ref(false)
 const tooltipRef = ref(null)
+let leaveTimeout = null
 
 const handleBarMouseEnter = (snapshot, cve, event) => {
+  // Cancel any pending hide
+  if (leaveTimeout) {
+    clearTimeout(leaveTimeout)
+    leaveTimeout = null
+  }
   isHovering.value = true
   hoveredSnapshot.value = {
     ...snapshot,
@@ -556,20 +560,33 @@ const handleBarMouseMove = (event) => {
 }
 
 const handleBarMouseLeave = () => {
-  isHovering.value = false
-  hoveredSnapshot.value = null
+  startLeaveTimeout()
 }
 
-const handleBarClick = (snapshot, cve) => {
-  const agents = snapshot.agents ? snapshot.agents.join(',') : ''
-  router.push({ path: '/timeline', query: { cve: cve.cve_id, agents } })
-}
-
-const handleTooltipClick = () => {
-  if (hoveredSnapshot.value && hoveredSnapshot.value.cve_id) {
-    const agents = hoveredSnapshot.value.agents ? hoveredSnapshot.value.agents.join(',') : ''
-    router.push({ path: '/timeline', query: { cve: hoveredSnapshot.value.cve_id, agents } })
+const cancelLeaveTimeout = () => {
+  if (leaveTimeout) {
+    clearTimeout(leaveTimeout)
+    leaveTimeout = null
   }
+}
+
+const startLeaveTimeout = () => {
+  leaveTimeout = setTimeout(() => {
+    isHovering.value = false
+    hoveredSnapshot.value = null
+    leaveTimeout = null
+  }, 100)
+}
+
+const handleBarClick = (cve, idx) => {
+  const snap = cve.snapshots[idx]
+  const agents = snap.agents ? snap.agents.join(',') : ''
+  const nextSnap = cve.snapshots[idx + 1]
+  const syncEnd = nextSnap ? nextSnap.syncTimestamp : new Date().toISOString()
+  router.push({
+    path: '/timeline',
+    query: { cve: cve.cve_id, agents, syncStart: snap.syncTimestamp, syncEnd }
+  })
 }
 
 const displayedAgents = computed(() => {
@@ -1086,13 +1103,8 @@ const formatDate = (d) => {
   line-height: 1.5;
   max-width: 260px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-  pointer-events: auto;
+  pointer-events: none;
   border: 1px solid var(--border, #e5e7eb);
-  cursor: pointer;
-}
-
-.gantt-tooltip:hover {
-  background: #f8fafc;
 }
 
 .tooltip-header {

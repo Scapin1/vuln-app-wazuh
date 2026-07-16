@@ -75,8 +75,10 @@ describe('ConfigUser.vue', () => {
 
         await wrapper.find('.btn-primary').trigger('click')
 
-        wrapper.vm.newUser.username = 'new_admin'
-        wrapper.vm.newUser.password = 'SuperSecret123'
+        wrapper.vm.newUser.user_name = 'new_admin'
+        wrapper.vm.newUser.user_email = 'new_admin@empresa.com'
+        wrapper.vm.newUser.user_rol = 'admin'
+        wrapper.vm.newUser.user_password = 'SuperSecret123'
 
         userService.createUser.mockResolvedValueOnce({})
 
@@ -84,8 +86,10 @@ describe('ConfigUser.vue', () => {
         await flushPromises()
 
         expect(userService.createUser).toHaveBeenCalledWith({
-            username: 'new_admin',
-            password: 'SuperSecret123'
+            user_name: 'new_admin',
+            user_email: 'new_admin@empresa.com',
+            user_rol: 'admin',
+            user_password: 'SuperSecret123'
         })
         expect(wrapper.vm.showAddModal).toBe(false)
         expect(userService.getUsers).toHaveBeenCalledTimes(2) // 1 initial, 1 after add
@@ -97,12 +101,13 @@ describe('ConfigUser.vue', () => {
 
         await wrapper.find('.btn-primary').trigger('click')
 
-        wrapper.vm.newUser.username = ''
-        wrapper.vm.newUser.password = ''
+        wrapper.vm.newUser.user_name = ''
+        wrapper.vm.newUser.user_email = ''
+        wrapper.vm.newUser.user_password = ''
 
         await wrapper.find('form').trigger('submit.prevent')
 
-        expect(wrapper.vm.error).toContain('no pueden estar vacíos')
+        expect(wrapper.vm.error).toContain('Todos los campos son requeridos.')
         expect(userService.createUser).not.toHaveBeenCalled()
     })
 
@@ -111,8 +116,10 @@ describe('ConfigUser.vue', () => {
         await flushPromises()
 
         await wrapper.find('.btn-primary').trigger('click')
-        wrapper.vm.newUser.username = 'fail_user'
-        wrapper.vm.newUser.password = 'pass'
+        wrapper.vm.newUser.user_name = 'fail_user'
+        wrapper.vm.newUser.user_email = 'fail@empresa.com'
+        wrapper.vm.newUser.user_rol = 'admin'
+        wrapper.vm.newUser.user_password = 'pass123'
 
         userService.createUser.mockRejectedValueOnce({ response: { data: { detail: 'User exists' } } })
 

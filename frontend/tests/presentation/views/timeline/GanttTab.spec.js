@@ -366,7 +366,7 @@ describe('GanttTab.vue', () => {
 
       const snapshots = wrapper.vm.cveSnapshots
       expect(snapshots.length).toBe(1)
-      expect(snapshots[0].snapshots.length).toBe(2) // first_seen + history timestamps
+      expect(snapshots[0].snapshots.length).toBe(1) // only history timestamps (Gantt uses syncs, not first_seen)
     })
 
     it('builds snapshots with real data correctly', () => {
@@ -398,26 +398,14 @@ describe('GanttTab.vue', () => {
 
       const cve = wrapper.vm.cveSnapshots.find(c => c.cve_id === 'CVE-MULTI')
       expect(cve.cve_id).toBe('CVE-MULTI')
-      // 3 unique timestamps: Feb 1 (agent-01 first seen),
-      // Mar 1 (agent-02 first seen), Apr 1 (agent-01 history RESOLVED)
-      expect(cve.snapshots.length).toBe(3)
+      // Only 1 timestamp: Apr 1 (agent-01 history RESOLVED)
+      // first_seen is excluded — Gantt is driven by syncs, not first detection
+      expect(cve.snapshots.length).toBe(1)
 
-      // Each snapshot has agents only from events at that exact timestamp
       const snapTimestamps = cve.snapshots.map(s => s.syncTimestamp)
-      expect(snapTimestamps.some(ts => ts.includes('2026-02-01'))).toBe(true)
-      expect(snapTimestamps.some(ts => ts.includes('2026-03-01'))).toBe(true)
       expect(snapTimestamps.some(ts => ts.includes('2026-04-01'))).toBe(true)
-
-      // The snapshot at '2026-02-01' has only agent-01
-      const febSnap = cve.snapshots.find(s => s.syncTimestamp.includes('2026-02-01'))
-      expect(febSnap.agentCount).toBe(1)
-      expect(febSnap.agents).toContain('agent-01')
-
-      // The snapshot at '2026-03-01' has only agent-02
-      const marSnap = cve.snapshots.find(s => s.syncTimestamp.includes('2026-03-01'))
-      expect(marSnap.syncTimestamp).toContain('2026-03-01')
-      expect(marSnap.agentCount).toBe(1)
-      expect(marSnap.agents).toContain('agent-02')
+      expect(snapTimestamps.some(ts => ts.includes('2026-02-01'))).toBe(false)
+      expect(snapTimestamps.some(ts => ts.includes('2026-03-01'))).toBe(false)
     })
 
     it('groups agents by shared last_seen (sync) timestamp', () => {
@@ -460,8 +448,8 @@ describe('GanttTab.vue', () => {
       const cve = wrapper.vm.cveSnapshots.find(c => c.cve_id === 'CVE-SHARED-SYNC')
       expect(cve.cve_id).toBe('CVE-SHARED-SYNC')
 
-      // 4 snapshots: 3 unique first_seen + 1 shared sync last_seen
-      expect(cve.snapshots.length).toBe(4)
+      // 1 snapshot: only the shared sync last_seen (first_seen excluded from Gantt)
+      expect(cve.snapshots.length).toBe(1)
 
       // The shared sync snapshot has all 3 agents
       const syncSnap = cve.snapshots.find(s => s.syncTimestamp.includes('2026-06-01'))
@@ -649,7 +637,7 @@ describe('GanttTab.vue', () => {
       expect(wrapper.vm.tooltipPos.y).toBe(190) // clientY - 10
     })
 
-    it('handleBarMouseLeave clears hover state', () => {
+    it('handleBarMouseLeave clears hover state after delay', async () => {
       const wrapper = emptyWrapper()
       const cve = wrapper.vm.cveSnapshots[0]
       const snap = cve.snapshots[0]
@@ -658,6 +646,12 @@ describe('GanttTab.vue', () => {
       expect(wrapper.vm.isHovering).toBe(true)
 
       wrapper.vm.handleBarMouseLeave()
+      // State persists during the 100ms delay
+      expect(wrapper.vm.isHovering).toBe(true)
+      expect(wrapper.vm.hoveredSnapshot).not.toBe(null)
+
+      // After delay, it clears
+      await new Promise(r => setTimeout(r, 150))
       expect(wrapper.vm.isHovering).toBe(false)
       expect(wrapper.vm.hoveredSnapshot).toBe(null)
     })
