@@ -374,4 +374,23 @@ describe('TimelineFilters.vue', () => {
 
     expect(wrapper.vm.dateModel).toBeNull()
   })
+
+  it('onDatePickerChange emits formatted customDate', () => {
+    const wrapper = mount(TimelineFilters, {
+      props: defaultProps
+    })
+
+    wrapper.vm.onDatePickerChange(new Date('2026-07-15T14:30:00'))
+    expect(wrapper.emitted('update:customDate')).toHaveLength(1)
+    expect(wrapper.emitted('update:customDate')[0][0]).toBe('2026-07-15T14:30')
+  })
+
+  it('onDatePickerChange ignores null date', () => {
+    const wrapper = mount(TimelineFilters, {
+      props: defaultProps
+    })
+
+    wrapper.vm.onDatePickerChange(null)
+    expect(wrapper.emitted('update:customDate')).toBeUndefined()
+  })
 })
