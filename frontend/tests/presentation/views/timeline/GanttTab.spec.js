@@ -2,7 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import GanttTab from '@/presentation/views/timeline/components/GanttTab.vue'
 
+const mockRouterPush = vi.fn()
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push: mockRouterPush })
+}))
+
 describe('GanttTab.vue', () => {
+  beforeEach(() => {
+    mockRouterPush.mockClear()
+  })
+
   // With empty ganttData, DEMO_SNAPSHOTS is shown (5 CVEs)
   const emptyWrapper = () => mount(GanttTab, {
     props: { ganttData: [] }
@@ -203,8 +212,9 @@ describe('GanttTab.vue', () => {
       const wrapper = emptyWrapper()
       const result = wrapper.vm.toLocalDate('2026-03-15T14:30:00Z')
       expect(result).toBeInstanceOf(Date)
-      expect(result.getHours()).toBe(14)
-      expect(result.getMinutes()).toBe(30)
+      // parseServerDate correctly converts UTC string to Date object
+      // getTime() is timezone-independent, so we compare absolute timestamps
+      expect(result.getTime()).toBe(new Date('2026-03-15T14:30:00Z').getTime())
     })
 
     it('handles ISO date string without time', () => {
@@ -365,7 +375,7 @@ describe('GanttTab.vue', () => {
 
       const snapshots = wrapper.vm.cveSnapshots
       expect(snapshots.length).toBe(1)
-      expect(snapshots[0].snapshots.length).toBe(2) // first_seen + history timestamps
+      expect(snapshots[0].snapshots).toHaveLength(1) // only history timestamps (Gantt uses syncs, not first_seen)
     })
 
     it('builds snapshots with real data correctly', () => {
@@ -397,26 +407,14 @@ describe('GanttTab.vue', () => {
 
       const cve = wrapper.vm.cveSnapshots.find(c => c.cve_id === 'CVE-MULTI')
       expect(cve.cve_id).toBe('CVE-MULTI')
-      // 3 unique timestamps: Feb 1 (agent-01 first seen),
-      // Mar 1 (agent-02 first seen), Apr 1 (agent-01 history RESOLVED)
-      expect(cve.snapshots.length).toBe(3)
+      // Only 1 timestamp: Apr 1 (agent-01 history RESOLVED)
+      // first_seen is excluded — Gantt is driven by syncs, not first detection
+      expect(cve.snapshots).toHaveLength(1)
 
-      // Each snapshot has agents only from events at that exact timestamp
       const snapTimestamps = cve.snapshots.map(s => s.syncTimestamp)
-      expect(snapTimestamps.some(ts => ts.includes('2026-02-01'))).toBe(true)
-      expect(snapTimestamps.some(ts => ts.includes('2026-03-01'))).toBe(true)
       expect(snapTimestamps.some(ts => ts.includes('2026-04-01'))).toBe(true)
-
-      // The snapshot at '2026-02-01' has only agent-01
-      const febSnap = cve.snapshots.find(s => s.syncTimestamp.includes('2026-02-01'))
-      expect(febSnap.agentCount).toBe(1)
-      expect(febSnap.agents).toContain('agent-01')
-
-      // The snapshot at '2026-03-01' has only agent-02
-      const marSnap = cve.snapshots.find(s => s.syncTimestamp.includes('2026-03-01'))
-      expect(marSnap.syncTimestamp).toContain('2026-03-01')
-      expect(marSnap.agentCount).toBe(1)
-      expect(marSnap.agents).toContain('agent-02')
+      expect(snapTimestamps.some(ts => ts.includes('2026-02-01'))).toBe(false)
+      expect(snapTimestamps.some(ts => ts.includes('2026-03-01'))).toBe(false)
     })
 
     it('groups agents by shared last_seen (sync) timestamp', () => {
@@ -459,8 +457,8 @@ describe('GanttTab.vue', () => {
       const cve = wrapper.vm.cveSnapshots.find(c => c.cve_id === 'CVE-SHARED-SYNC')
       expect(cve.cve_id).toBe('CVE-SHARED-SYNC')
 
-      // 4 snapshots: 3 unique first_seen + 1 shared sync last_seen
-      expect(cve.snapshots.length).toBe(4)
+      // 1 snapshot: only the shared sync last_seen (first_seen excluded from Gantt)
+      expect(cve.snapshots).toHaveLength(1)
 
       // The shared sync snapshot has all 3 agents
       const syncSnap = cve.snapshots.find(s => s.syncTimestamp.includes('2026-06-01'))
@@ -648,7 +646,7 @@ describe('GanttTab.vue', () => {
       expect(wrapper.vm.tooltipPos.y).toBe(190) // clientY - 10
     })
 
-    it('handleBarMouseLeave clears hover state', () => {
+    it('handleBarMouseLeave clears hover state after delay', async () => {
       const wrapper = emptyWrapper()
       const cve = wrapper.vm.cveSnapshots[0]
       const snap = cve.snapshots[0]
@@ -657,6 +655,12 @@ describe('GanttTab.vue', () => {
       expect(wrapper.vm.isHovering).toBe(true)
 
       wrapper.vm.handleBarMouseLeave()
+      // State persists during the 100ms delay
+      expect(wrapper.vm.isHovering).toBe(true)
+      expect(wrapper.vm.hoveredSnapshot).not.toBeNull()
+
+      // After delay, it clears
+      await new Promise(r => setTimeout(r, 150))
       expect(wrapper.vm.isHovering).toBe(false)
       expect(wrapper.vm.hoveredSnapshot).toBe(null)
     })
@@ -727,6 +731,124 @@ describe('GanttTab.vue', () => {
       const label = wrapper.find('label[for="ganttSearchDate"]')
       expect(label.exists()).toBe(true)
       expect(label.attributes('style')).toBeUndefined()
+    })
+  })
+
+  describe('Date picker and search', () => {
+    it('onGanttDatePickerChange sets searchDate from Date object', () => {
+      const wrapper = emptyWrapper()
+      wrapper.vm.onGanttDatePickerChange(new Date('2026-07-15T14:30:00'))
+      expect(wrapper.vm.searchDate).toBe('2026-07-15T14:30')
+    })
+
+    it('onGanttDatePickerChange ignores null date', () => {
+      const wrapper = emptyWrapper()
+      wrapper.vm.onGanttDatePickerChange(null)
+      expect(wrapper.vm.searchDate).toBe('')
+    })
+  })
+
+  describe('Bar click navigation', () => {
+    it('handleBarClick navigates to timeline with query params', () => {
+      const wrapper = emptyWrapper()
+      const cve = {
+        cve_id: 'CVE-TEST',
+        snapshots: [
+          { syncTimestamp: '2026-07-01T10:00:00', agents: ['agent-1', 'agent-2'] },
+          { syncTimestamp: '2026-07-10T10:00:00' }
+        ]
+      }
+      wrapper.vm.handleBarClick(cve, 0)
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        path: '/timeline',
+        query: { cve: 'CVE-TEST', agents: 'agent-1,agent-2', syncStart: '2026-07-01T10:00:00', syncEnd: '2026-07-10T10:00:00' }
+      })
+    })
+
+    it('handleBarClick with no agents uses empty string', () => {
+      const wrapper = emptyWrapper()
+      const cve = {
+        cve_id: 'CVE-NOAGENTS',
+        snapshots: [{ syncTimestamp: '2026-07-01T10:00:00' }]
+      }
+      wrapper.vm.handleBarClick(cve, 0)
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        path: '/timeline',
+        query: { cve: 'CVE-NOAGENTS', agents: '', syncStart: '2026-07-01T10:00:00', syncEnd: expect.any(String) }
+      })
+    })
+  })
+
+  describe('Tooltip edge cases', () => {
+    it('cancelLeaveTimeout clears the leave timeout', () => {
+      const wrapper = emptyWrapper()
+      wrapper.vm.startLeaveTimeout()
+      expect(wrapper.vm.leaveTimeout).not.toBeNull()
+      wrapper.vm.cancelLeaveTimeout()
+      expect(wrapper.vm.leaveTimeout).toBeNull()
+    })
+
+    it('handleBarMouseEnter clears existing leaveTimeout', () => {
+      const wrapper = emptyWrapper()
+      const cve = wrapper.vm.cveSnapshots[0]
+      const snap = cve.snapshots[0]
+
+      // Start a leave timeout first
+      wrapper.vm.startLeaveTimeout()
+      expect(wrapper.vm.leaveTimeout).not.toBeNull()
+
+      // Enter again — should clear the old timeout
+      wrapper.vm.handleBarMouseEnter(snap, cve, { clientX: 100, clientY: 200 })
+      expect(wrapper.vm.isHovering).toBe(true)
+      expect(wrapper.vm.leaveTimeout).toBeNull()
+    })
+  })
+
+  describe('Pagination', () => {
+    const manyCves = Array.from({ length: 25 }, (_, i) => ({
+      cve_id: `CVE-PAG-${String(i + 1).padStart(4, '0')}`,
+      severity: 'HIGH',
+      description: `Pagination CVE ${i + 1}`,
+      snapshots: [{ syncTimestamp: '2026-07-01T10:00:00', agentCount: 1 }]
+    }))
+
+    it('shows pagination when ganttData has more than 20 CVEs', () => {
+      const wrapper = mount(GanttTab, { props: { ganttData: manyCves } })
+      expect(wrapper.vm.totalPages).toBe(2)
+      expect(wrapper.find('.gantt-pagination').exists()).toBe(true)
+    })
+
+    it('clicking Siguiente advances to page 2', async () => {
+      const wrapper = mount(GanttTab, { props: { ganttData: manyCves } })
+      expect(wrapper.vm.currentPage).toBe(1)
+
+      await wrapper.find('.page-btn:last-child').trigger('click')
+      expect(wrapper.vm.currentPage).toBe(2)
+    })
+
+    it('clicking Anterior goes back to page 1', async () => {
+      const wrapper = mount(GanttTab, { props: { ganttData: manyCves } })
+      wrapper.vm.currentPage = 2
+      await wrapper.vm.$nextTick()
+
+      const btns = wrapper.findAll('.page-btn')
+      const prevBtn = btns[0]
+      await prevBtn.trigger('click')
+      expect(wrapper.vm.currentPage).toBe(1)
+    })
+
+    it('Anterior button is disabled on page 1', () => {
+      const wrapper = mount(GanttTab, { props: { ganttData: manyCves } })
+      const btns = wrapper.findAll('.page-btn')
+      expect(btns[0].element.disabled).toBe(true)
+    })
+
+    it('Siguiente button is disabled on last page', async () => {
+      const wrapper = mount(GanttTab, { props: { ganttData: manyCves } })
+      wrapper.vm.currentPage = 2
+      await wrapper.vm.$nextTick()
+      const btns = wrapper.findAll('.page-btn')
+      expect(btns[1].element.disabled).toBe(true)
     })
   })
 })

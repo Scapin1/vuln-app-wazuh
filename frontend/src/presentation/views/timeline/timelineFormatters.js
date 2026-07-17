@@ -23,6 +23,19 @@ export const toLocalDatetimeString = (date) => {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`
 }
 
+/**
+ * Parsea un string de fecha del backend.
+ * Si no tiene timezone info (ni Z, ni +, ni offset), asume UTC y agrega Z.
+ * Esto corrige el bug donde datetime.utcnow() se serializa sin "Z"
+ * y el frontend lo interpreta como hora local.
+ */
+export const parseServerDate = (dateString) => {
+  if (!dateString) return null
+  const str = String(dateString)
+  const hasTimezone = str.includes('Z') || /[+-]\d{2}:\d{2}$/.test(str)
+  return new Date(hasTimezone ? str : str + 'Z')
+}
+
 export const fmtDateTime = value => {
   const date = new Date(value)
   return date.toLocaleString('es-CL', {

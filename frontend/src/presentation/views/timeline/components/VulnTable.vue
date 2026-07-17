@@ -100,7 +100,7 @@
         </thead>
         <tbody>
           <tr v-for="vuln in paginatedVulns" :key="vuln.id">
-            <td>{{ vuln.connection_name || '-' }}</td>
+            <td>{{ vuln.connection_name || connectionName || '-' }}</td>
             <td>
               <span :class="getSeverityClass(vuln.severity)">
                 {{ (vuln.severity || 'UNKNOWN').toUpperCase() }}
@@ -200,10 +200,14 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { parseServerDate } from '../timelineFormatters'
 
 const props = defineProps({
   vulns: { type: Array, required: true },
-  loading: { type: Boolean, default: false }
+  loading: { type: Boolean, default: false },
+  connectionName: { type: String, default: '' },
+  syncStart: { type: String, default: null },
+  syncEnd: { type: String, default: null }
 })
 
 // Sorting state
@@ -231,8 +235,8 @@ const compareValues = (a, b, key) => {
   let bVal = b[key]
 
   if (key === 'first_seen' || key === 'last_seen') {
-    aVal = aVal ? new Date(aVal).getTime() : 0
-    bVal = bVal ? new Date(bVal).getTime() : 0
+    aVal = aVal ? parseServerDate(aVal).getTime() : 0
+    bVal = bVal ? parseServerDate(bVal).getTime() : 0
     return aVal - bVal
   } else if (key === 'severity') {
     aVal = getSeverityLevel(aVal)
@@ -250,8 +254,8 @@ const compareValues = (a, b, key) => {
 
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A'
-  const d = new Date(dateString)
-  return d.toLocaleDateString('es-ES', {
+  const d = parseServerDate(dateString)
+  return d.toLocaleDateString('es-CL', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit'
   })
@@ -276,15 +280,15 @@ const getSeverityBadgeClass = (severity) => {
 const isRecentlySeen = (lastSeenDate) => {
   if (!lastSeenDate) return false
   const now = new Date()
-  const lastSeen = new Date(lastSeenDate)
+  const lastSeen = parseServerDate(lastSeenDate)
   const diffMinutes = Math.floor((now - lastSeen) / (1000 * 60))
   return diffMinutes <= 60
 }
 
 const getTimelineProgress = (vuln) => {
   if (!vuln.first_seen || !vuln.last_seen) return 0
-  const first = new Date(vuln.first_seen).getTime()
-  const last = new Date(vuln.last_seen).getTime()
+  const first = parseServerDate(vuln.first_seen).getTime()
+  const last = parseServerDate(vuln.last_seen).getTime()
   const now = Date.now()
 
   if (last === first) return 0
@@ -297,7 +301,7 @@ const getTimelineProgress = (vuln) => {
 
 const timeAgo = (date) => {
   if (!date) return 'N/A'
-  const seconds = Math.floor((Date.now() - new Date(date)) / 1000)
+  const seconds = Math.floor((Date.now() - parseServerDate(date)) / 1000)
 
   let interval = seconds / 31536000
   if (interval > 1) return `Hace ${Math.floor(interval)} años`
@@ -317,11 +321,31 @@ const timeAgo = (date) => {
   return 'Justo ahora'
 }
 
+// ── Date interval filter (from Gantt click) ──
+
+const isInSyncInterval = (vuln) => {
+  if (!props.syncStart) return true
+
+  const syncStartMs = new Date(props.syncStart).getTime()
+  const syncEndMs = props.syncEnd ? new Date(props.syncEnd).getTime() : Date.now()
+
+  // Filter by last_seen being within the sync interval
+  const lastSeenMs = new Date(vuln.last_seen).getTime()
+  return lastSeenMs >= syncStartMs && lastSeenMs <= syncEndMs
+}
+
 // ── Sorting ──
 
 const sortedVulns = computed(() => {
-  if (!sortKey.value) return [...props.vulns]
-  return [...props.vulns].sort((a, b) => {
+  let result = [...props.vulns]
+
+  // Apply sync interval filter if set (from Gantt click)
+  if (props.syncStart) {
+    result = result.filter(isInSyncInterval)
+  }
+
+  if (!sortKey.value) return result
+  return result.sort((a, b) => {
     const cmp = compareValues(a, b, sortKey.value)
     return sortOrder.value === 'asc' ? cmp : -cmp
   })

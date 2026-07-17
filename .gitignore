@@ -11,6 +11,12 @@ frontend/dist/
 # Frontend deps
 frontend/node_modules/
 frontend/node_modules/.pnpm/
+
+# Root tooling deps
+node_modules/
+
+# Codegraph index
+.codegraph/
 frontend/node_modules/.modules.yaml
 frontend/node_modules/.pnpm-workspace-state-v1.json
 

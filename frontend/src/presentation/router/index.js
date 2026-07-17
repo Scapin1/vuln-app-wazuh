@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../views/Login.vue'
-import Dashboard from '../views/Dashboard.vue'
 import ConfigUser from '../views/ConfigUser.vue'
 import ConfigWazuh from '../views/ConfigWazuh.vue'
 import Timeline from '../views/Timeline.vue'
@@ -13,9 +12,9 @@ import userService from '../../application/services/userService'
 const routes = [
   { path: '/login', name: 'Login', component: Login },
   { path: '/', redirect: '/login' },
-  { path: '/dashboard', name: 'Dashboard', component: Dashboard, meta: { requiresAuth: true } },
+  { path: '/dashboard', name: 'VulnAnalytics', component: VulnAnalytics, meta: { requiresAuth: true } },
+  { path: '/vuln-analytics', redirect: '/dashboard' },
   { path: '/timeline', name: 'Timeline', component: Timeline, meta: { requiresAuth: true } },
-  { path: '/vuln-analytics', name: 'VulnAnalytics', component: VulnAnalytics, meta: { requiresAuth: true } },
   { path: '/config-user', name: 'ConfigUser', component: ConfigUser, meta: { requiresAuth: true } },
   { path: '/config-wazuh', name: 'ConfigWazuh', component: ConfigWazuh, meta: { requiresAuth: true } },
   { path: '/change-password', name: 'ChangePassword', component: ChangePassword, meta: { requiresAuth: true } },

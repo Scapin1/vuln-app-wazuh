@@ -2,8 +2,8 @@
   <div class="fade-in timeline-view">
     <div class="header-actions">
       <div>
-        <h1 class="title">Linea del tiempo</h1>
-        <p class="subtitle">Vista infografica con linea continua y slots con o sin cambios.</p>
+        <h1 class="title">Vulnerabilidades</h1>
+        <p class="subtitle">Listado de vulnerabilidades detectadas con filtros y tabla ordenable.</p>
       </div>
     </div>
 
@@ -21,6 +21,7 @@
       :periods="periods"
       :custom-date="customDate"
       :loading="loading"
+      compact
       @update:selected-connection="selectedConnection = $event"
       @update:selected-agents="selectedAgents = $event"
       @update:selected-vulns="selectedVulns = $event"
@@ -31,7 +32,8 @@
     />
 
     <TimelineKpiStrip
-      :has-built="hasBuilt || loading"
+      v-if="hasBuilt"
+      :has-built="hasBuilt"
       :painted-count="paintedCount"
       :latest-snap="latestSnap"
     />
@@ -64,12 +66,20 @@
       <h3>Sin datos para mostrar</h3>
       <p>No se encontraron vulnerabilidades para los filtros seleccionados.</p>
     </div>
-    <VulnTable v-else :vulns="filteredVulnsData" :loading="false" />
+    <VulnTable
+      v-else
+      :vulns="filteredVulnsData"
+      :loading="false"
+      :connection-name="getConnectionName()"
+      :sync-start="tableSyncStart"
+      :sync-end="tableSyncEnd"
+    />
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useVulnStore } from '../../application/stores/vulnStore'
 import wazuhService from '../../application/services/wazuhService'
 import { toLocalDatetimeString } from './timeline/timelineFormatters'
@@ -78,13 +88,14 @@ import TimelineFilters from './timeline/components/TimelineFilters.vue'
 import TimelineKpiStrip from './timeline/components/TimelineKpiStrip.vue'
 import VulnTable from './timeline/components/VulnTable.vue'
 
+const route = useRoute()
+const router = useRouter()
 const store = useVulnStore()
 
 const periods = [
   { l: '24H', v: '24h' },
   { l: '7D', v: '7d' },
   { l: '30D', v: '30d' },
-  { l: 'Dia', v: 'day' },
   { l: 'Todo', v: 'all' }
 ]
 
@@ -97,6 +108,8 @@ const selectedVulns = ref([])
 const period = ref('30d')
 const customDate = ref(toLocalDatetimeString())
 const errorBanner = ref('')
+const tableSyncStart = ref(null)
+const tableSyncEnd = ref(null)
 
 const getConnectionName = () => {
   const found = connections.value.find(conn => String(conn.id) === String(selectedConnection.value))
@@ -140,12 +153,42 @@ const onConnectionChange = async () => {
   agentOpts.value = []
   vulnOpts.value = []
   errorBanner.value = ''
+  tableSyncStart.value = null
+  tableSyncEnd.value = null
 
   if (selectedConnection.value) {
     try {
       const filterOptions = await store.fetchFilterOptions(selectedConnection.value)
       agentOpts.value = filterOptions.agents || []
       vulnOpts.value = filterOptions.cves || []
+
+      // Apply filters from query params if present
+      const cveFromQuery = route.query.cve
+      const agentsFromQuery = route.query.agents
+      const syncStart = route.query.syncStart
+      const syncEnd = route.query.syncEnd
+
+      if (cveFromQuery && vulnOpts.value.includes(cveFromQuery)) {
+        selectedVulns.value = [cveFromQuery]
+      }
+
+      if (agentsFromQuery) {
+        const agentList = agentsFromQuery.split(',').filter(a => agentOpts.value.includes(a))
+        if (agentList.length > 0) {
+          selectedAgents.value = agentList
+        }
+      }
+
+      // If coming from Gantt click, pass the exact sync interval to the table
+      if (syncStart) {
+        tableSyncStart.value = syncStart
+        tableSyncEnd.value = syncEnd || null
+      }
+
+      // Clean URL after applying filters
+      if (cveFromQuery || agentsFromQuery || syncStart) {
+        router.replace({ query: {} })
+      }
     } catch (error) {
       console.error(error)
       errorBanner.value = 'No se pudieron cargar agentes y CVEs para la conexion seleccionada.'
@@ -173,8 +216,8 @@ onMounted(async () => {
     if (connections.value.length > 0) {
       selectedConnection.value = connections.value[0].id
     }
-    // Auto-load timeline data
-    await buildTimeline()
+    // Load filter options + timeline data via onConnectionChange
+    await onConnectionChange()
   } catch (error) {
     console.error(error)
     errorBanner.value = 'No se pudieron cargar las conexiones Wazuh.'

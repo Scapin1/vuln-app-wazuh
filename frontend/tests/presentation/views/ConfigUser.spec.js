@@ -75,8 +75,10 @@ describe('ConfigUser.vue', () => {
 
         await wrapper.find('.btn-primary').trigger('click')
 
-        wrapper.vm.newUser.username = 'new_admin'
-        wrapper.vm.newUser.password = 'SuperSecret123'
+        wrapper.vm.newUser.user_name = 'new_admin'
+        wrapper.vm.newUser.user_email = 'new_admin@empresa.com'
+        wrapper.vm.newUser.user_rol = 'admin'
+        wrapper.vm.newUser.user_password = 'SuperSecret123'
 
         userService.createUser.mockResolvedValueOnce({})
 
@@ -84,8 +86,10 @@ describe('ConfigUser.vue', () => {
         await flushPromises()
 
         expect(userService.createUser).toHaveBeenCalledWith({
-            username: 'new_admin',
-            password: 'SuperSecret123'
+            user_name: 'new_admin',
+            user_email: 'new_admin@empresa.com',
+            user_rol: 'admin',
+            user_password: 'SuperSecret123'
         })
         expect(wrapper.vm.showAddModal).toBe(false)
         expect(userService.getUsers).toHaveBeenCalledTimes(2) // 1 initial, 1 after add
@@ -97,12 +101,13 @@ describe('ConfigUser.vue', () => {
 
         await wrapper.find('.btn-primary').trigger('click')
 
-        wrapper.vm.newUser.username = ''
-        wrapper.vm.newUser.password = ''
+        wrapper.vm.newUser.user_name = ''
+        wrapper.vm.newUser.user_email = ''
+        wrapper.vm.newUser.user_password = ''
 
         await wrapper.find('form').trigger('submit.prevent')
 
-        expect(wrapper.vm.error).toContain('no pueden estar vacíos')
+        expect(wrapper.vm.error).toContain('Todos los campos son requeridos.')
         expect(userService.createUser).not.toHaveBeenCalled()
     })
 
@@ -111,8 +116,10 @@ describe('ConfigUser.vue', () => {
         await flushPromises()
 
         await wrapper.find('.btn-primary').trigger('click')
-        wrapper.vm.newUser.username = 'fail_user'
-        wrapper.vm.newUser.password = 'pass'
+        wrapper.vm.newUser.user_name = 'fail_user'
+        wrapper.vm.newUser.user_email = 'fail@empresa.com'
+        wrapper.vm.newUser.user_rol = 'admin'
+        wrapper.vm.newUser.user_password = 'pass123'
 
         userService.createUser.mockRejectedValueOnce({ response: { data: { detail: 'User exists' } } })
 
@@ -151,5 +158,47 @@ describe('ConfigUser.vue', () => {
         await flushPromises()
 
         expect(userService.deleteUser).not.toHaveBeenCalled()
+    })
+
+    it('handles delete failure gracefully', async () => {
+        const wrapper = mount(ConfigUser)
+        await flushPromises()
+
+        Swal.fire.mockResolvedValueOnce({ isConfirmed: true })
+        userService.deleteUser.mockRejectedValueOnce(new Error('Server error'))
+
+        const deleteBtn = wrapper.findAll('tbody tr')[0].find('.btn-icon-danger')
+        await deleteBtn.trigger('click')
+        await flushPromises()
+
+        expect(Swal.fire).toHaveBeenCalledWith(
+            expect.objectContaining({ icon: 'error' })
+        )
+    })
+
+    it('handles generic create error without detail field', async () => {
+        const wrapper = mount(ConfigUser)
+        await flushPromises()
+
+        await wrapper.find('.btn-primary').trigger('click')
+        wrapper.vm.newUser.user_name = 'test'
+        wrapper.vm.newUser.user_email = 'test@test.com'
+        wrapper.vm.newUser.user_password = 'pass123'
+
+        userService.createUser.mockRejectedValueOnce(new Error('Network error'))
+
+        await wrapper.find('form').trigger('submit.prevent')
+        await flushPromises()
+
+        expect(wrapper.vm.error).toBe('Error al crear el usuario. Asegúrate de que no exista.')
+    })
+
+    it('handles nested response data format', async () => {
+        userService.getUsers.mockResolvedValueOnce({ data: { data: [{ id: 10, username: 'nested' }] } })
+        const wrapper = mount(ConfigUser)
+        await flushPromises()
+
+        expect(wrapper.vm.users).toHaveLength(1)
+        expect(wrapper.vm.users[0].username).toBe('nested')
     })
 })

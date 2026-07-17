@@ -20,7 +20,6 @@ describe('TimelineFilters.vue', () => {
       { v: '24h', l: '24 horas' },
       { v: '7d', l: '7 días' },
       { v: '30d', l: '30 días' },
-      { v: 'day', l: 'Día' },
       { v: 'all', l: 'Todo' }
     ],
     customDate: '',
@@ -32,12 +31,18 @@ describe('TimelineFilters.vue', () => {
       props: defaultProps
     })
 
-    const select = wrapper.find('select')
-    expect(select.exists()).toBe(true)
+    // Open connection dropdown
+    const ddButtons = wrapper.findAll('.dd-btn')
+    await ddButtons[0].trigger('click')
+    await wrapper.vm.$nextTick()
 
-    await select.setValue('1')
+    // Select first connection
+    const connButton = wrapper.find('.dd-item-btn')
+    await connButton.trigger('click')
+
     expect(wrapper.emitted('update:selectedConnection')).toHaveLength(1)
     expect(wrapper.emitted('update:selectedConnection')[0]).toEqual([1])
+    expect(wrapper.emitted('connection-change')).toHaveLength(1)
   })
 
   it('shows agent selector when agents are available', () => {
@@ -61,7 +66,7 @@ describe('TimelineFilters.vue', () => {
     })
 
     const ddButtons = wrapper.findAll('.dd-btn')
-    await ddButtons[0].trigger('click')
+    await ddButtons[1].trigger('click')
 
     await wrapper.vm.$nextTick()
     expect(wrapper.find('.dd-panel').exists()).toBe(true)
@@ -77,7 +82,7 @@ describe('TimelineFilters.vue', () => {
 
     // Open dropdown
     const ddButtons = wrapper.findAll('.dd-btn')
-    await ddButtons[0].trigger('click')
+    await ddButtons[1].trigger('click')
 
     // Search input should be visible
     const searchInput = wrapper.find('.dd-search')
@@ -97,29 +102,12 @@ describe('TimelineFilters.vue', () => {
     })
 
     const chips = wrapper.findAll('.chip')
-    expect(chips.length).toBe(5)
+    expect(chips).toHaveLength(4)
 
     // Click '7d' chip
     await chips[1].trigger('click')
     expect(wrapper.emitted('set-period')).toHaveLength(1)
     expect(wrapper.emitted('set-period')[0]).toContain('7d')
-  })
-
-  it('shows date picker when period is "day"', async () => {
-    const wrapper = mount(TimelineFilters, {
-      props: {
-        ...defaultProps,
-        period: 'day',
-        customDate: '2026-03-08T10:00'
-      }
-    })
-
-    const dateInput = wrapper.find('input[type="date"]')
-    expect(dateInput.exists()).toBe(true)
-    expect(dateInput.element.value).toBe('2026-03-08')
-    const hourSel = wrapper.find('.dt-row select:first-of-type')
-    expect(hourSel.exists()).toBe(true)
-    expect(hourSel.element.value).toBe('10')
   })
 
   it('emits vuln selection changes', async () => {
@@ -132,7 +120,7 @@ describe('TimelineFilters.vue', () => {
 
     // Open vuln dropdown
     const ddButtons = wrapper.findAll('.dd-btn')
-    await ddButtons[1].trigger('click')
+    await ddButtons[2].trigger('click')
     await wrapper.vm.$nextTick()
 
     // Check dropdown opened
@@ -183,8 +171,7 @@ describe('TimelineFilters.vue', () => {
     expect(chips[0].text()).toBe('24 horas')
     expect(chips[1].text()).toBe('7 días')
     expect(chips[2].text()).toBe('30 días')
-    expect(chips[3].text()).toBe('Día')
-    expect(chips[4].text()).toBe('Todo')
+    expect(chips[3].text()).toBe('Todo')
   })
 
   it('applies active class to selected period', () => {
@@ -209,7 +196,7 @@ describe('TimelineFilters.vue', () => {
 
     // Open dropdown
     const ddButtons = wrapper.findAll('.dd-btn')
-    await ddButtons[0].trigger('click')
+    await ddButtons[1].trigger('click')
     await wrapper.vm.$nextTick()
 
     // Click "Todos"
@@ -232,7 +219,7 @@ describe('TimelineFilters.vue', () => {
 
     // Open dropdown
     const ddButtons = wrapper.findAll('.dd-btn')
-    await ddButtons[0].trigger('click')
+    await ddButtons[1].trigger('click')
     await wrapper.vm.$nextTick()
 
     // Click "Limpiar"
@@ -253,7 +240,7 @@ describe('TimelineFilters.vue', () => {
     })
 
     const ddButtons = wrapper.findAll('.dd-btn')
-    await ddButtons[1].trigger('click') // Vulns dropdown
+    await ddButtons[2].trigger('click') // Vulns dropdown
 
     const todosButton = wrapper.findAll('.dd-panel .dd-actions span')[0]
     await todosButton.trigger('click')
@@ -271,7 +258,7 @@ describe('TimelineFilters.vue', () => {
     })
 
     const ddButtons = wrapper.findAll('.dd-btn')
-    await ddButtons[1].trigger('click')
+    await ddButtons[2].trigger('click')
 
     const searchInput = wrapper.find('.dd-search')
     await searchInput.setValue('CVE-2023-002')
@@ -290,12 +277,12 @@ describe('TimelineFilters.vue', () => {
     const ddButtons = wrapper.findAll('.dd-btn')
 
     // Open vulns dropdown first
-    await ddButtons[1].trigger('click')
+    await ddButtons[2].trigger('click')
     await wrapper.vm.$nextTick()
     expect(wrapper.findAll('.dd-panel')).toHaveLength(1)
 
     // Now open agents — should close vulns
-    await ddButtons[0].trigger('click')
+    await ddButtons[1].trigger('click')
     await wrapper.vm.$nextTick()
     expect(wrapper.findAll('.dd-panel')).toHaveLength(1)
   })
@@ -311,12 +298,12 @@ describe('TimelineFilters.vue', () => {
     const ddButtons = wrapper.findAll('.dd-btn')
 
     // Open agents dropdown first
-    await ddButtons[0].trigger('click')
+    await ddButtons[1].trigger('click')
     await wrapper.vm.$nextTick()
     expect(wrapper.findAll('.dd-panel')).toHaveLength(1)
 
     // Now open vulns — should close agents
-    await ddButtons[1].trigger('click')
+    await ddButtons[2].trigger('click')
     await wrapper.vm.$nextTick()
     expect(wrapper.findAll('.dd-panel')).toHaveLength(1)
   })
@@ -331,7 +318,7 @@ describe('TimelineFilters.vue', () => {
 
     // Open agents dropdown
     const ddButtons = wrapper.findAll('.dd-btn')
-    await ddButtons[0].trigger('click')
+    await ddButtons[1].trigger('click')
     await wrapper.vm.$nextTick()
     expect(wrapper.findAll('.dd-panel')).toHaveLength(1)
 
@@ -341,51 +328,69 @@ describe('TimelineFilters.vue', () => {
     expect(wrapper.findAll('.dd-panel')).toHaveLength(0)
   })
 
-  it('updates custom date when date changes', async () => {
+  it('toggles severity chips and emits update', async () => {
     const wrapper = mount(TimelineFilters, {
       props: {
         ...defaultProps,
-        period: 'day',
-        customDate: '2026-03-08T10:00'
+        selectedConnection: '1',
+        severityOptions: [
+          { value: 'CRITICAL', label: 'Crítica' },
+          { value: 'HIGH', label: 'Alta' }
+        ]
       }
     })
 
-    const dateInput = wrapper.find('input[type="date"]')
-    await dateInput.setValue('2026-03-10')
+    // Click first severity chip
+    const chips = wrapper.findAll('.chip')
+    const critChip = chips.find(c => c.text().includes('Crítica'))
+    await critChip.trigger('click')
+    await wrapper.vm.$nextTick()
 
-    expect(wrapper.emitted('update:customDate')).toHaveLength(1)
-    expect(wrapper.emitted('update:customDate')[0]).toEqual(['2026-03-10T10:00'])
+    expect(wrapper.emitted('update:selectedSeverities')).toHaveLength(1)
+    expect(wrapper.emitted('update:selectedSeverities')[0][0]).toContain('CRITICAL')
   })
 
-  it('updates custom date when hour changes', async () => {
+  it('dateModel handles valid customDate', () => {
     const wrapper = mount(TimelineFilters, {
       props: {
         ...defaultProps,
-        period: 'day',
-        customDate: '2026-03-08T10:00'
+        customDate: '2026-07-01T10:30'
       }
     })
 
-    const hourSel = wrapper.find('.dt-row select:first-of-type')
-    await hourSel.setValue('14')
-
-    expect(wrapper.emitted('update:customDate')).toHaveLength(1)
-    expect(wrapper.emitted('update:customDate')[0]).toEqual(['2026-03-08T14:00'])
+    expect(wrapper.vm.dateModel).toBeInstanceOf(Date)
+    expect(wrapper.vm.dateModel.getFullYear()).toBe(2026)
+    expect(wrapper.vm.dateModel.getMonth()).toBe(6) // 0-indexed, July = 6
+    expect(wrapper.vm.dateModel.getDate()).toBe(1)
   })
 
-  it('updates custom date when minute changes', async () => {
+  it('dateModel returns null for invalid customDate', () => {
     const wrapper = mount(TimelineFilters, {
       props: {
         ...defaultProps,
-        period: 'day',
-        customDate: '2026-03-08T10:00'
+        customDate: 'invalid-date'
       }
     })
 
-    const minuteSel = wrapper.find('.dt-row select:last-of-type')
-    await minuteSel.setValue('30')
+    expect(wrapper.vm.dateModel).toBeNull()
+  })
 
+  it('onDatePickerChange emits formatted customDate', () => {
+    const wrapper = mount(TimelineFilters, {
+      props: defaultProps
+    })
+
+    wrapper.vm.onDatePickerChange(new Date('2026-07-15T14:30:00'))
     expect(wrapper.emitted('update:customDate')).toHaveLength(1)
-    expect(wrapper.emitted('update:customDate')[0]).toEqual(['2026-03-08T10:30'])
+    expect(wrapper.emitted('update:customDate')[0][0]).toBe('2026-07-15T14:30')
+  })
+
+  it('onDatePickerChange ignores null date', () => {
+    const wrapper = mount(TimelineFilters, {
+      props: defaultProps
+    })
+
+    wrapper.vm.onDatePickerChange(null)
+    expect(wrapper.emitted('update:customDate')).toBeUndefined()
   })
 })

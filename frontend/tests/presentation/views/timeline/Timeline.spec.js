@@ -1,10 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import Timeline from '@/presentation/views/Timeline.vue'
 import wazuhService from '@/application/services/wazuhService'
 import { useVulnStore } from '@/application/stores/vulnStore'
 import TimelineFilters from '@/presentation/views/timeline/components/TimelineFilters.vue'
+import VulnTable from '@/presentation/views/timeline/components/VulnTable.vue'
 // Note: TimelineDetailModal.vue exists but is no longer rendered directly in Timeline.vue
+
+// Mock vue-router
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ query: {} }),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() })
+}))
 
 // Mock services
 vi.mock('@/application/services/wazuhService', () => ({
@@ -39,7 +47,32 @@ describe('Timeline.vue', () => {
     await flushPromises()
 
     expect(wrapper.find('.timeline-view').exists()).toBe(true)
-    expect(wrapper.text()).toContain('Linea del tiempo')
+    expect(wrapper.text()).toContain('Vulnerabilidades')
+  })
+
+  it('renders new title and subtitle', async () => {
+    const wrapper = mount(Timeline)
+    await flushPromises()
+
+    expect(wrapper.find('h1').text()).toBe('Vulnerabilidades')
+    expect(wrapper.text()).toContain('Listado de vulnerabilidades detectadas con filtros y tabla ordenable.')
+  })
+
+  it('passes connectionName prop to VulnTable from getConnectionName', async () => {
+    const wrapper = mount(Timeline)
+    await flushPromises()
+
+    wrapper.vm.connections = [{ id: '1', name: 'Alpha Connection' }]
+    wrapper.vm.selectedConnection = '1'
+    wrapper.vm.filteredVulnsData = [{ id: 1, cve_id: 'CVE-1', connection_name: null }]
+    wrapper.vm.hasBuilt = true
+    wrapper.vm.loading = false
+    await wrapper.vm.$nextTick()
+    await nextTick()
+
+    const vulnTable = wrapper.findComponent(VulnTable)
+    expect(vulnTable.exists()).toBe(true)
+    expect(vulnTable.props('connectionName')).toBe('Alpha Connection')
   })
 
   it('loads connections on mount', async () => {
@@ -53,7 +86,7 @@ describe('Timeline.vue', () => {
     const wrapper = mount(Timeline)
 
     expect(wrapper.find('.timeline-view').exists()).toBe(true)
-    expect(wrapper.text()).toContain('Linea del tiempo')
+    expect(wrapper.text()).toContain('Vulnerabilidades')
   })
 
   it('fetches agents and vulns when connection changes', async () => {
@@ -103,12 +136,11 @@ describe('Timeline.vue', () => {
     const wrapper = mount(Timeline)
 
     const periods = wrapper.vm.periods
-    expect(periods).toHaveLength(5)
+    expect(periods).toHaveLength(4)
     expect(periods[0]).toEqual({ v: '24h', l: '24H' })
     expect(periods[1]).toEqual({ v: '7d', l: '7D' })
     expect(periods[2]).toEqual({ v: '30d', l: '30D' })
-    expect(periods[3]).toEqual({ v: 'day', l: 'Dia' })
-    expect(periods[4]).toEqual({ v: 'all', l: 'Todo' })
+    expect(periods[3]).toEqual({ v: 'all', l: 'Todo' })
   })
 
   it('updates agent and vuln options when connection changes', async () => {

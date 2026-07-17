@@ -500,6 +500,41 @@ describe('VulnTable.vue', () => {
     })
   })
 
+  describe('connectionName prop', () => {
+    it('renders connectionName prop value when vuln.connection_name is null', () => {
+      const vulns = [makeVuln({ connection_name: null })]
+      const wrapper = mount(VulnTable, {
+        props: { vulns, loading: false, connectionName: 'Test Connection' }
+      })
+      expect(wrapper.text()).toContain('Test Connection')
+    })
+
+    it('prefers vuln.connection_name over connectionName prop', () => {
+      const vulns = [makeVuln({ connection_name: 'Vuln Connection' })]
+      const wrapper = mount(VulnTable, {
+        props: { vulns, loading: false, connectionName: 'Prop Connection' }
+      })
+      expect(wrapper.text()).toContain('Vuln Connection')
+      expect(wrapper.text()).not.toContain('Prop Connection')
+    })
+
+    it('falls back to connectionName prop when vuln.connection_name is missing', () => {
+      const vulns = [makeVuln({ connection_name: undefined })]
+      const wrapper = mount(VulnTable, {
+        props: { vulns, loading: false, connectionName: 'Fallback Connection' }
+      })
+      expect(wrapper.text()).toContain('Fallback Connection')
+    })
+
+    it('falls back to dash when neither connection_name nor connectionName prop is provided', () => {
+      const vulns = [makeVuln({ connection_name: null })]
+      const wrapper = mount(VulnTable, {
+        props: { vulns, loading: false }
+      })
+      expect(wrapper.text()).toContain('-')
+    })
+  })
+
   describe('edge cases', () => {
     it('handles null scores', () => {
       const vulns = [makeVuln({ score_base: null })]
@@ -559,6 +594,84 @@ describe('VulnTable.vue', () => {
         props: { vulns, loading: false }
       })
       expect(wrapper.text()).toContain('N/A')
+    })
+  })
+
+  describe('sync interval filtering (from Gantt click)', () => {
+    it('returns all vulns when no syncStart is set', () => {
+      const vulns = [
+        makeVuln({ id: 1, last_seen: '2026-03-01T10:00:00Z' }),
+        makeVuln({ id: 2, last_seen: '2026-03-05T10:00:00Z' })
+      ]
+      const wrapper = mount(VulnTable, {
+        props: { vulns, loading: false }
+      })
+      expect(wrapper.vm.sortedVulns).toHaveLength(2)
+    })
+
+    it('filters vulns within syncStart-syncEnd interval', () => {
+      const vulns = [
+        makeVuln({ id: 1, last_seen: '2026-03-01T10:00:00Z' }),
+        makeVuln({ id: 2, last_seen: '2026-03-15T10:00:00Z' }),
+        makeVuln({ id: 3, last_seen: '2026-03-20T10:00:00Z' })
+      ]
+      const wrapper = mount(VulnTable, {
+        props: {
+          vulns,
+          loading: false,
+          syncStart: '2026-03-10T00:00:00Z',
+          syncEnd: '2026-03-18T00:00:00Z'
+        }
+      })
+      expect(wrapper.vm.sortedVulns).toHaveLength(1)
+      expect(wrapper.vm.sortedVulns[0].id).toBe(2)
+    })
+
+    it('uses Date.now() as syncEnd when syncEnd is not provided', () => {
+      const vulns = [
+        makeVuln({ id: 1, last_seen: '2026-01-01T00:00:00Z' }),
+        makeVuln({ id: 2, last_seen: '2026-03-08T12:00:00Z' }) // within system time
+      ]
+      const wrapper = mount(VulnTable, {
+        props: {
+          vulns,
+          loading: false,
+          syncStart: '2026-03-01T00:00:00Z'
+        }
+      })
+      // System time is 2026-03-08T16:00:00Z
+      expect(wrapper.vm.sortedVulns).toHaveLength(1)
+      expect(wrapper.vm.sortedVulns[0].id).toBe(2)
+    })
+
+    it('excludes vulns before syncStart', () => {
+      const vulns = [
+        makeVuln({ id: 1, last_seen: '2026-02-01T10:00:00Z' }),
+        makeVuln({ id: 2, last_seen: '2026-03-15T10:00:00Z' })
+      ]
+      const wrapper = mount(VulnTable, {
+        props: {
+          vulns,
+          loading: false,
+          syncStart: '2026-03-01T00:00:00Z',
+          syncEnd: '2026-04-01T00:00:00Z'
+        }
+      })
+      expect(wrapper.vm.sortedVulns).toHaveLength(1)
+      expect(wrapper.vm.sortedVulns[0].id).toBe(2)
+    })
+
+    it('handles isInSyncInterval directly', () => {
+      const wrapper = mount(VulnTable, {
+        props: {
+          vulns: [makeVuln()],
+          loading: false,
+          syncStart: '2026-03-01T00:00:00Z',
+          syncEnd: '2026-04-01T00:00:00Z'
+        }
+      })
+      expect(wrapper.vm.isInSyncInterval(makeVuln({ last_seen: '2026-03-07T10:00:00Z' }))).toBe(true)
+      expect(wrapper.vm.isInSyncInterval(makeVuln({ last_seen: '2026-05-01T10:00:00Z' }))).toBe(false)
     })
   })
 })

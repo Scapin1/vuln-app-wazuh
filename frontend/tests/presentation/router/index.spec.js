@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import router from '@/presentation/router/index'
 import userService from '@/application/services/userService'
+import VulnAnalytics from '@/presentation/views/VulnAnalytics.vue'
 
 // 1. OBLIGATORIO: Simular el servicio que usa el router
 vi.mock('@/application/services/userService', () => ({
@@ -95,5 +96,28 @@ describe('router/index.js global guard', () => {
         expect(router.currentRoute.value.path).toBe('/login')
         expect(localStorage.getItem('token')).toBeNull()
         expect(localStorage.getItem('username')).toBeNull()
+    })
+
+    it('redirects /vuln-analytics to /dashboard', async () => {
+        localStorage.setItem('token', 'fake-token')
+        userService.getUserMe.mockResolvedValueOnce({ data: { is_default_password: false } })
+
+        await router.push('/vuln-analytics')
+        await router.isReady()
+
+        expect(router.currentRoute.value.path).toBe('/dashboard')
+    })
+
+    it('serves VulnAnalytics at /dashboard', () => {
+        const resolved = router.resolve('/dashboard')
+        expect(resolved.name).toBe('VulnAnalytics')
+        const routeRecord = router.getRoutes().find(r => r.path === '/dashboard')
+        expect(routeRecord.components.default).toBe(VulnAnalytics)
+    })
+
+    it('does not define a Dashboard route', () => {
+        const resolved = router.resolve('/dashboard')
+        expect(resolved.name).not.toBe('Dashboard')
+        expect(resolved.name).toBe('VulnAnalytics')
     })
 })

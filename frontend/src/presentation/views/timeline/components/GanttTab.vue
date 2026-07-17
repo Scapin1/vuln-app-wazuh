@@ -10,97 +10,105 @@
     </div>
 
     <template v-else>
-    <div class="gantt-header">
-      <h3 class="gantt-title">Seguimiento de CVEs</h3>
-      <div class="gantt-controls">
-        <div class="search-date">
-          <label for="ganttSearchDate" class="search-date-label">Buscar fecha:</label>
-          <div class="search-dt-row">
-            <input id="ganttSearchDate" type="date" :value="ganttDatePart" @input="e => onGanttDateChange(e.target.value)" class="date-input" />
-            <select id="gantt-hour" :value="ganttHourPart" @change="e => onGanttHourChange(e.target.value)" class="date-input time-sel" aria-label="Hora">
-              <option v-for="h in GANTT_HOURS" :key="h" :value="h">{{ h }}</option>
-            </select>
-            <select id="gantt-minute" :value="ganttMinutePart" @change="e => onGanttMinuteChange(e.target.value)" class="date-input time-sel" aria-label="Minuto">
-              <option v-for="m in GANTT_MINUTES" :key="m" :value="m">{{ m }}</option>
-            </select>
+      <div class="gantt-header">
+        <h3 class="gantt-title">Seguimiento de CVEs</h3>
+        <div class="gantt-controls">
+          <div class="search-date">
+            <label for="ganttSearchDate" class="search-date-label">Buscar fecha:</label>
+            <VueDatePicker
+              v-model="ganttDateModel"
+              :enable-time-picker="true"
+              :time-picker-inline="true"
+              format="dd/MM/yyyy HH:mm"
+              :teleport="true"
+              auto-apply
+              @update:model-value="onGanttDatePickerChange"
+            />
+            <button class="search-btn" @click="scrollToDate">Ir</button>
           </div>
-          <button class="search-btn" @click="scrollToDate">Ir</button>
-        </div>
-        <div class="zoom-controls">
-          <button class="zoom-btn" @click="zoomOut" title="Alejar">-</button>
-          <span class="zoom-level">{{ zoomLabel }}</span>
-          <button class="zoom-btn" @click="zoomIn" title="Acercar">+</button>
-        </div>
-        <div class="gantt-legend">
-          <div class="legend-item"><span class="legend-dot snap-detected"></span> Activo</div>
-          <div class="legend-item"><span class="legend-dot snap-reopened"></span> Reabierto</div>
-          <div class="legend-item"><span class="legend-dot snap-resolved"></span> Resuelto</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="gantt-scroll-wrapper" ref="scrollWrapper">
-      <div class="gantt-header-row">
-        <div class="gantt-sidebar-header">CVE / DETALLE</div>
-        <div class="gantt-timeline-header" :style="{ minWidth: timelineWidth + 'px' }">
-          <div v-for="label in timeLabels" :key="label.label" class="month-label"
-            :style="{ width: MONTH_WIDTH + 'px' }">
-            {{ label.label }}
+          <div class="zoom-controls">
+            <button class="zoom-btn" @click="zoomOut" title="Alejar">-</button>
+            <span class="zoom-level">{{ zoomLabel }}</span>
+            <button class="zoom-btn" @click="zoomIn" title="Acercar">+</button>
+          </div>
+          <div class="gantt-legend">
+            <div class="legend-item"><span class="legend-dot snap-detected"></span> Activo</div>
+            <div class="legend-item"><span class="legend-dot snap-reopened"></span> Reabierto</div>
+            <div class="legend-item"><span class="legend-dot snap-resolved"></span> Resuelto</div>
           </div>
         </div>
       </div>
 
-      <div class="gantt-body">
-        <div v-for="cve in paginatedCveSnapshots" :key="cve.cve_id" class="gantt-row cve-row">
-          <div class="gantt-sidebar-cell">
-            <div class="cve-top">
-              <span class="cve-id">{{ cve.cve_id }}</span>
-              <span class="sev-badge" :class="cve.severity.toLowerCase()">{{ cve.severity }}</span>
+      <div class="gantt-scroll-wrapper" ref="scrollWrapper">
+        <div class="gantt-header-row">
+          <div class="gantt-sidebar-header">CVE / DETALLE</div>
+          <div class="gantt-timeline-header" :style="{ minWidth: timelineWidth + 'px' }">
+            <div v-for="label in timeLabels" :key="label.label" class="month-label"
+              :style="{ width: MONTH_WIDTH + 'px' }">
+              {{ label.label }}
             </div>
-            <span class="cve-desc">{{ cve.description }}</span>
-            <span class="cve-sync-count">{{ cve.snapshots.length }} sincronizaciones</span>
           </div>
-          <div class="gantt-chart-cell" :style="{ minWidth: timelineWidth + 'px' }">
-            <div v-for="(snap, idx) in cve.snapshots" :key="idx"
-                 class="gantt-bar snapshot-bar"
-                 :style="getSnapshotBarStyle(cve, idx)"
-                 :class="getSnapshotBarClass(cve, idx)"
-                 @mouseenter="handleBarMouseEnter(snap, cve, $event)"
-                 @mousemove="handleBarMouseMove($event)"
-                 @mouseleave="handleBarMouseLeave">
-              <span class="bar-label">{{ getSnapshotStatusLabel(cve, idx) }}</span>
+        </div>
+
+        <div class="gantt-body">
+          <div v-for="cve in paginatedCveSnapshots" :key="cve.cve_id" class="gantt-row cve-row">
+            <div class="gantt-sidebar-cell">
+              <div class="cve-top">
+                <span class="cve-id">{{ cve.cve_id }}</span>
+                <span class="sev-badge" :class="cve.severity.toLowerCase()">{{ cve.severity }}</span>
+              </div>
+              <span class="cve-desc">{{ cve.description }}</span>
+              <span class="cve-sync-count">{{ cve.snapshots.length }} sincronizaciones</span>
+            </div>
+            <div class="gantt-chart-cell" :style="{ minWidth: timelineWidth + 'px' }">
+              <div v-for="(snap, idx) in cve.snapshots" :key="idx" class="gantt-bar snapshot-bar"
+                :style="getSnapshotBarStyle(cve, idx)" :class="getSnapshotBarClass(cve, idx)"
+                @mouseenter="handleBarMouseEnter(snap, cve, $event)" @mousemove="handleBarMouseMove($event)"
+                @mouseleave="handleBarMouseLeave" @click="handleBarClick(cve, idx)">
+                <span class="bar-label">{{ getSnapshotStatusLabel(cve, idx) }}</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <div v-if="totalPages > 1" class="gantt-pagination">
-      <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">Anterior</button>
-      <span class="page-info">Pagina {{ currentPage }} de {{ totalPages }} ({{ cveSnapshots.length }} CVEs)</span>
-      <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">Siguiente</button>
-    </div>
-
-    <!-- Tooltip -->
-    <div v-if="isHovering && hoveredSnapshot"
-         ref="tooltipRef"
-         class="gantt-tooltip"
-         :style="{ left: tooltipPos.x + 'px', top: tooltipPos.y + 'px' }">
-      <div class="tooltip-header">{{ hoveredSnapshot.cve_id }}</div>
-      <div class="tooltip-sync">Sincronización: {{ formatDate(hoveredSnapshot.syncTimestamp) }}</div>
-      <div class="tooltip-agents">
-        <div v-for="agent in hoveredSnapshot.agents" :key="agent" class="tooltip-agent">
-          {{ agent }}
-        </div>
+      <div v-if="totalPages > 1" class="gantt-pagination">
+        <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">Anterior</button>
+        <span class="page-info">Pagina {{ currentPage }} de {{ totalPages }} ({{ cveSnapshots.length }} CVEs)</span>
+        <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">Siguiente</button>
       </div>
-      <div class="tooltip-count">{{ hoveredSnapshot.agentCount }} agente{{ hoveredSnapshot.agentCount > 1 ? 's' : '' }} afectado{{ hoveredSnapshot.agentCount > 1 ? 's' : '' }}</div>
-    </div>
+
+      <!-- Tooltip (pointer-events: none so clicks pass through to bar) -->
+      <div v-if="isHovering && hoveredSnapshot" ref="tooltipRef" class="gantt-tooltip"
+        :style="{ left: tooltipPos.x + 'px', top: tooltipPos.y + 'px' }">
+        <div class="tooltip-header">
+          {{ hoveredSnapshot.cve_id }}
+          <span class="tooltip-click-hint">Click bar para filtrar</span>
+        </div>
+        <div class="tooltip-sync">Sincronización: {{ formatDate(hoveredSnapshot.syncTimestamp) }}</div>
+        <div class="tooltip-agents">
+          <div v-for="agent in displayedAgents" :key="agent" class="tooltip-agent">
+            {{ agent }}
+          </div>
+          <div v-if="hoveredSnapshot.agentCount > 5" class="tooltip-more">
+            ... y {{ hoveredSnapshot.agentCount - 5 }} más
+          </div>
+        </div>
+        <div class="tooltip-count">{{ hoveredSnapshot.agentCount }} agente{{ hoveredSnapshot.agentCount > 1 ? 's' : ''
+        }} afectado{{ hoveredSnapshot.agentCount > 1 ? 's' : '' }}</div>
+      </div>
     </template>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
+import { VueDatePicker } from '@vuepic/vue-datepicker'
+import '@vuepic/vue-datepicker/dist/main.css'
+import { parseServerDate } from '../timelineFormatters'
+
+const router = useRouter()
 
 const props = defineProps({
   ganttData: { type: Array, default: () => null }
@@ -109,22 +117,11 @@ const props = defineProps({
 const ITEMS_PER_PAGE = 20
 const currentPage = ref(1)
 
-// Preserve full datetime — do NOT strip time component
+// Preserve full datetime — use parseServerDate for correct UTC handling
 const toLocalDate = (d) => {
   if (!d) return new Date()
   if (d instanceof Date) return d
-  const dateStr = d.split('T')[0]
-  const parts = dateStr.split('-')
-  const base = new Date(Number.parseInt(parts[0]), Number.parseInt(parts[1]) - 1, Number.parseInt(parts[2]))
-  if (d.includes('T')) {
-    const timePart = d.split('T')[1]
-    if (timePart) {
-      const [hms] = timePart.split(/[Z+-]/)
-      const [h, m, s] = hms.split(':').map(Number)
-      base.setHours(h || 0, m || 0, s || 0, 0)
-    }
-  }
-  return base
+  return parseServerDate(d) || new Date()
 }
 
 // ── DEMO SNAPSHOTS (replaces old DEMO_DATA) ──
@@ -234,8 +231,7 @@ const buildCveSnapshots = (vulns) => {
         timestampMap.get(ts).add(agent.agent_name)
       }
 
-      addTimestamp(agent.first_seen)
-      addTimestamp(agent.last_seen)  // sync timestamp — shared across machines
+      addTimestamp(agent.last_seen)  // sync timestamp — Gantt is driven by syncs, not first_seen
       agent.history.forEach(h => addTimestamp(h.timestamp))
     })
 
@@ -290,22 +286,28 @@ watch(() => props.ganttData, () => {
 })
 
 // ── Scroll / Search ──
-const GANTT_HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
-const GANTT_MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
-
 const scrollWrapper = ref(null)
 const searchDate = ref('')
 
-const ganttDatePart = computed(() => searchDate.value?.split('T')[0] || '')
-const ganttHourPart = computed(() => searchDate.value?.split('T')[1]?.split(':')[0] || '00')
-const ganttMinutePart = computed(() => searchDate.value?.split('T')[1]?.split(':')[1] || '00')
+const ganttDateModel = computed({
+  get: () => {
+    if (!searchDate.value) return null
+    const d = new Date(searchDate.value)
+    return Number.isNaN(d.getTime()) ? null : d
+  },
+  set: () => {}
+})
 
-const updateSearchDate = (date, hour, minute) => {
-  searchDate.value = `${date || ganttDatePart.value}T${hour || ganttHourPart.value}:${minute || ganttMinutePart.value}`
+const onGanttDatePickerChange = (date) => {
+  if (!date) return
+  const d = date instanceof Date ? date : new Date(date)
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  searchDate.value = `${yyyy}-${mm}-${dd}T${hh}:${min}`
 }
-const onGanttDateChange = (d) => updateSearchDate(d)
-const onGanttHourChange = (h) => updateSearchDate(null, h)
-const onGanttMinuteChange = (m) => updateSearchDate(null, null, m)
 
 const scrollToDate = () => {
   if (!searchDate.value || !scrollWrapper.value || !timeLabels.value.length) return
@@ -533,8 +535,14 @@ const hoveredSnapshot = ref(null)
 const tooltipPos = ref({ x: 0, y: 0 })
 const isHovering = ref(false)
 const tooltipRef = ref(null)
+let leaveTimeout = null
 
 const handleBarMouseEnter = (snapshot, cve, event) => {
+  // Cancel any pending hide
+  if (leaveTimeout) {
+    clearTimeout(leaveTimeout)
+    leaveTimeout = null
+  }
   isHovering.value = true
   hoveredSnapshot.value = {
     ...snapshot,
@@ -552,9 +560,40 @@ const handleBarMouseMove = (event) => {
 }
 
 const handleBarMouseLeave = () => {
-  isHovering.value = false
-  hoveredSnapshot.value = null
+  startLeaveTimeout()
 }
+
+const cancelLeaveTimeout = () => {
+  if (leaveTimeout) {
+    clearTimeout(leaveTimeout)
+    leaveTimeout = null
+  }
+}
+
+const startLeaveTimeout = () => {
+  leaveTimeout = setTimeout(() => {
+    isHovering.value = false
+    hoveredSnapshot.value = null
+    leaveTimeout = null
+  }, 100)
+}
+
+const handleBarClick = (cve, idx) => {
+  const snap = cve.snapshots[idx]
+  const agents = snap.agents ? snap.agents.join(',') : ''
+  const nextSnap = cve.snapshots[idx + 1]
+  const syncEnd = nextSnap ? nextSnap.syncTimestamp : new Date().toISOString()
+  router.push({
+    path: '/timeline',
+    query: { cve: cve.cve_id, agents, syncStart: snap.syncTimestamp, syncEnd }
+  })
+}
+
+const displayedAgents = computed(() => {
+  if (!hoveredSnapshot.value) return []
+  const agents = hoveredSnapshot.value.agents || []
+  return agents.slice(0, 5)
+})
 
 const updateTooltipPos = (event) => {
   tooltipPos.value = { x: event.clientX + 12, y: event.clientY - 10 }
@@ -626,32 +665,84 @@ const formatDate = (d) => {
   align-items: center;
 }
 
-.search-dt-row {
-  display: flex;
-  gap: 2px;
-  align-items: stretch;
-}
-
-.time-sel {
-  flex: 0 0 58px;
-  cursor: pointer;
-  appearance: auto;
-}
-
-.date-input {
-  padding: 4px 6px;
+.search-date :deep(.dp__input) {
+  padding: 2px 4px;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
   font-size: 11px;
   background: white;
   color: #334155;
   outline: none;
-  width: 200px;
+  width: 130px;
+  height: 24px;
 }
 
-.date-input:focus {
+.search-date :deep(.dp__input:focus) {
   border-color: #3d6a00;
   box-shadow: 0 0 0 2px rgba(61, 106, 0, 0.15);
+}
+
+.search-date :deep(.dp__input_icons) {
+  color: #64748b;
+  font-size: 12px;
+}
+
+/* Ultra-compact popup */
+.search-date :deep(.dp__menu) {
+  font-size: 10px;
+  padding: 4px;
+}
+
+.search-date :deep(.dp__calendar) {
+  max-width: 180px;
+}
+
+.search-date :deep(.dp__calendar_header) {
+  padding: 2px 4px;
+  gap: 2px;
+}
+
+.search-date :deep(.dp__calendar_nav) {
+  font-size: 12px;
+}
+
+.search-date :deep(.dp__cell_inner) {
+  font-size: 9px;
+  height: 20px;
+  width: 20px;
+}
+
+.search-date :deep(.dp__day) {
+  font-size: 9px;
+  height: 20px;
+  width: 20px;
+}
+
+.search-date :deep(.dp__month_year_item) {
+  font-size: 9px;
+  height: 22px;
+  width: 22px;
+}
+
+.search-date :deep(.dp__time_input) {
+  font-size: 10px;
+  padding: 2px;
+}
+
+.search-date :deep(.dp__time_col) {
+  padding: 0 2px;
+}
+
+.search-date :deep(.dp__time_btn) {
+  font-size: 9px;
+  height: 18px;
+  width: 28px;
+}
+
+.search-date :deep(.dp__inc_dec_buttons) {
+  font-size: 10px;
+  width: 18px;
+  height: 18px;
 }
 
 .search-date-label {
@@ -682,7 +773,9 @@ const formatDate = (d) => {
 }
 
 @keyframes gantt-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .search-btn {
@@ -1020,6 +1113,18 @@ const formatDate = (d) => {
   margin-bottom: 4px;
   color: var(--text-main, #111827);
   font-family: monospace;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.tooltip-click-hint {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--primary, #3d6a00);
+  font-family: sans-serif;
+  white-space: nowrap;
 }
 
 .tooltip-sync {
@@ -1039,6 +1144,13 @@ const formatDate = (d) => {
   font-size: 11px;
   color: var(--text-main, #111827);
   padding: 1px 0;
+}
+
+.tooltip-more {
+  font-size: 10px;
+  color: var(--text-muted, #6b7280);
+  font-style: italic;
+  padding: 2px 0;
 }
 
 .tooltip-agent::before {

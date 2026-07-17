@@ -1,12 +1,25 @@
 <template>
   <div class="card filter-panel" :class="{ compact }">
     <div class="filter-row">
-      <div class="f-group">
-        <label for="connection-select">Conexion Wazuh</label>
-        <select id="connection-select" v-model="connectionModel" @change="emit('connection-change')" class="filter-input">
-          <option value="" disabled>Selecciona servidor...</option>
-          <option v-for="conn in connections" :key="conn.id" :value="conn.id">{{ conn.name }}</option>
-        </select>
+      <div class="f-group popover-wrap" v-click-outside="() => (activeDropdown = '')">
+        <label for="filter-connection">Conexión Wazuh</label>
+        <button id="filter-connection" class="filter-input dd-btn" @click="activeDropdown = activeDropdown === 'connections' ? '' : 'connections'">
+          <span>{{ selectedConnectionName || 'Selecciona servidor...' }}</span>
+          <span>▼</span>
+        </button>
+        <div v-if="activeDropdown === 'connections'" class="dd-panel fade-in">
+          <div class="dd-list custom-scroll">
+            <button 
+              v-for="conn in connections" 
+              :key="conn.id" 
+              class="dd-item dd-item-btn"
+              :class="{ 'dd-item-selected': String(conn.id) === String(connectionModel) }"
+              @click="selectConnection(conn.id)"
+            >
+              {{ conn.name }}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="f-group popover-wrap" v-click-outside="() => (activeDropdown = '')">
@@ -80,16 +93,17 @@
       </div>
 
       <div class="f-group day-datetime-group" v-if="period === 'day'">
-        <label for="custom-date">Dia</label>
-        <div class="dt-row">
-          <input id="custom-date" type="date" :value="datePart" @input="onDateChange" class="filter-input">
-          <select id="filter-hour" :value="hourPart" @change="onHourChange" class="filter-input time-sel" aria-label="Hora">
-            <option v-for="h in HOURS" :key="h" :value="h">{{ h }}</option>
-          </select>
-          <select id="filter-minute" :value="minutePart" @change="onMinuteChange" class="filter-input time-sel" aria-label="Minuto">
-            <option v-for="m in MINUTES" :key="m" :value="m">{{ m }}</option>
-          </select>
-        </div>
+        <label for="custom-date">Dia y Hora</label>
+        <VueDatePicker
+          v-model="dateModel"
+          :enable-time-picker="true"
+          :time-picker-inline="true"
+          format="dd/MM/yyyy HH:mm"
+          preview-format="dd/MM/yyyy HH:mm"
+          :teleport="true"
+          auto-apply
+          @update:model-value="onDatePickerChange"
+        />
       </div>
 
       <div class="f-group f-action">
@@ -103,6 +117,8 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { VueDatePicker } from '@vuepic/vue-datepicker'
+import '@vuepic/vue-datepicker/dist/main.css'
 
 const props = defineProps({
   /** customDate puede ser "YYYY-MM-DD" (solo fecha) o "YYYY-MM-DDTHH:MM" (con hora) */
@@ -147,19 +163,36 @@ const selectedVulnsModel = computed({
   set: value => emit('update:selectedVulns', value)
 })
 
-const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
-const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
+const selectedConnectionName = computed(() => {
+  const found = props.connections.find(c => String(c.id) === String(props.selectedConnection))
+  return found?.name || ''
+})
 
-const datePart = computed(() => props.customDate?.split('T')[0] || '')
-const hourPart = computed(() => props.customDate?.split('T')[1]?.split(':')[0] || '00')
-const minutePart = computed(() => props.customDate?.split('T')[1]?.split(':')[1] || '00')
-
-const emitDatetime = (date, hour, minute) => {
-  emit('update:customDate', `${date || datePart.value}T${hour || hourPart.value}:${minute || minutePart.value}`)
+const selectConnection = (connId) => {
+  connectionModel.value = connId
+  activeDropdown.value = ''
+  emit('connection-change')
 }
-const onDateChange = (e) => emitDatetime(e.target.value)
-const onHourChange = (e) => emitDatetime(null, e.target.value)
-const onMinuteChange = (e) => emitDatetime(null, null, e.target.value)
+
+const dateModel = computed({
+  get: () => {
+    if (!props.customDate) return null
+    const d = new Date(props.customDate)
+    return Number.isNaN(d.getTime()) ? null : d
+  },
+  set: () => {} // handled by onDatePickerChange
+})
+
+const onDatePickerChange = (date) => {
+  if (!date) return
+  const d = date instanceof Date ? date : new Date(date)
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  emit('update:customDate', `${yyyy}-${mm}-${dd}T${hh}:${min}`)
+}
 
 const search = reactive({ agent: '', vuln: '' })
 const activeDropdown = ref('')
@@ -204,14 +237,70 @@ const toggleSeverity = (sev) => {
 .dd-list { max-height: 220px; overflow-y: auto; }
 .dd-item { display: flex; gap: 0.6rem; padding: 0.4rem 0.9rem; font-size: 0.82rem; }
 .dd-item:hover { background: var(--bg-hover); }
+.dd-item-btn { width: 100%; text-align: left; background: none; border: none; color: var(--text-main); cursor: pointer; }
+.dd-item-selected { background: var(--primary-bg); color: var(--primary); font-weight: 600; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 .chip { padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-dark); font-size: 0.72rem; font-weight: 700; color: var(--text-muted); cursor: pointer; }
 .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
 .sel-badge { background: var(--primary-bg); color: var(--primary); border-radius: 999px; padding: 0.1rem 0.45rem; font-size: 0.72rem; font-weight: 700; }
-.day-datetime-group { min-width: 320px; }
-.dt-row { display: flex; gap: 0.35rem; align-items: stretch; }
-.dt-row .filter-input { flex: 1; min-width: 0; }
-.time-sel { flex: 0 0 70px; cursor: pointer; appearance: auto; }
+.day-datetime-group { min-width: 240px; }
+.day-datetime-group :deep(.dp__input) {
+  width: 100%;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--border);
+  background: var(--bg-dark);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  font-size: 0.8rem;
+  cursor: pointer;
+  height: 34px;
+}
+.day-datetime-group :deep(.dp__input_icons) {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* Compact calendar popup */
+.day-datetime-group :deep(.dp__menu) {
+  font-size: 11px;
+  padding: 6px;
+}
+
+.day-datetime-group :deep(.dp__calendar) {
+  max-width: 220px;
+}
+
+.day-datetime-group :deep(.dp__cell_inner) {
+  font-size: 10px;
+  height: 24px;
+  width: 24px;
+}
+
+.day-datetime-group :deep(.dp__day) {
+  font-size: 10px;
+  height: 24px;
+  width: 24px;
+}
+
+.day-datetime-group :deep(.dp__month_year_item) {
+  font-size: 10px;
+  height: 28px;
+  width: 28px;
+}
+
+.day-datetime-group :deep(.dp__time_input) {
+  font-size: 11px;
+}
+
+.day-datetime-group :deep(.dp__time_col) {
+  padding: 2px;
+}
+
+.day-datetime-group :deep(.dp__time_btn) {
+  font-size: 10px;
+  height: 22px;
+  width: 36px;
+}
 
 @media (max-width: 1400px) {
   .filter-row { grid-template-columns: 1fr 1fr; }
