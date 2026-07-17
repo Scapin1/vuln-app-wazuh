@@ -57,6 +57,16 @@ services:
     networks:
       - app-network
 
+  wazuh-mock:
+    build: ./wazuh-mock-indexer
+    container_name: wazuh-mock
+    ports:
+      - "9200:9200"
+    networks:
+      - app-network
+    # Cambiá los valores para ajustar la simulación
+    command: python server.py --agents 500 --detections 4000000
+
 volumes:
   timescaledb_data:
 
