@@ -369,7 +369,7 @@ const syncVulns = async () => {
     await vulnService.syncVulns()
     store.invalidateCache()
     await buildAnalytics()
-  } catch (err) {
+  } catch {
     errorBanner.value = 'Error durante la sincronización con Wazuh. Verifica tu configuración en Admin Wazuh.'
   } finally {
     syncing.value = false

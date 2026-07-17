@@ -198,7 +198,7 @@ describe('ConfigUser.vue', () => {
         const wrapper = mount(ConfigUser)
         await flushPromises()
 
-        expect(wrapper.vm.users.length).toBe(1)
+        expect(wrapper.vm.users).toHaveLength(1)
         expect(wrapper.vm.users[0].username).toBe('nested')
     })
 })

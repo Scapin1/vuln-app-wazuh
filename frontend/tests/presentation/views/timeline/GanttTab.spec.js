@@ -2,7 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import GanttTab from '@/presentation/views/timeline/components/GanttTab.vue'
 
+const mockRouterPush = vi.fn()
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push: mockRouterPush })
+}))
+
 describe('GanttTab.vue', () => {
+  beforeEach(() => {
+    mockRouterPush.mockClear()
+  })
+
   // With empty ganttData, DEMO_SNAPSHOTS is shown (5 CVEs)
   const emptyWrapper = () => mount(GanttTab, {
     props: { ganttData: [] }
@@ -722,6 +731,124 @@ describe('GanttTab.vue', () => {
       const label = wrapper.find('label[for="ganttSearchDate"]')
       expect(label.exists()).toBe(true)
       expect(label.attributes('style')).toBeUndefined()
+    })
+  })
+
+  describe('Date picker and search', () => {
+    it('onGanttDatePickerChange sets searchDate from Date object', () => {
+      const wrapper = emptyWrapper()
+      wrapper.vm.onGanttDatePickerChange(new Date('2026-07-15T14:30:00'))
+      expect(wrapper.vm.searchDate).toBe('2026-07-15T14:30')
+    })
+
+    it('onGanttDatePickerChange ignores null date', () => {
+      const wrapper = emptyWrapper()
+      wrapper.vm.onGanttDatePickerChange(null)
+      expect(wrapper.vm.searchDate).toBe('')
+    })
+  })
+
+  describe('Bar click navigation', () => {
+    it('handleBarClick navigates to timeline with query params', () => {
+      const wrapper = emptyWrapper()
+      const cve = {
+        cve_id: 'CVE-TEST',
+        snapshots: [
+          { syncTimestamp: '2026-07-01T10:00:00', agents: ['agent-1', 'agent-2'] },
+          { syncTimestamp: '2026-07-10T10:00:00' }
+        ]
+      }
+      wrapper.vm.handleBarClick(cve, 0)
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        path: '/timeline',
+        query: { cve: 'CVE-TEST', agents: 'agent-1,agent-2', syncStart: '2026-07-01T10:00:00', syncEnd: '2026-07-10T10:00:00' }
+      })
+    })
+
+    it('handleBarClick with no agents uses empty string', () => {
+      const wrapper = emptyWrapper()
+      const cve = {
+        cve_id: 'CVE-NOAGENTS',
+        snapshots: [{ syncTimestamp: '2026-07-01T10:00:00' }]
+      }
+      wrapper.vm.handleBarClick(cve, 0)
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        path: '/timeline',
+        query: { cve: 'CVE-NOAGENTS', agents: '', syncStart: '2026-07-01T10:00:00', syncEnd: expect.any(String) }
+      })
+    })
+  })
+
+  describe('Tooltip edge cases', () => {
+    it('cancelLeaveTimeout clears the leave timeout', () => {
+      const wrapper = emptyWrapper()
+      wrapper.vm.startLeaveTimeout()
+      expect(wrapper.vm.leaveTimeout).not.toBeNull()
+      wrapper.vm.cancelLeaveTimeout()
+      expect(wrapper.vm.leaveTimeout).toBeNull()
+    })
+
+    it('handleBarMouseEnter clears existing leaveTimeout', () => {
+      const wrapper = emptyWrapper()
+      const cve = wrapper.vm.cveSnapshots[0]
+      const snap = cve.snapshots[0]
+
+      // Start a leave timeout first
+      wrapper.vm.startLeaveTimeout()
+      expect(wrapper.vm.leaveTimeout).not.toBeNull()
+
+      // Enter again — should clear the old timeout
+      wrapper.vm.handleBarMouseEnter(snap, cve, { clientX: 100, clientY: 200 })
+      expect(wrapper.vm.isHovering).toBe(true)
+      expect(wrapper.vm.leaveTimeout).toBeNull()
+    })
+  })
+
+  describe('Pagination', () => {
+    const manyCves = Array.from({ length: 25 }, (_, i) => ({
+      cve_id: `CVE-PAG-${String(i + 1).padStart(4, '0')}`,
+      severity: 'HIGH',
+      description: `Pagination CVE ${i + 1}`,
+      snapshots: [{ syncTimestamp: '2026-07-01T10:00:00', agentCount: 1 }]
+    }))
+
+    it('shows pagination when ganttData has more than 20 CVEs', () => {
+      const wrapper = mount(GanttTab, { props: { ganttData: manyCves } })
+      expect(wrapper.vm.totalPages).toBe(2)
+      expect(wrapper.find('.gantt-pagination').exists()).toBe(true)
+    })
+
+    it('clicking Siguiente advances to page 2', async () => {
+      const wrapper = mount(GanttTab, { props: { ganttData: manyCves } })
+      expect(wrapper.vm.currentPage).toBe(1)
+
+      await wrapper.find('.page-btn:last-child').trigger('click')
+      expect(wrapper.vm.currentPage).toBe(2)
+    })
+
+    it('clicking Anterior goes back to page 1', async () => {
+      const wrapper = mount(GanttTab, { props: { ganttData: manyCves } })
+      wrapper.vm.currentPage = 2
+      await wrapper.vm.$nextTick()
+
+      const btns = wrapper.findAll('.page-btn')
+      const prevBtn = btns[0]
+      await prevBtn.trigger('click')
+      expect(wrapper.vm.currentPage).toBe(1)
+    })
+
+    it('Anterior button is disabled on page 1', () => {
+      const wrapper = mount(GanttTab, { props: { ganttData: manyCves } })
+      const btns = wrapper.findAll('.page-btn')
+      expect(btns[0].element.disabled).toBe(true)
+    })
+
+    it('Siguiente button is disabled on last page', async () => {
+      const wrapper = mount(GanttTab, { props: { ganttData: manyCves } })
+      wrapper.vm.currentPage = 2
+      await wrapper.vm.$nextTick()
+      const btns = wrapper.findAll('.page-btn')
+      expect(btns[1].element.disabled).toBe(true)
     })
   })
 })
