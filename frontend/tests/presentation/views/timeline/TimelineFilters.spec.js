@@ -102,7 +102,7 @@ describe('TimelineFilters.vue', () => {
     })
 
     const chips = wrapper.findAll('.chip')
-    expect(chips.length).toBe(4)
+    expect(chips).toHaveLength(4)
 
     // Click '7d' chip
     await chips[1].trigger('click')
@@ -326,5 +326,52 @@ describe('TimelineFilters.vue', () => {
     document.body.click()
     await wrapper.vm.$nextTick()
     expect(wrapper.findAll('.dd-panel')).toHaveLength(0)
+  })
+
+  it('toggles severity chips and emits update', async () => {
+    const wrapper = mount(TimelineFilters, {
+      props: {
+        ...defaultProps,
+        selectedConnection: '1',
+        severityOptions: [
+          { value: 'CRITICAL', label: 'Crítica' },
+          { value: 'HIGH', label: 'Alta' }
+        ]
+      }
+    })
+
+    // Click first severity chip
+    const chips = wrapper.findAll('.chip')
+    const critChip = chips.find(c => c.text().includes('Crítica'))
+    await critChip.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.emitted('update:selectedSeverities')).toHaveLength(1)
+    expect(wrapper.emitted('update:selectedSeverities')[0][0]).toContain('CRITICAL')
+  })
+
+  it('dateModel handles valid customDate', () => {
+    const wrapper = mount(TimelineFilters, {
+      props: {
+        ...defaultProps,
+        customDate: '2026-07-01T10:30'
+      }
+    })
+
+    expect(wrapper.vm.dateModel).toBeInstanceOf(Date)
+    expect(wrapper.vm.dateModel.getFullYear()).toBe(2026)
+    expect(wrapper.vm.dateModel.getMonth()).toBe(6) // 0-indexed, July = 6
+    expect(wrapper.vm.dateModel.getDate()).toBe(1)
+  })
+
+  it('dateModel returns null for invalid customDate', () => {
+    const wrapper = mount(TimelineFilters, {
+      props: {
+        ...defaultProps,
+        customDate: 'invalid-date'
+      }
+    })
+
+    expect(wrapper.vm.dateModel).toBeNull()
   })
 })

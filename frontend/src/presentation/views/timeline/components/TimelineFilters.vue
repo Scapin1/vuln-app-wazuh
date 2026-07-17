@@ -2,8 +2,8 @@
   <div class="card filter-panel" :class="{ compact }">
     <div class="filter-row">
       <div class="f-group popover-wrap" v-click-outside="() => (activeDropdown = '')">
-        <label>Conexión Wazuh</label>
-        <button class="filter-input dd-btn" @click="activeDropdown = activeDropdown === 'connections' ? '' : 'connections'">
+        <label for="filter-connection">Conexión Wazuh</label>
+        <button id="filter-connection" class="filter-input dd-btn" @click="activeDropdown = activeDropdown === 'connections' ? '' : 'connections'">
           <span>{{ selectedConnectionName || 'Selecciona servidor...' }}</span>
           <span>▼</span>
         </button>
@@ -174,14 +174,11 @@ const selectConnection = (connId) => {
   emit('connection-change')
 }
 
-// Helper to get connection ids for "Todas" action
-const connectionOptions = computed(() => props.connections.map(c => c.id))
-
 const dateModel = computed({
   get: () => {
     if (!props.customDate) return null
     const d = new Date(props.customDate)
-    return isNaN(d.getTime()) ? null : d
+    return Number.isNaN(d.getTime()) ? null : d
   },
   set: () => {} // handled by onDatePickerChange
 })

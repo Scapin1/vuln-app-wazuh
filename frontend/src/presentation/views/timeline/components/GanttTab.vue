@@ -293,7 +293,7 @@ const ganttDateModel = computed({
   get: () => {
     if (!searchDate.value) return null
     const d = new Date(searchDate.value)
-    return isNaN(d.getTime()) ? null : d
+    return Number.isNaN(d.getTime()) ? null : d
   },
   set: () => {}
 })

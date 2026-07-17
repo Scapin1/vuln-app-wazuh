@@ -63,26 +63,26 @@
         
         <form @submit.prevent="handleAddUser">
           <div class="form-group">
-            <label class="form-label">Nombre de usuario</label>
+            <label for="user-name" class="form-label">Nombre de usuario</label>
             <div class="input-icon">
               <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-              <input type="text" v-model="newUser.user_name" class="form-input" required placeholder="Ej: analista_soc">
+              <input id="user-name" type="text" v-model="newUser.user_name" class="form-input" required placeholder="Ej: analista_soc">
             </div>
           </div>
 
           <div class="form-group">
-            <label class="form-label">Correo electrónico</label>
+            <label for="user-email" class="form-label">Correo electrónico</label>
             <div class="input-icon">
               <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-              <input type="email" v-model="newUser.user_email" class="form-input" required placeholder="Ej: usuario@empresa.com">
+              <input id="user-email" type="email" v-model="newUser.user_email" class="form-input" required placeholder="Ej: usuario@empresa.com">
             </div>
           </div>
 
           <div class="form-group">
-            <label class="form-label">Rol</label>
+            <label for="user-rol" class="form-label">Rol</label>
             <div class="input-icon">
               <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-              <select v-model="newUser.user_rol" class="form-input" required style="padding-left: 3rem;">
+              <select id="user-rol" v-model="newUser.user_rol" class="form-input" required style="padding-left: 3rem;">
                 <option value="admin">Administrador</option>
                 <option value="analyst">Analista</option>
                 <option value="viewer">Visor</option>
@@ -91,10 +91,10 @@
           </div>
           
           <div class="form-group">
-            <label class="form-label">Contraseña inicial</label>
+            <label for="user-password" class="form-label">Contraseña inicial</label>
             <div class="input-icon">
               <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-              <input type="password" v-model="newUser.user_password" class="form-input" required placeholder="••••••••">
+              <input id="user-password" type="password" v-model="newUser.user_password" class="form-input" required placeholder="••••••••">
             </div>
           </div>
 

@@ -159,17 +159,6 @@ describe('VulnAnalytics.vue', () => {
         expect(wrapper.find('.status-banner').exists()).toBe(true)
     })
 
-    it('toggleSeverity adds and removes severity', () => {
-        const wrapper = mount(VulnAnalytics)
-        wrapper.vm.selectedSeverities = ['CRITICAL', 'HIGH']
-
-        wrapper.vm.toggleSeverity('MEDIUM')
-        expect(wrapper.vm.selectedSeverities).toContain('MEDIUM')
-
-        wrapper.vm.toggleSeverity('CRITICAL')
-        expect(wrapper.vm.selectedSeverities).not.toContain('CRITICAL')
-    })
-
     it('topCriticalCve returns most frequent CVE among critical vulns', async () => {
         const mockVulns = [
             { cve_id: 'CVE-2026-0001', severity: 'CRITICAL', status: 'Detected', agent_name: 'srv-a',

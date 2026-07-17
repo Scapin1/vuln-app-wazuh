@@ -164,14 +164,6 @@ const filteredData = computed(() => {
   })
 })
 
-const toggleSeverity = (sev) => {
-  if (selectedSeverities.value.includes(sev)) {
-    selectedSeverities.value = selectedSeverities.value.filter(s => s !== sev)
-  } else {
-    selectedSeverities.value = [...selectedSeverities.value, sev]
-  }
-}
-
 // ── Loading state ──
 const loading = ref(false)
 const loadingMessage = ref('')
@@ -378,7 +370,6 @@ const syncVulns = async () => {
     store.invalidateCache()
     await buildAnalytics()
   } catch (err) {
-    console.error('Error syncing vulns:', err)
     errorBanner.value = 'Error durante la sincronización con Wazuh. Verifica tu configuración en Admin Wazuh.'
   } finally {
     syncing.value = false

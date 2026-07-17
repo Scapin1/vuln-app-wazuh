@@ -159,4 +159,46 @@ describe('ConfigUser.vue', () => {
 
         expect(userService.deleteUser).not.toHaveBeenCalled()
     })
+
+    it('handles delete failure gracefully', async () => {
+        const wrapper = mount(ConfigUser)
+        await flushPromises()
+
+        Swal.fire.mockResolvedValueOnce({ isConfirmed: true })
+        userService.deleteUser.mockRejectedValueOnce(new Error('Server error'))
+
+        const deleteBtn = wrapper.findAll('tbody tr')[0].find('.btn-icon-danger')
+        await deleteBtn.trigger('click')
+        await flushPromises()
+
+        expect(Swal.fire).toHaveBeenCalledWith(
+            expect.objectContaining({ icon: 'error' })
+        )
+    })
+
+    it('handles generic create error without detail field', async () => {
+        const wrapper = mount(ConfigUser)
+        await flushPromises()
+
+        await wrapper.find('.btn-primary').trigger('click')
+        wrapper.vm.newUser.user_name = 'test'
+        wrapper.vm.newUser.user_email = 'test@test.com'
+        wrapper.vm.newUser.user_password = 'pass123'
+
+        userService.createUser.mockRejectedValueOnce(new Error('Network error'))
+
+        await wrapper.find('form').trigger('submit.prevent')
+        await flushPromises()
+
+        expect(wrapper.vm.error).toBe('Error al crear el usuario. Asegúrate de que no exista.')
+    })
+
+    it('handles nested response data format', async () => {
+        userService.getUsers.mockResolvedValueOnce({ data: { data: [{ id: 10, username: 'nested' }] } })
+        const wrapper = mount(ConfigUser)
+        await flushPromises()
+
+        expect(wrapper.vm.users.length).toBe(1)
+        expect(wrapper.vm.users[0].username).toBe('nested')
+    })
 })
