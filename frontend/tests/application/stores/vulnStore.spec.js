@@ -179,17 +179,10 @@ describe('vulnStore.js', () => {
     expect(store.loading).toBe(false)
   })
 
-  it('fetchAnalytics falls back to client-side when API fails', async () => {
+  it('fetchAnalytics re-throws API error instead of client fallback', async () => {
     vulnService.getAnalytics.mockRejectedValueOnce(new Error('API down'))
-    vulnService.getVulns.mockResolvedValueOnce({ data: [mockVuln(), mockVuln({ cve_id: 'CVE-2', severity: 'LOW', status: 'Resolved' })] })
 
-    const result = await store.fetchAnalytics('conn-1', 'all')
-
-    expect(result.severity_distribution).toBeDefined()
-    expect(result.status_distribution).toBeDefined()
-    expect(result.top_agents).toHaveLength(1)
-    expect(result.critical_count).toBe(1)
-    expect(result.top_critical_cve).toBe('CVE-2026-0001')
+    await expect(store.fetchAnalytics('conn-1', 'all')).rejects.toThrow('API down')
     expect(store.loading).toBe(false)
   })
 
@@ -206,16 +199,10 @@ describe('vulnStore.js', () => {
     expect(store.loading).toBe(false)
   })
 
-  it('fetchFilterOptions falls back to client-side when API fails', async () => {
+  it('fetchFilterOptions re-throws API error instead of client fallback', async () => {
     vulnService.getFilterOptions.mockRejectedValueOnce(new Error('API down'))
-    vulnService.getVulns.mockResolvedValueOnce({ data: [mockVuln(), mockVuln({ cve_id: 'CVE-2', agent_name: 'srv-b' })] })
 
-    const result = await store.fetchFilterOptions('conn-1')
-
-    expect(result.agents).toContain('srv-a')
-    expect(result.agents).toContain('srv-b')
-    expect(result.cves).toContain('CVE-2026-0001')
-    expect(result.cves).toContain('CVE-2')
+    await expect(store.fetchFilterOptions('conn-1')).rejects.toThrow('API down')
     expect(store.loading).toBe(false)
   })
 
@@ -390,14 +377,10 @@ describe('vulnStore.js', () => {
     expect(store.loading).toBe(false)
   })
 
-  it('fetchTimeline falls back to client-side when API fails', async () => {
+  it('fetchTimeline re-throws API error instead of client fallback', async () => {
     vulnService.getTimeline.mockRejectedValueOnce(new Error('API down'))
-    vulnService.getVulns.mockResolvedValueOnce({ data: [mockVuln()] })
 
-    const result = await store.fetchTimeline('conn-1', 'all')
-
-    expect(result.total_cves).toBe(1)
-    expect(result.cves).toHaveLength(1)
+    await expect(store.fetchTimeline('conn-1', 'all')).rejects.toThrow('API down')
     expect(store.loading).toBe(false)
   })
 
@@ -437,14 +420,10 @@ describe('vulnStore.js', () => {
 
   // ── fetchFilterOptions fallback handles no data ──
 
-  it('fetchFilterOptions fallback handles empty vulns', async () => {
+  it('fetchFilterOptions re-throws error on empty vulns (no fallback)', async () => {
     vulnService.getFilterOptions.mockRejectedValueOnce(new Error('API down'))
-    vulnService.getVulns.mockResolvedValueOnce({ data: [] })
 
-    const result = await store.fetchFilterOptions('conn-1')
-
-    expect(result.agents).toEqual([])
-    expect(result.cves).toEqual([])
+    await expect(store.fetchFilterOptions('conn-1')).rejects.toThrow('API down')
     expect(store.loading).toBe(false)
   })
 

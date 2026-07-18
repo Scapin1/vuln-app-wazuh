@@ -212,7 +212,8 @@ export const useVulnStore = defineStore('vulns', () => {
   // ── Timeline / Gantt Data ──
   async function fetchTimeline(connectionId, period, customDate, page = 1, perPage = 20, filters = {}) {
     activeConnectionId.value = connectionId
-    const cacheType = `timeline:${period}:${customDate || ''}:${page}:${perPage}`
+    const f = filters || {}
+    const cacheType = `timeline:${period}:${customDate || ''}:${page}:${perPage}:${f.agent || ''}:${f.severity || ''}:${f.search || ''}`
     const cached = getCached(cacheType)
     if (cached) return cached
 
@@ -227,37 +228,8 @@ export const useVulnStore = defineStore('vulns', () => {
       if (page === 1) setCache(cacheType, data)
       return data
     } catch (apiErr) {
-      console.warn('[vulnStore] API fallback:', apiErr)
-      // Fallback: fetch all vulns, group by CVE, build snapshots
-      const allVulns = await fetchAllVulns(connectionId)
-      const filtered = filterByPeriod(allVulns, period, customDate)
-      const cves = buildCveSnapshots(filtered)
-
-      // Compute global min/max across all CVEs for timeline header
-      let minTimestamp = null
-      let maxTimestamp = null
-      cves.forEach(cve => {
-        if (cve.firstSync && (!minTimestamp || cve.firstSync < minTimestamp)) minTimestamp = cve.firstSync
-        if (cve.lastSync && (!maxTimestamp || cve.lastSync > maxTimestamp)) maxTimestamp = cve.lastSync
-      })
-
-      const totalPages = Math.max(1, Math.ceil(cves.length / perPage))
-      const start = (page - 1) * perPage
-      const paginated = cves.slice(start, start + perPage)
-
-      const data = {
-        cves: paginated,
-        total_cves: cves.length,
-        total_pages: totalPages,
-        current_page: page,
-        per_page: perPage,
-        min_timestamp: minTimestamp,
-        max_timestamp: maxTimestamp
-      }
-
-      // Only cache first page (full dataset is too large)
-      if (page === 1) setCache(cacheType, data)
-      return data
+      console.error('[vulnStore] API error:', apiErr)
+      throw apiErr
     } finally {
       loading.value = false
     }
@@ -266,7 +238,7 @@ export const useVulnStore = defineStore('vulns', () => {
   // ── Analytics ──
   async function fetchAnalytics(connectionId, period, customDate) {
     activeConnectionId.value = connectionId
-    const cached = getCached('analytics')
+    const cached = getCached(`analytics:${period}:${customDate || ''}`)
     if (cached) return cached
 
     loading.value = true
@@ -278,32 +250,8 @@ export const useVulnStore = defineStore('vulns', () => {
       setCache('analytics', data)
       return data
     } catch (apiErr) {
-      console.warn('[vulnStore] API fallback:', apiErr)
-      // Fallback client-side
-      const allVulns = await fetchAllVulns(connectionId)
-      const filtered = filterByPeriod(allVulns, period, customDate)
-
-      // Map API status to display status
-      const displayStatus = (status) => {
-        const map = { Detected: 'Activo', Resolved: 'Resuelto', 'Re-emerged': 'Reabierto' }
-        return map[status] || status || 'Activo'
-      }
-
-      const statusDist = {}
-      filtered.forEach(v => {
-        const s = displayStatus(v.status)
-        statusDist[s] = (statusDist[s] || 0) + 1
-      })
-
-      const data = {
-        severity_distribution: computeSeverityDistribution(filtered),
-        status_distribution: statusDist,
-        top_agents: computeTopAgents(filtered),
-        critical_count: computeCriticalInfo(filtered).count,
-        top_critical_cve: computeCriticalInfo(filtered).topCve
-      }
-      setCache('analytics', data)
-      return data
+      console.error('[vulnStore] API error:', apiErr)
+      throw apiErr
     } finally {
       loading.value = false
     }
@@ -324,12 +272,8 @@ export const useVulnStore = defineStore('vulns', () => {
       setCache('filters', data)
       return data
     } catch (apiErr) {
-      console.warn('[vulnStore] API fallback:', apiErr)
-      // Fallback client-side
-      const allVulns = await fetchAllVulns(connectionId)
-      const options = computeFilterOptions(allVulns)
-      setCache('filters', options)
-      return options
+      console.error('[vulnStore] API error:', apiErr)
+      throw apiErr
     } finally {
       loading.value = false
     }
