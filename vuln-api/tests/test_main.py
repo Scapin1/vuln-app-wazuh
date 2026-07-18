@@ -720,7 +720,7 @@ async def test_create_asset():
         "wazuh_agent_id": "100",
         "hostname": "test-server",
         "os_version": "Debian 11",
-        "wazuh_connection_id": str(uuid.uuid4()),
+        "wazuh_connection_id": 1,
         "ip_address": "192.168.1.10"
     }
 

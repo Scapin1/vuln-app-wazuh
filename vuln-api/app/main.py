@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 from datetime import datetime, time, timedelta, timezone
 from uuid import UUID
 from typing import List, Annotated, Literal, Optional, Dict, Set, Any, Tuple
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.sql import func
 from sqlalchemy import select, insert, update, delete, text, and_, or_
 from .db import Base, engine, get_db
@@ -690,23 +690,31 @@ async def process_wazuh_vulnerabilities(db: AsyncSession, conn_id: int, raw_vuln
 
         if not agent_id or not cve_id: 
             continue
-
         if agent_id not in assets_data:
-            assets_data[agent_id] = {
-                "wazuh_agent_id": agent_id,
-                "hostname": agent.get("name", "Unknown"),
-                "os_version": agent.get("os", {}).get("full"),
-                "wazuh_connection_id": conn_id  # Enlazado directamente al ID de WazuhConnection
-            }
-
+            try:
+                asset_obj = AssetCreate(
+                    wazuh_agent_id=agent_id,
+                    hostname=agent.get("name", "Unknown"),
+                    os_version=agent.get("os", {}).get("full"),
+                    wazuh_connection_id=conn_id
+                )
+                assets_data[agent_id] = asset_obj.model_dump()
+            except ValidationError as e:
+                logger.error(f"Error validando Asset {agent_id}: {e}")
+                continue
         if cve_id not in catalog_data:
-            catalog_data[cve_id] = {
-                "cve_id": cve_id,
-                "severity": vuln.get("severity", "Unknown"),
-                "description": vuln.get("description"),
-                "cvss_score": (vuln.get("score") or {}).get("base")
-            }
-
+            try:
+                cvss_score = (vuln.get("score") or {}).get("base")
+                catalog_obj = CatalogCreate(
+                    cve_id=cve_id,
+                    severity=vuln.get("severity", "Unknown"),
+                    description=vuln.get("description"),
+                    cvss_score=float(cvss_score) if cvss_score else 0.0
+                )
+                catalog_data[cve_id] = catalog_obj.model_dump()
+            except ValidationError as e:
+                logger.error(f"Error validando CVE {cve_id}: {e}")
+                continue
     if catalog_data:
         catalog_items = list(catalog_data.values())
         for chunk in chunk_list(catalog_items, 1000):
@@ -718,7 +726,13 @@ async def process_wazuh_vulnerabilities(db: AsyncSession, conn_id: int, raw_vuln
         assets_items = list(assets_data.values())
         for chunk in chunk_list(assets_items, 1000):
             stmt_assets = pg_insert(Asset).values(chunk)
-            stmt_assets = stmt_assets.on_conflict_do_nothing(index_elements=['wazuh_agent_id'])
+            stmt_assets = stmt_assets.on_conflict_do_update(
+                index_elements=['wazuh_agent_id'],
+                set_={
+                    'hostname': stmt_assets.excluded.hostname,
+                    'os_version': stmt_assets.excluded.os_version
+                }
+            )
             await db.execute(stmt_assets)
 
     agent_wazuh_ids = list(assets_data.keys())
@@ -739,11 +753,7 @@ async def process_wazuh_vulnerabilities(db: AsyncSession, conn_id: int, raw_vuln
         ORDER BY d.asset_id, d.cve_id, d.timestamp DESC
     """
     
-    result_state = await db.execute(
-        text(query_last_state), 
-        {"conn_id": conn_id}
-    )
-    
+    result_state = await db.execute(text(query_last_state), {"conn_id": conn_id})
     current_state: Dict[Tuple[UUID, str], VulnStatus] = {
         (row.asset_id, row.cve_id): row.status for row in result_state.fetchall()
     }
@@ -764,27 +774,33 @@ async def process_wazuh_vulnerabilities(db: AsyncSession, conn_id: int, raw_vuln
 
         pair_key = (asset_uuid, cve_id)
         seen_in_payload.add(pair_key)
-
         if pair_key in inserted_in_loop:
             continue
+        try:
+            base_detection = DetectionCreate(
+                asset_id=asset_uuid,
+                cve_id=cve_id,
+                package_name=pkg.get("name", "Unknown"),
+                package_version=pkg.get("version", "Unknown")
+            )
+            detected_at_str = v.get("vulnerability", {}).get("detected_at")
+            first_seen = parse_wazuh_date(detected_at_str) if detected_at_str else current_timestamp
+            det_dict = base_detection.model_dump()
+            det_dict.update({
+                "timestamp": current_timestamp,
+                "first_seen_at": first_seen,
+                "status": VulnStatus.Detected 
+            })
+            
+            detections_to_insert.append(det_dict)
+            inserted_in_loop.add(pair_key)
+            
+        except ValidationError as e:
+            logger.error(f"Error validando Deteccion {cve_id} para {asset_uuid}: {e}")
+            continue
 
-        detected_at_str = v.get("vulnerability", {}).get("detected_at")
-        first_seen = parse_wazuh_date(detected_at_str) if detected_at_str else current_timestamp
-
-        detections_to_insert.append({
-            "timestamp": current_timestamp,
-            "asset_id": asset_uuid,
-            "cve_id": cve_id,
-            "status": VulnStatus.Detected,
-            "first_seen_at": first_seen,
-            "package_name": pkg.get("name"),
-            "package_version": pkg.get("version")
-        })
-        inserted_in_loop.add(pair_key)
-
-    # Si en la BD el último estado era 'Detected' pero ya no existe en este payload, insertamos un registro de tipo 'Resolved'.
     for (asset_uuid, cve_id), status in current_state.items():
-        if status == VulnStatus.Detected and (asset_uuid, cve_id) not in seen_in_payload:
+        if status in (VulnStatus.Detected, VulnStatus.Re_emerged) and (asset_uuid, cve_id) not in seen_in_payload:
             pair_key = (asset_uuid, cve_id)
             if pair_key in inserted_in_loop:
                 continue
@@ -795,14 +811,19 @@ async def process_wazuh_vulnerabilities(db: AsyncSession, conn_id: int, raw_vuln
                 "cve_id": cve_id,
                 "status": VulnStatus.Resolved,
                 "first_seen_at": current_timestamp, 
-                "package_name": None,
-                "package_version": None
+                "package_name": "N/A",
+                "package_version": "N/A"
             })
             inserted_in_loop.add(pair_key)
 
     if detections_to_insert:
         for chunk in chunk_list(detections_to_insert, 1000):
-            await db.execute(pg_insert(VulnerabilityDetection).values(chunk))
+            stmt_detections = pg_insert(VulnerabilityDetection).values(chunk)
+
+            stmt_detections = stmt_detections.on_conflict_do_nothing(
+                index_elements=['timestamp', 'asset_id', 'cve_id']
+            )
+            await db.execute(stmt_detections)
 
     return len(detections_to_insert)
 

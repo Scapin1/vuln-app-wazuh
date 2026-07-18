@@ -132,6 +132,10 @@ RETURNS TRIGGER AS $$
 DECLARE
     last_status vulnerability_detections.status%TYPE;
 BEGIN
+    IF NEW.status = 'Resolved' THEN
+        RETURN NEW;
+    END IF;
+
     SELECT status INTO last_status
     FROM vulnerability_detections
     WHERE asset_id = NEW.asset_id 

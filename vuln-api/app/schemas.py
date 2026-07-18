@@ -29,7 +29,7 @@ class AssetBase(BaseModel):
     hostname: str
     os_version: Optional[str] = None
     ip_address: Optional[IPvAnyAddress] = None
-    wazuh_connection_id: UUID
+    wazuh_connection_id: int
 
 class AssetCreate(AssetBase):
     pass
@@ -42,7 +42,7 @@ class AssetUpdate(BaseModel):
     hostname: Optional[str] = None
     os_version: Optional[str] = None
     ip_address: Optional[IPvAnyAddress] = None
-    wazuh_connection_id: Optional[UUID] = None
+    wazuh_connection_id: Optional[int] = None
 
 # --- CATALOG SCHEMAS ---
 class CatalogCreate(BaseModel):
