@@ -179,10 +179,11 @@ async def test_sync_process_complete_flow():
 
     app.dependency_overrides[get_db] = lambda: mock_db
     
-    with patch("app.main.fetch_all_vulns", new_callable=AsyncMock) as mock_fetch, \
-         patch("app.main.decrypt", return_value="plain"):
-        
-        mock_fetch.return_value = mock_raw_wazuh
+    async def mock_fetch_generator(*args, **kwargs):
+            yield mock_raw_wazuh
+
+    with patch("app.main.fetch_all_vulns", side_effect=mock_fetch_generator) as mock_fetch, \
+             patch("app.main.decrypt", return_value="plain"):
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -665,11 +666,11 @@ async def test_sync_process_batching_logic(mock_wazuh_raw_data):
 
     app.dependency_overrides[get_db] = lambda: mock_db
     
-    with patch("app.main.fetch_all_vulns", new_callable=AsyncMock) as mock_fetch, \
-         patch("app.main.decrypt", return_value="plain_pass"):
-        
-        # Inyectamos el fixture que simula la respuesta de la API de Wazuh (1 nuevo, 1 existente redetectado)
-        mock_fetch.return_value = mock_wazuh_raw_data
+    async def mock_fetch_generator(*args, **kwargs):
+            yield mock_wazuh_raw_data
+
+    with patch("app.main.fetch_all_vulns", side_effect=mock_fetch_generator) as mock_fetch, \
+             patch("app.main.decrypt", return_value="plain_pass"):
         
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
