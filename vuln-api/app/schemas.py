@@ -166,3 +166,16 @@ class PaginatedCatalogAgentsResponse(BaseModel):
     limit: int
     offset: int
     data: List[CatalogActiveAgentsView]
+
+class AffectedAssetFiltered(BaseModel):
+    asset_id: UUID
+    wazuh_connection_name: str  
+    hostname: str
+
+class CVEFilteredAgentsResponse(BaseModel):
+    cve_id: str
+    severity: str
+    total_agents: int
+    limit: int
+    offset: int
+    agents: List[AffectedAssetFiltered]

@@ -30,7 +30,7 @@ from .models import Asset, VulnerabilityCatalog, VulnerabilityDetection, User, W
 from .schemas import (
     AnalyticsSummaryResponse, CatalogActiveAgentsView, DashboardSummaryResponse, FilterOptionsResponse, GanttTimelineResponse, PaginatedCatalogAgentsResponse, SnapshotSchema, TimelineCVESchema, TimelineEventsResponse, UserCreate, UserOut, AssetCreate, AssetOut, 
     CatalogCreate, CatalogOut, DetectionCreate, DetectionOut, 
-    VulnStatus, AssetUpdate, CatalogUpdate, CriticalVulnViewDTO,
+    VulnStatus, AssetUpdate, CatalogUpdate, CriticalVulnViewDTO, CVEFilteredAgentsResponse,
 ) 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -1220,3 +1220,62 @@ async def refresh_catalog_active_agents(
             status_code=500, 
             detail="Error interno al intentar actualizar la vista de agentes. Contacte al administrador."
         )
+    
+@app.get(
+    "/api/vulns/filtered-agents", 
+    response_model=CVEFilteredAgentsResponse, 
+    tags=["Read"]
+)
+async def get_agents_by_cve_and_time(
+    cve_id: str = Query(..., description="ID de la vulnerabilidad (ej. CVE-2024-1234)"),
+    start_date: datetime = Query(..., description="Fecha de inicio (ISO 8601)"),
+    end_date: datetime = Query(..., description="Fecha de fin (ISO 8601)"),
+    connection_name: str = Query(..., description="Nombre de la conexión Wazuh"), # Modificado
+    limit: Annotated[int, Query(ge=1, le=1000)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    stmt_cve = select(VulnerabilityCatalog.cve_id, VulnerabilityCatalog.severity).where(
+        VulnerabilityCatalog.cve_id == cve_id
+    )
+    res_cve = await db.execute(stmt_cve)
+    cve_info = res_cve.first()
+    
+    if not cve_info:
+        raise HTTPException(status_code=404, detail="El CVE no existe en el catálogo.")
+
+    base_query = (
+        select(Asset.asset_id, WazuhConnection.name.label("connection_name"), Asset.hostname)
+        .join(VulnerabilityDetection, VulnerabilityDetection.asset_id == Asset.asset_id)
+        .join(WazuhConnection, Asset.wazuh_connection_id == WazuhConnection.id)
+        .where(
+            VulnerabilityDetection.cve_id == cve_id,
+            VulnerabilityDetection.timestamp >= start_date,
+            VulnerabilityDetection.timestamp <= end_date,
+            WazuhConnection.name == connection_name # Filtro por nombre
+        )
+        .distinct() 
+    )
+
+    count_stmt = select(func.count()).select_from(base_query.subquery())
+    total_count = (await db.execute(count_stmt)).scalar() or 0
+
+    data_stmt = base_query.order_by(Asset.hostname.asc()).limit(limit).offset(offset)
+    res_assets = await db.execute(data_stmt)
+    agents_list = res_assets.all()
+
+    return {
+        "cve_id": cve_info.cve_id,
+        "severity": cve_info.severity,
+        "total_agents": total_count,
+        "limit": limit,
+        "offset": offset,
+        "agents": [
+            {
+                "asset_id": a.asset_id,
+                "wazuh_connection_name": a.connection_name,
+                "hostname": a.hostname
+            } for a in agents_list
+        ]
+    }
