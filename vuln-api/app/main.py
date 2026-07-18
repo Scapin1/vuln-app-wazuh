@@ -300,7 +300,7 @@ def get_date_filters(period: str, date: Optional[str], model_col):
         raise HTTPException(status_code=400, detail={"error": "Periodo no válido"})
 
 
-@app.get("/api/vulns/dashboard", response_model=DashboardSummaryResponse)
+@app.get("/vulns/dashboard", response_model=DashboardSummaryResponse)
 async def get_vulns_dashboard(
     connection_id: int = Query(..., description="ID de conexión Wazuh (requerido)"),
     period: Literal["24h", "7d", "30d", "day", "all"] = Query("30d"),
@@ -350,7 +350,7 @@ async def get_vulns_dashboard(
         "total": total
     }
 
-@app.get("/api/vulns/timeline/gantt", response_model=GanttTimelineResponse)
+@app.get("/vulns/timeline/gantt", response_model=GanttTimelineResponse)
 async def get_vulns_timeline_gantt(
     connection_id: int = Query(..., description="ID de conexión (requerido)"),
     period: Literal["24h", "7d", "30d", "day", "all"] = Query("all"),
@@ -470,7 +470,7 @@ async def get_vulns_timeline_gantt(
         "max_timestamp": max_ts.isoformat() if max_ts else None
     }
 
-@app.get("/api/vulns/analytics", response_model=AnalyticsSummaryResponse)
+@app.get("/vulns/analytics", response_model=AnalyticsSummaryResponse)
 async def get_vulns_analytics_summary(
     connection_id: int = Query(..., description="ID de conexión (requerido)"),
     period: Literal["24h", "7d", "30d", "day", "all"] = Query("30d"),
@@ -555,7 +555,7 @@ async def get_vulns_analytics_summary(
         "top_critical_cve": top_critical_cve
     }
 
-@app.get("/api/vulns/filter-options", response_model=FilterOptionsResponse)
+@app.get("/vulns/filter-options", response_model=FilterOptionsResponse)
 async def get_vulns_filter_options(
     connection_id: int = Query(..., description="ID de conexión (requerido)"),
     db: AsyncSession = Depends(get_db)
@@ -587,7 +587,7 @@ async def get_vulns_filter_options(
         "cves": cves_list
     }
 
-@app.get("/api/vulns/events", response_model=TimelineEventsResponse)
+@app.get("/vulns/events", response_model=TimelineEventsResponse)
 async def get_vulns_timeline_events(
     connection_id: int = Query(..., description="ID de conexión (requerido)"),
     start_ms: int = Query(..., description="Unix ms del inicio del rango"),
@@ -1099,7 +1099,7 @@ async def update_catalog(
 # Vistas Materializadas
 # ===================================================================
 
-@app.post("/api/vulns/analytics/refresh-critical", tags=["Analytics"])
+@app.post("/vulns/analytics/refresh-critical", tags=["Analytics"])
 async def refresh_critical_view(
     current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db)
@@ -1122,7 +1122,7 @@ async def refresh_critical_view(
         )
     
 @app.get(
-    "/api/vulns/analytics/critical-view", 
+    "/vulns/analytics/critical-view", 
     response_model=List[CriticalVulnViewDTO], 
     tags=["Analytics"]
 )

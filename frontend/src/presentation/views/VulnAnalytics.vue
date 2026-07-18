@@ -61,6 +61,44 @@
       </div>
     </div>
 
+    <!-- ── Critical CVEs (Global — vista materializada) ── -->
+    <div v-if="criticalData !== null" class="card critical-card">
+      <div class="critical-header">
+        <span class="critical-title">Críticas <span class="critical-badge">Global</span></span>
+        <button class="critical-refresh-btn" @click="refreshCriticalView" :disabled="criticalLoading" title="Refrescar">
+          <svg :class="{ spin: criticalLoading }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.5l1.75 1.93"></path></svg>
+        </button>
+      </div>
+      <div v-if="!criticalData.length" class="critical-empty">
+        <p>No hay datos. Hacé sync y refrescá.</p>
+      </div>
+      <div v-else class="critical-scroll">
+        <table class="critical-table">
+          <thead>
+            <tr>
+              <th>CVE</th>
+              <th>CVSS</th>
+              <th>Agentes afectados</th>
+              <th>Hosts</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="cve in criticalData" :key="cve.cve_id">
+              <td class="critical-cve-id">{{ cve.cve_id }}</td>
+              <td>
+                <span class="cvss-badge" :class="cvssClass(cve.cvss_score)">{{ cve.cvss_score ?? '—' }}</span>
+              </td>
+              <td class="critical-agents-count">{{ cve.total_affected_agents }}</td>
+              <td class="critical-hosts">
+                <span v-for="host in cve.affected_hostnames.slice(0, 3)" :key="host" class="host-chip">{{ host }}</span>
+                <span v-if="cve.affected_hostnames.length > 3" class="host-more">+{{ cve.affected_hostnames.length - 3 }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <TimelineFilters
       :connections="connections"
       :agent-options="agentOpts"
@@ -81,11 +119,13 @@
       @update:selected-severities="selectedSeverities = $event"
       @update:custom-date="customDate = $event"
       @connection-change="onConnectionChange"
-      @set-period="period = $event"
+      @set-period="period = $event; ganttPage = 1"
       @build="buildAnalytics"
     />
 
-    <GanttTab v-if="!loading" :gantt-data="ganttData" />
+    <GanttTab v-if="!loading" :snapshots="ganttData"
+      :current-page="ganttPage" :total-pages="ganttTotalPages"
+      @page-change="onGanttPageChange" />
 
     <div v-else class="card loading-card">
       <div class="loading-progress">
@@ -144,25 +184,20 @@ const agentOpts = ref([])
 const vulnOpts = ref([])
 const selectedAgents = ref([])
 const selectedVulns = ref([])
-const selectedSeverities = ref(['CRITICAL', 'HIGH'])
+const selectedSeverities = ref([])
 const period = ref('30d')
 const customDate = ref(toLocalDatetimeString())
 const errorBanner = ref('')
 const syncing = ref(false)
 
 // ── Data state ──
-const filteredVulnsData = ref([])
+const analyticsData = ref(null)
+const timelineData = ref(null)
 const hasBuilt = ref(false)
-
-// ── Severity-filtered view ──
-const filteredData = computed(() => {
-  if (!hasBuilt.value || filteredVulnsData.value.length === 0) return filteredVulnsData.value
-  if (selectedSeverities.value.length === 0) return filteredVulnsData.value
-  return filteredVulnsData.value.filter(v => {
-    const sev = (v.severity || 'LOW').toUpperCase()
-    return selectedSeverities.value.includes(sev)
-  })
-})
+const ganttPage = ref(1)
+const ganttTotalPages = ref(1)
+const criticalData = ref(null)
+const criticalLoading = ref(false)
 
 // ── Loading state ──
 const loading = ref(false)
@@ -171,52 +206,21 @@ const elapsedSeconds = ref(0)
 const fetchProgress = ref({ current: 0 })
 let timerInterval = null
 
-// ── Computed chart data ──
+// ── Computed chart data from server API ──
 
-const severityDistribution = computed(() => {
-  const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
-  filteredData.value.forEach(v => {
-    const sev = (v.severity || 'LOW').toUpperCase()
-    if (counts[sev] !== undefined) counts[sev]++
-  })
-  return counts
-})
+const severityDistribution = computed(() => analyticsData.value?.severity_distribution
+  || { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 })
 
-const statusDistribution = computed(() => {
-  const counts = { Activo: 0, Resuelto: 0, Reabierto: 0 }
-  filteredData.value.forEach(v => {
-    const mapped = v.status ? STATUS_API_MAP[v.status] : null
-    if (mapped && counts[mapped] !== undefined) counts[mapped]++
-  })
-  return counts
-})
+const statusDistribution = computed(() => analyticsData.value?.status_distribution
+  || { Activo: 0, Resuelto: 0, Reabierto: 0 })
 
-const topAgentsDistribution = computed(() => {
-  const agentMap = {}
-  filteredData.value.forEach(v => {
-    const agent = v.agent_name || 'unknown'
-    agentMap[agent] = (agentMap[agent] || 0) + 1
-  })
-  return Object.entries(agentMap)
-    .map(([agent, count]) => ({ agent, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5)
-})
+const topAgentsDistribution = computed(() => analyticsData.value?.top_agents || [])
 
-const criticalCount = computed(() => {
-  return filteredData.value.filter(v => (v.severity || '').toUpperCase() === 'CRITICAL').length
-})
+const criticalCount = computed(() => analyticsData.value?.critical_count || 0)
 
-const topCriticalCve = computed(() => {
-  const criticalVulns = filteredVulnsData.value.filter(v => (v.severity || '').toUpperCase() === 'CRITICAL')
-  if (criticalVulns.length === 0) return null
-  const cveCounts = {}
-  criticalVulns.forEach(v => {
-    if (v.cve_id) cveCounts[v.cve_id] = (cveCounts[v.cve_id] || 0) + 1
-  })
-  const sorted = Object.entries(cveCounts).sort((a, b) => b[1] - a[1])
-  return sorted.length > 0 ? sorted[0][0] : null
-})
+const topCriticalCve = computed(() => analyticsData.value?.top_critical_cve || null)
+
+const ganttData = computed(() => timelineData.value?.cves || [])
 
 // ── Inline chart data ──
 
@@ -268,10 +272,6 @@ const doughnutOptions = {
   cutout: '55%'
 }
 
-const ganttData = computed(() => {
-  return hasBuilt.value && filteredData.value.length > 0 ? filteredData.value : []
-})
-
 const loadingBarWidth = computed(() => {
   if (fetchProgress.value.done) return 100
   return Math.min(fetchProgress.value.current * 20, 80)
@@ -305,13 +305,14 @@ const onConnectionChange = async () => {
   selectedVulns.value = []
   agentOpts.value = []
   vulnOpts.value = []
+  ganttPage.value = 1
   errorBanner.value = ''
 
   if (selectedConnection.value) {
     try {
       const filterOptions = await store.fetchFilterOptions(selectedConnection.value)
-      agentOpts.value = filterOptions.agents || []
-      vulnOpts.value = filterOptions.cves || []
+      agentOpts.value = (filterOptions.agents || []).map(a => a.name || a)
+      vulnOpts.value = (filterOptions.cves || []).map(c => c.id || c)
     } catch (error) {
       console.error(error)
       errorBanner.value = 'No se pudieron cargar agentes y CVEs para la conexión seleccionada.'
@@ -331,33 +332,39 @@ const buildAnalytics = async () => {
   startTimer()
 
   try {
-    // Fetch all vulns (without connectionId when none selected → returns ALL)
     const connId = selectedConnection.value || undefined
-    const allVulns = await store.fetchAllVulns(connId)
+
+    // Build filters from selected values
+    // Backend accepts single agent (ilike), single severity, and search (ilike on cve_id)
+    const filters = {}
+    if (selectedAgents.value.length > 0) filters.agent = selectedAgents.value[0]
+    if (selectedSeverities.value.length > 0) filters.severity = selectedSeverities.value[0]
+    if (selectedVulns.value.length > 0) filters.search = selectedVulns.value[0]
+
+    // Fetch analytics (metrics bar) and timeline (Gantt) in parallel
+    const [analytics, timeline] = await Promise.all([
+      store.fetchAnalytics(connId, period.value, customDate.value),
+      store.fetchTimeline(connId, period.value, customDate.value, ganttPage.value, 100, filters)
+    ])
+
+    analyticsData.value = analytics
+    timelineData.value = timeline
+    ganttTotalPages.value = timeline.total_pages || 1
     fetchProgress.value = { current: 1, done: true }
-
-    // Apply period filter client-side
-    let result = store.filterByPeriod(allVulns, period.value, customDate.value)
-
-    // Apply agent and CVE filters
-    if (selectedAgents.value.length > 0) {
-      result = result.filter(v => selectedAgents.value.includes(v.agent_name))
-    }
-    if (selectedVulns.value.length > 0) {
-      result = result.filter(v => selectedVulns.value.includes(v.cve_id))
-    }
-
-    loadingMessage.value = 'Procesando datos...'
-    filteredVulnsData.value = result
     hasBuilt.value = true
   } catch (err) {
-    console.error('Error fetching vulns:', err)
-    errorBanner.value = 'Error al cargar vulnerabilidades. Verifica tu conexión Wazuh.'
+    console.error('Error fetching analytics:', err)
+    errorBanner.value = 'Error al cargar datos de analítica. Verifica tu conexión Wazuh.'
     hasBuilt.value = false
   } finally {
     stopTimer()
     loading.value = false
   }
+}
+
+const onGanttPageChange = (page) => {
+  ganttPage.value = page
+  buildAnalytics()
 }
 
 const syncVulns = async () => {
@@ -369,11 +376,49 @@ const syncVulns = async () => {
     await vulnService.syncVulns()
     store.invalidateCache()
     await buildAnalytics()
+    // Refrescar y recargar la vista materializada de críticos
+    await vulnService.refreshCriticalView()
+    await fetchCriticalView()
   } catch {
     errorBanner.value = 'Error durante la sincronización con Wazuh. Verifica tu configuración en Admin Wazuh.'
   } finally {
     syncing.value = false
   }
+}
+
+// ── Critical CVEs from materialized view (global) ──
+
+const fetchCriticalView = async () => {
+  criticalLoading.value = true
+  try {
+    const res = await vulnService.getCriticalView()
+    criticalData.value = Array.isArray(res.data) ? res.data : []
+  } catch (err) {
+    console.error('Error fetching critical view:', err)
+    criticalData.value = []
+  } finally {
+    criticalLoading.value = false
+  }
+}
+
+const refreshCriticalView = async () => {
+  criticalLoading.value = true
+  try {
+    await vulnService.refreshCriticalView()
+    await fetchCriticalView()
+  } catch (err) {
+    console.error('Error refreshing critical view:', err)
+  } finally {
+    criticalLoading.value = false
+  }
+}
+
+const cvssClass = (score) => {
+  if (score == null) return ''
+  if (score >= 9.0) return 'cvss-critical'
+  if (score >= 7.0) return 'cvss-high'
+  if (score >= 4.0) return 'cvss-medium'
+  return 'cvss-low'
 }
 
 // ── Lifecycle ──
@@ -388,6 +433,8 @@ onMounted(async () => {
     }
     // Load filter options + analytics data via onConnectionChange
     await onConnectionChange()
+    // Load critical CVEs from materialized view (global)
+    await fetchCriticalView()
   } catch (error) {
     console.error(error)
     errorBanner.value = 'No se pudieron cargar las conexiones Wazuh.'
@@ -535,6 +582,146 @@ onUnmounted(() => {
 .critical-text {
   color: #dc2626;
 }
+
+/* ── Critical CVEs card (global MV) ── */
+.critical-card {
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+
+.critical-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 1rem;
+  background: var(--surface-container-high, #f1f5f9);
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+
+.critical-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text, #1e293b);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.critical-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 1px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.03em;
+}
+
+.critical-refresh-btn {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  transition: all 0.15s;
+}
+
+.critical-refresh-btn:hover {
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+.critical-empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.82rem;
+}
+
+.critical-scroll {
+  overflow-x: auto;
+}
+
+.critical-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.critical-table th {
+  text-align: left;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.critical-table td {
+  padding: 0.35rem 0.8rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.critical-table tr:hover td {
+  background: #f8fafc;
+}
+
+.critical-cve-id {
+  font-family: monospace;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.critical-agents-count {
+  font-weight: 700;
+  text-align: center;
+  color: #dc2626;
+}
+
+.critical-hosts {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.host-chip {
+  font-size: 0.68rem;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+.host-more {
+  font-size: 0.65rem;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.cvss-badge {
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.72rem;
+}
+
+.cvss-badge.cvss-critical { background: #fee2e2; color: #991b1b; }
+.cvss-badge.cvss-high { background: #ffedd5; color: #9a3412; }
+.cvss-badge.cvss-medium { background: #dbeafe; color: #1e40af; }
+.cvss-badge.cvss-low { background: #dcfce7; color: #166534; }
 
 @media (max-width: 900px) {
   .metrics-bar {
