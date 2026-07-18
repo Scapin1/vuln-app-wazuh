@@ -1230,7 +1230,6 @@ async def get_agents_by_cve_and_time(
     cve_id: str = Query(..., description="ID de la vulnerabilidad (ej. CVE-2024-1234)"),
     start_date: datetime = Query(..., description="Fecha de inicio (ISO 8601)"),
     end_date: datetime = Query(..., description="Fecha de fin (ISO 8601)"),
-    connection_name: str = Query(..., description="Nombre de la conexión Wazuh"), # Modificado
     limit: Annotated[int, Query(ge=1, le=1000)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
     db: AsyncSession = Depends(get_db),
@@ -1252,8 +1251,7 @@ async def get_agents_by_cve_and_time(
         .where(
             VulnerabilityDetection.cve_id == cve_id,
             VulnerabilityDetection.timestamp >= start_date,
-            VulnerabilityDetection.timestamp <= end_date,
-            WazuhConnection.name == connection_name # Filtro por nombre
+            VulnerabilityDetection.timestamp <= end_date
         )
         .distinct() 
     )
