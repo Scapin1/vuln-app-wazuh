@@ -28,7 +28,7 @@ from .wazuh_client import fetch_all_vulns, check_connection
 from .crypto import encrypt, decrypt
 from .models import Asset, VulnerabilityCatalog, VulnerabilityDetection, User, WazuhConnection
 from .schemas import (
-    AnalyticsSummaryResponse, DashboardSummaryResponse, FilterOptionsResponse, GanttTimelineResponse, SnapshotSchema, TimelineCVESchema, TimelineEventsResponse, UserCreate, UserOut, AssetCreate, AssetOut, 
+    AnalyticsSummaryResponse, CatalogActiveAgentsView, DashboardSummaryResponse, FilterOptionsResponse, GanttTimelineResponse, PaginatedCatalogAgentsResponse, SnapshotSchema, TimelineCVESchema, TimelineEventsResponse, UserCreate, UserOut, AssetCreate, AssetOut, 
     CatalogCreate, CatalogOut, DetectionCreate, DetectionOut, 
     VulnStatus, AssetUpdate, CatalogUpdate, CriticalVulnViewDTO,
 ) 
@@ -1156,3 +1156,67 @@ async def get_critical_vulnerabilities_view(
         })
         
     return response_data
+
+
+@app.get(
+    "/api/vulns/catalog-agents", 
+    response_model=PaginatedCatalogAgentsResponse, 
+    tags=["Analytics"]
+)
+async def get_catalog_active_agents_paginated(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+    limit: Annotated[int, Query(ge=1, le=1000)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+
+
+    count_query = "SELECT COUNT(*) FROM mv_catalog_active_agents;"
+    total_result = await db.execute(text(count_query))
+    total_count = total_result.scalar() or 0
+
+    data_query = """
+        SELECT 
+            cve_id, 
+            severity, 
+            description, 
+            cvss_score, 
+            total_affected_agents, 
+            affected_agents_details
+        FROM mv_catalog_active_agents
+        ORDER BY total_affected_agents DESC, cve_id ASC
+        LIMIT :limit OFFSET :offset;
+    """
+
+    result = await db.execute(text(data_query), {"limit": limit, "offset": offset})
+    rows = result.mappings().all()
+
+    return {
+        "total": total_count,
+        "limit": limit,
+        "offset": offset,
+        "data": rows
+    }
+
+@app.post("/api/vulns/catalog-agents/refresh", tags=["Analytics"])
+async def refresh_catalog_active_agents(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db)
+):
+
+    try:
+        await db.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY mv_catalog_active_agents;"))
+        await db.commit()
+        
+        return {
+            "status": "success", 
+            "message": "La vista de agentes afectados en el catálogo se actualizó correctamente."
+        }
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error actualizando la vista mv_catalog_active_agents: {e}")
+        
+        raise HTTPException(
+            status_code=500, 
+            detail="Error interno al intentar actualizar la vista de agentes. Contacte al administrador."
+        )

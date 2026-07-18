@@ -1372,5 +1372,136 @@ async def test_get_critical_vulnerabilities_view_empty():
     assert isinstance(data, list)
     assert len(data) == 0
 
+
+@pytest.fixture
+def mock_current_user():
+    return User(
+        user_id=1, 
+        user_name="Admin Test", 
+        user_email="admin@test.com", 
+        user_status=True
+    )
+## =================================================================
+## TESTS PARA REFRESH MANUAL DE VISTA MATERIALIZADA
+## =================================================================
+
+@pytest.mark.asyncio
+async def test_refresh_catalog_active_agents_success(mock_current_user):
+    """Prueba que la vista materializada se refresque exitosamente."""
+    mock_db = AsyncMock()
+    mock_db.execute = AsyncMock()
+    mock_db.commit = AsyncMock()
+    
+    app.dependency_overrides[get_db] = lambda: mock_db
+    app.dependency_overrides[get_current_user] = lambda: mock_current_user
+    
+    transport = ASGITransport(app=app)
+    original_root_path = app.root_path
+    app.root_path = ""
+    
+    try:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+            response = await ac.post("/api/vulns/catalog-agents/refresh")
+    finally:
+        app.dependency_overrides.clear()
+        app.root_path = original_root_path
+        
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+    assert mock_db.execute.called
+    assert mock_db.commit.called
+
+@pytest.mark.asyncio
+async def test_refresh_catalog_active_agents_error(mock_current_user):
+    """Prueba que un error en BD haga rollback y retorne 500."""
+    mock_db = AsyncMock()
+    mock_db.execute = AsyncMock(side_effect=Exception("Database Timeout"))
+    mock_db.rollback = AsyncMock()
+    
+    app.dependency_overrides[get_db] = lambda: mock_db
+    app.dependency_overrides[get_current_user] = lambda: mock_current_user
+    
+    transport = ASGITransport(app=app)
+    original_root_path = app.root_path
+    app.root_path = ""
+    
+    try:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+            response = await ac.post("/api/vulns/catalog-agents/refresh")
+    finally:
+        app.dependency_overrides.clear()
+        app.root_path = original_root_path
+        
+    assert response.status_code == 500
+    assert "Error interno al intentar actualizar" in response.json()["detail"]
+    assert mock_db.rollback.called
+
+## =================================================================
+## TEST PARA LECTURA PAGINADA DE VISTA MATERIALIZADA
+## =================================================================
+
+@pytest.mark.asyncio
+async def test_get_catalog_active_agents_paginated(mock_current_user):
+    """Prueba la lectura paginada de agentes activos en el catálogo."""
+    import uuid
+    mock_db = AsyncMock()
+    
+    # Mock COUNT
+    mock_count_result = MagicMock()
+    mock_count_result.scalar.return_value = 150 
+    
+    # Mock DATA
+    mock_data_result = MagicMock()
+    mock_mappings = MagicMock()
+    
+    mock_row = {
+        "cve_id": "CVE-2026-0001",
+        "severity": "CRITICAL",
+        "description": "Test vulnerability",
+        "cvss_score": 9.8,
+        "total_affected_agents": 2,
+        "affected_agents_details": [
+            {
+                "asset_id": str(uuid.uuid4()),
+                "hostname": "server-db",
+                "wazuh_connection_id": 1
+            },
+            {
+                "asset_id": str(uuid.uuid4()),
+                "hostname": "server-web",
+                "wazuh_connection_id": 1
+            }
+        ]
+    }
+    mock_mappings.all.return_value = [mock_row]
+    mock_data_result.mappings.return_value = mock_mappings
+    
+    mock_db.execute.side_effect = [mock_count_result, mock_data_result]
+    
+    app.dependency_overrides[get_db] = lambda: mock_db
+    app.dependency_overrides[get_current_user] = lambda: mock_current_user
+    
+    transport = ASGITransport(app=app)
+    original_root_path = app.root_path
+    app.root_path = ""
+    
+    try:
+        async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+            response = await ac.get("/api/vulns/catalog-agents?limit=10&offset=40")
+    finally:
+        app.dependency_overrides.clear()
+        app.root_path = original_root_path
+        
+    assert response.status_code == 200
+    data = response.json()
+    
+    assert data["total"] == 150
+    assert data["limit"] == 10
+    assert data["offset"] == 40
+    assert len(data["data"]) == 1
+    assert data["data"][0]["cve_id"] == "CVE-2026-0001"
+    assert len(data["data"][0]["affected_agents_details"]) == 2
+
+
 def teardown_module(module):
     app.dependency_overrides.clear()
