@@ -1,6 +1,6 @@
 <template>
   <div class="card gantt-card">
-    <div v-if="ganttData === null" class="gantt-loading-state">
+    <div v-if="!snapshots" class="gantt-loading-state">
       <div class="gantt-spinner"></div>
       <p>Cargando datos de vulnerabilidades...</p>
     </div>
@@ -51,10 +51,10 @@
         </div>
 
         <div class="gantt-body">
-          <div v-for="cve in paginatedCveSnapshots" :key="cve.cve_id" class="gantt-row cve-row">
+          <div v-for="cve in cveSnapshots" :key="cve.cve_id" class="gantt-row cve-row">
             <div class="gantt-sidebar-cell">
               <div class="cve-top">
-                <span class="cve-id">{{ cve.cve_id }}</span>
+                <span class="cve-id" @mouseenter="handleCveNameEnter(cve, $event)" @mousemove="handleCveNameMove($event)" @mouseleave="handleCveNameLeave">{{ cve.cve_id }}</span>
                 <span class="sev-badge" :class="cve.severity.toLowerCase()">{{ cve.severity }}</span>
               </div>
               <span class="cve-desc">{{ cve.description }}</span>
@@ -73,9 +73,9 @@
       </div>
 
       <div v-if="totalPages > 1" class="gantt-pagination">
-        <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">Anterior</button>
-        <span class="page-info">Pagina {{ currentPage }} de {{ totalPages }} ({{ cveSnapshots.length }} CVEs)</span>
-        <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">Siguiente</button>
+        <button class="page-btn" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">Anterior</button>
+        <span class="page-info">Pagina {{ currentPage }} de {{ totalPages }}</span>
+        <button class="page-btn" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)">Siguiente</button>
       </div>
 
       <!-- Tooltip (pointer-events: none so clicks pass through to bar) -->
@@ -97,6 +97,13 @@
         <div class="tooltip-count">{{ hoveredSnapshot.agentCount }} agente{{ hoveredSnapshot.agentCount > 1 ? 's' : ''
         }} afectado{{ hoveredSnapshot.agentCount > 1 ? 's' : '' }}</div>
       </div>
+
+      <!-- Tooltip del nombre CVE (columna izquierda) — estado separado de la barra -->
+      <div v-if="isCveNameHovering && hoveredCve" ref="cveTooltipRef" class="cve-name-tooltip"
+        :style="{ left: cveNameTooltipPos.x + 'px', top: cveNameTooltipPos.y + 'px' }">
+        <span class="cve-name-tooltip-title">Descripción</span>
+        <p class="cve-name-tooltip-desc">{{ hoveredCve.description }}</p>
+      </div>
     </template>
   </div>
 </template>
@@ -110,12 +117,21 @@ import { parseServerDate } from '../timelineFormatters'
 
 const router = useRouter()
 
+const emit = defineEmits(['page-change'])
+
 const props = defineProps({
-  ganttData: { type: Array, default: () => null }
+  snapshots: { type: Array, default: () => null },
+  currentPage: { type: Number, default: 1 },
+  totalPages: { type: Number, default: 1 }
 })
 
-const ITEMS_PER_PAGE = 20
-const currentPage = ref(1)
+// ── Normalise backend snake_case → camelCase ──
+const normalizeSnapshot = (snap) => ({
+  ...snap,
+  syncTimestamp: snap.syncTimestamp || snap.sync_timestamp || null,
+  agentCount: snap.agentCount ?? snap.agent_count ?? 0,
+  agents: snap.agents || snap.agent_names || []
+})
 
 // Preserve full datetime — use parseServerDate for correct UTC handling
 const toLocalDate = (d) => {
@@ -124,166 +140,20 @@ const toLocalDate = (d) => {
   return parseServerDate(d) || new Date()
 }
 
-// ── DEMO SNAPSHOTS (replaces old DEMO_DATA) ──
-const DEMO_SNAPSHOTS = [
-  {
-    cve_id: 'CVE-2026-0001',
-    severity: 'CRITICAL',
-    description: 'RCE en modulo de autenticacion (DEMO)',
-    snapshots: [
-      { syncTimestamp: new Date(2026, 2, 1).toISOString(), agents: ['srv-web-01', 'srv-db-02', 'srv-api-03'], agentCount: 3 },
-      { syncTimestamp: new Date(2026, 3, 1).toISOString(), agents: ['srv-web-01', 'srv-db-02'], agentCount: 2 },
-      { syncTimestamp: new Date(2026, 4, 1).toISOString(), agents: ['srv-web-01'], agentCount: 1 }
-    ],
-    firstSync: new Date(2026, 2, 1).toISOString(),
-    lastSync: new Date(2026, 4, 1).toISOString(),
-    isResolved: false
-  },
-  {
-    cve_id: 'CVE-2026-0002',
-    severity: 'HIGH',
-    description: 'SQL Injection en API REST (DEMO)',
-    snapshots: [
-      { syncTimestamp: new Date(2026, 2, 15).toISOString(), agents: ['srv-api-01', 'srv-web-02'], agentCount: 2 },
-      { syncTimestamp: new Date(2026, 3, 15).toISOString(), agents: ['srv-api-01', 'srv-web-02'], agentCount: 2 },
-      { syncTimestamp: new Date(2026, 4, 15).toISOString(), agents: ['srv-api-01', 'srv-web-02'], agentCount: 2 }
-    ],
-    firstSync: new Date(2026, 2, 15).toISOString(),
-    lastSync: new Date(2026, 4, 15).toISOString(),
-    isResolved: false
-  },
-  {
-    cve_id: 'CVE-2026-0003',
-    severity: 'MEDIUM',
-    description: 'XSS reflejado en dashboard (DEMO)',
-    snapshots: [
-      { syncTimestamp: new Date(2026, 1, 1).toISOString(), agents: ['srv-app-04'], agentCount: 1 },
-      { syncTimestamp: new Date(2026, 2, 1).toISOString(), agents: ['srv-app-04', 'srv-web-03'], agentCount: 2 },
-      { syncTimestamp: new Date(2026, 3, 1).toISOString(), agents: [], agentCount: 0 },
-      { syncTimestamp: new Date(2026, 4, 1).toISOString(), agents: ['srv-app-04', 'srv-web-03', 'srv-db-01'], agentCount: 3 }
-    ],
-    firstSync: new Date(2026, 1, 1).toISOString(),
-    lastSync: new Date(2026, 4, 1).toISOString(),
-    isResolved: false
-  },
-  {
-    cve_id: 'CVE-2026-0004',
-    severity: 'LOW',
-    description: 'Info disclosure en header HTTP (DEMO)',
-    snapshots: [
-      { syncTimestamp: new Date(2026, 0, 10).toISOString(), agents: ['srv-proxy-05'], agentCount: 1 },
-      { syncTimestamp: new Date(2026, 1, 10).toISOString(), agents: ['srv-proxy-05'], agentCount: 1 },
-      { syncTimestamp: new Date(2026, 2, 10).toISOString(), agents: ['srv-proxy-05'], agentCount: 1 },
-      { syncTimestamp: new Date(2026, 3, 10).toISOString(), agents: ['srv-proxy-05'], agentCount: 1 },
-      { syncTimestamp: new Date(2026, 4, 10).toISOString(), agents: [], agentCount: 0 }
-    ],
-    firstSync: new Date(2026, 0, 10).toISOString(),
-    lastSync: new Date(2026, 4, 10).toISOString(),
-    isResolved: true
-  },
-  {
-    cve_id: 'CVE-2026-0005',
-    severity: 'CRITICAL',
-    description: 'Desbordamiento de buffer en servicio DHCP (DEMO)',
-    snapshots: [
-      { syncTimestamp: new Date(2026, 3, 5).toISOString(), agents: ['srv-dhcp-01', 'srv-dhcp-02', 'srv-dhcp-03', 'srv-dhcp-04', 'srv-dhcp-05'], agentCount: 5 }
-    ],
-    firstSync: new Date(2026, 3, 5).toISOString(),
-    lastSync: new Date(2026, 3, 5).toISOString(),
-    isResolved: false
-  }
-]
-
-// ── Build CVEs with snapshots from real vuln data ──
-const buildCveSnapshots = (vulns) => {
-  // Group by cve_id
-  const cveMap = new Map()
-
-  vulns.forEach(v => {
-    if (!cveMap.has(v.cve_id)) {
-      cveMap.set(v.cve_id, {
-        cve_id: v.cve_id,
-        severity: v.severity || 'MEDIUM',
-        description: v.description || '',
-        agents: [],
-        snapshots: [],
-        isResolved: false
-      })
-    }
-    const cve = cveMap.get(v.cve_id)
-    cve.agents.push({
-      agent_name: v.agent_name || 'unknown',
-      agent_id: v.agent_id || '',
-      first_seen: v.first_seen,
-      last_seen: v.last_seen, // sync timestamp — same across machines
-      history: v.historySorted || []
-    })
-  })
-
-  // For each CVE, collect timestamps and build snapshots
-  cveMap.forEach((cve) => {
-    const timestampMap = new Map() // timestamp → Set of agent_names
-
-    cve.agents.forEach(agent => {
-      const addTimestamp = (ts) => {
-        if (!ts) return
-        if (!timestampMap.has(ts)) timestampMap.set(ts, new Set())
-        timestampMap.get(ts).add(agent.agent_name)
-      }
-
-      addTimestamp(agent.last_seen)  // sync timestamp — Gantt is driven by syncs, not first_seen
-      agent.history.forEach(h => addTimestamp(h.timestamp))
-    })
-
-    const sortedTimestamps = Array.from(timestampMap.keys()).sort(
-      (a, b) => new Date(a).getTime() - new Date(b).getTime()
-    )
-
-    cve.snapshots = sortedTimestamps.map(ts => ({
-      syncTimestamp: ts,
-      agents: Array.from(timestampMap.get(ts) || []),
-      agentCount: (timestampMap.get(ts) || new Set()).size,
-      cve_id: cve.cve_id
-    }))
-
-    // Resolved when all agents have a RESOLVED as their last history event
-    cve.isResolved = cve.agents.length > 0 && cve.agents.every(agent => {
-      const lastEvent = agent.history[agent.history.length - 1]
-      return lastEvent && lastEvent.action === 'RESOLVED'
-    })
-
-    cve.firstSync = cve.snapshots[0]?.syncTimestamp || null
-    cve.lastSync = cve.snapshots[cve.snapshots.length - 1]?.syncTimestamp || null
-  })
-
-  return Array.from(cveMap.values())
-}
-
 // ── Core computed: CVEs with sync snapshots ──
 const cveSnapshots = computed(() => {
-  const data = props.ganttData
-  if (!data || data.length === 0) return DEMO_SNAPSHOTS
-  const cves = buildCveSnapshots(data)
-  // Merge nearby snapshots based on zoom level to avoid overlapping bars
-  cves.forEach(cve => {
-    cve.snapshots = mergeSnapshotsByZoom(cve.snapshots)
-    cve.firstSync = cve.snapshots[0]?.syncTimestamp || null
-    cve.lastSync = cve.snapshots[cve.snapshots.length - 1]?.syncTimestamp || null
-  })
-  return cves
+  const data = props.snapshots
+  if (!data || data.length === 0) return []
+  const result = data.map(cve => ({
+    ...cve,
+    snapshots: mergeSnapshotsByZoom((cve.snapshots || []).map(normalizeSnapshot))
+  }))
+  return result
 })
 
-// ── Pagination ──
-const totalPages = computed(() => Math.max(1, Math.ceil(cveSnapshots.value.length / ITEMS_PER_PAGE)))
-
-const paginatedCveSnapshots = computed(() => {
-  const start = (currentPage.value - 1) * ITEMS_PER_PAGE
-  return cveSnapshots.value.slice(start, start + ITEMS_PER_PAGE)
-})
-
-watch(() => props.ganttData, () => {
-  currentPage.value = 1
-})
+const goToPage = (page) => {
+  emit('page-change', page)
+}
 
 // ── Scroll / Search ──
 const scrollWrapper = ref(null)
@@ -594,6 +464,50 @@ const displayedAgents = computed(() => {
   const agents = hoveredSnapshot.value.agents || []
   return agents.slice(0, 5)
 })
+
+// ── Tooltip del nombre CVE (columna izquierda) — estado separado del de la barra ──
+const hoveredCve = ref(null)
+const cveNameTooltipPos = ref({ x: 0, y: 0 })
+const isCveNameHovering = ref(false)
+const cveTooltipRef = ref(null)
+let cveNameLeaveTimeout = null
+
+const handleCveNameEnter = (cve, event) => {
+  if (cveNameLeaveTimeout) {
+    clearTimeout(cveNameLeaveTimeout)
+    cveNameLeaveTimeout = null
+  }
+  isCveNameHovering.value = true
+  hoveredCve.value = cve
+  cveNameTooltipPos.value = { x: event.clientX + 14, y: event.clientY + 14 }
+  nextTick(() => refineCveNameTooltipPos(event))
+}
+
+const handleCveNameMove = (event) => {
+  cveNameTooltipPos.value = { x: event.clientX + 14, y: event.clientY + 14 }
+  nextTick(() => refineCveNameTooltipPos(event))
+}
+
+const handleCveNameLeave = () => {
+  cveNameLeaveTimeout = setTimeout(() => {
+    isCveNameHovering.value = false
+    hoveredCve.value = null
+    cveNameLeaveTimeout = null
+  }, 100)
+}
+
+const refineCveNameTooltipPos = (event) => {
+  if (!cveTooltipRef.value) return
+  const h = cveTooltipRef.value.offsetHeight
+  const w = cveTooltipRef.value.offsetWidth
+  let x = event.clientX + 14
+  let y = event.clientY + 14
+  if (x + w > window.innerWidth - 8) x = event.clientX - w - 14
+  if (y + h > window.innerHeight - 8) y = event.clientY - h - 14
+  if (y < 8) y = 8
+  if (x < 8) x = 8
+  cveNameTooltipPos.value = { x, y }
+}
 
 const updateTooltipPos = (event) => {
   tooltipPos.value = { x: event.clientX + 12, y: event.clientY - 10 }
@@ -1164,5 +1078,37 @@ const formatDate = (d) => {
   font-weight: 700;
   padding-top: 4px;
   border-top: 1px solid var(--border, #e5e7eb);
+}
+
+/* ── Tooltip del nombre CVE (columna izquierda) ── */
+.cve-name-tooltip {
+  position: fixed;
+  z-index: 9998;
+  background: var(--bg-card, #ffffff);
+  color: var(--text-main, #111827);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  max-width: 280px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.cve-name-tooltip-title {
+  display: block;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #6b7280);
+  margin-bottom: 3px;
+}
+
+.cve-name-tooltip-desc {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-main, #111827);
 }
 </style>

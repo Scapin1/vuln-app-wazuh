@@ -99,5 +99,21 @@ export default {
         end_ms: endMs
       }
     })
+  },
+
+  /**
+   * GET /api/vulns/analytics/critical-view
+   * Critical CVEs from materialized view (global — todas las conexiones)
+   */
+  getCriticalView: async () => {
+    return apiClient.get('/vulns/analytics/critical-view')
+  },
+
+  /**
+   * POST /api/vulns/analytics/refresh-critical
+   * Refresca la vista materializada de CVEs críticos
+   */
+  refreshCriticalView: async () => {
+    return apiClient.post('/vulns/analytics/refresh-critical')
   }
 }

@@ -7,26 +7,111 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mockRouterPush })
 }))
 
+// ── Helper: build mock CVEs with snapshot-shaped data ──
+function makeCveSnapshots(overrides = {}) {
+  return {
+    cve_id: 'CVE-TEST-001',
+    severity: 'HIGH',
+    description: 'Test vulnerability',
+    snapshots: [
+      { syncTimestamp: '2026-06-01T10:00:00Z', agents: ['srv-a'], agentCount: 1 },
+      { syncTimestamp: '2026-07-01T10:00:00Z', agents: ['srv-b'], agentCount: 1 },
+    ],
+    isResolved: false,
+    firstSync: '2026-06-01T10:00:00Z',
+    lastSync: '2026-07-01T10:00:00Z',
+    ...overrides
+  }
+}
+
+const MOCK_SNAPSHOTS = [
+  {
+    cve_id: 'CVE-2026-0001',
+    severity: 'CRITICAL',
+    description: 'RCE en modulo de autenticacion',
+    snapshots: [
+      { syncTimestamp: '2026-03-01T00:00:00Z', agents: ['srv-web-01', 'srv-db-02', 'srv-api-03'], agentCount: 3 },
+      { syncTimestamp: '2026-04-01T00:00:00Z', agents: ['srv-web-01', 'srv-db-02'], agentCount: 2 },
+      { syncTimestamp: '2026-05-01T00:00:00Z', agents: ['srv-web-01'], agentCount: 1 }
+    ],
+    firstSync: '2026-03-01T00:00:00Z',
+    lastSync: '2026-05-01T00:00:00Z',
+    isResolved: false
+  },
+  {
+    cve_id: 'CVE-2026-0002',
+    severity: 'HIGH',
+    description: 'SQL Injection en API REST',
+    snapshots: [
+      { syncTimestamp: '2026-03-15T00:00:00Z', agents: ['srv-api-01', 'srv-web-02'], agentCount: 2 },
+      { syncTimestamp: '2026-04-15T00:00:00Z', agents: ['srv-api-01', 'srv-web-02'], agentCount: 2 },
+      { syncTimestamp: '2026-05-15T00:00:00Z', agents: ['srv-api-01', 'srv-web-02'], agentCount: 2 }
+    ],
+    firstSync: '2026-03-15T00:00:00Z',
+    lastSync: '2026-05-15T00:00:00Z',
+    isResolved: false
+  },
+  {
+    cve_id: 'CVE-2026-0003',
+    severity: 'MEDIUM',
+    description: 'XSS reflejado en dashboard',
+    snapshots: [
+      { syncTimestamp: '2026-02-01T00:00:00Z', agents: ['srv-app-04'], agentCount: 1 },
+      { syncTimestamp: '2026-03-01T00:00:00Z', agents: ['srv-app-04', 'srv-web-03'], agentCount: 2 },
+      { syncTimestamp: '2026-04-01T00:00:00Z', agents: [], agentCount: 0 },
+      { syncTimestamp: '2026-05-01T00:00:00Z', agents: ['srv-app-04', 'srv-web-03', 'srv-db-01'], agentCount: 3 }
+    ],
+    firstSync: '2026-02-01T00:00:00Z',
+    lastSync: '2026-05-01T00:00:00Z',
+    isResolved: false
+  },
+  {
+    cve_id: 'CVE-2026-0004',
+    severity: 'LOW',
+    description: 'Info disclosure en header HTTP',
+    snapshots: [
+      { syncTimestamp: '2026-01-10T00:00:00Z', agents: ['srv-proxy-05'], agentCount: 1 },
+      { syncTimestamp: '2026-02-10T00:00:00Z', agents: ['srv-proxy-05'], agentCount: 1 },
+      { syncTimestamp: '2026-03-10T00:00:00Z', agents: ['srv-proxy-05'], agentCount: 1 },
+      { syncTimestamp: '2026-04-10T00:00:00Z', agents: ['srv-proxy-05'], agentCount: 1 },
+      { syncTimestamp: '2026-05-10T00:00:00Z', agents: [], agentCount: 0 }
+    ],
+    firstSync: '2026-01-10T00:00:00Z',
+    lastSync: '2026-05-10T00:00:00Z',
+    isResolved: true
+  },
+  {
+    cve_id: 'CVE-2026-0005',
+    severity: 'CRITICAL',
+    description: 'Desbordamiento de buffer en servicio DHCP',
+    snapshots: [
+      { syncTimestamp: '2026-04-05T00:00:00Z', agents: ['srv-dhcp-01', 'srv-dhcp-02', 'srv-dhcp-03', 'srv-dhcp-04', 'srv-dhcp-05'], agentCount: 5 }
+    ],
+    firstSync: '2026-04-05T00:00:00Z',
+    lastSync: '2026-04-05T00:00:00Z',
+    isResolved: false
+  }
+]
+
 describe('GanttTab.vue', () => {
   beforeEach(() => {
     mockRouterPush.mockClear()
   })
 
-  // With empty ganttData, DEMO_SNAPSHOTS is shown (5 CVEs)
-  const emptyWrapper = () => mount(GanttTab, {
-    props: { ganttData: [] }
-  })
-
-  describe('rendering with DEMO data only', () => {
+  describe('rendering with snapshots prop', () => {
     it('renders the gantt card and title', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
 
       expect(wrapper.find('.gantt-card').exists()).toBe(true)
       expect(wrapper.text()).toContain('Seguimiento de CVEs')
     })
 
-    it('renders CVE headers from DEMO_SNAPSHOTS', () => {
-      const wrapper = emptyWrapper()
+    it('renders CVE headers from snapshots', () => {
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
 
       expect(wrapper.text()).toContain('CVE-2026-0001')
       expect(wrapper.text()).toContain('CVE-2026-0002')
@@ -36,7 +121,9 @@ describe('GanttTab.vue', () => {
     })
 
     it('renders severity badges', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
 
       expect(wrapper.text()).toContain('CRITICAL')
       expect(wrapper.text()).toContain('HIGH')
@@ -45,7 +132,9 @@ describe('GanttTab.vue', () => {
     })
 
     it('renders sync count info for each CVE', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
 
       expect(wrapper.text()).toContain('sincronizaciones')
       // CVE-2026-0001 has 3 snapshots
@@ -55,27 +144,33 @@ describe('GanttTab.vue', () => {
     })
 
     it('renders snapshot bar elements', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
 
       const bars = wrapper.findAll('.gantt-bar')
       expect(bars.length).toBeGreaterThan(0)
     })
 
     it('renders different bar classes by status (detected / reopened / resolved)', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
 
       const detectedBars = wrapper.findAll('.gantt-bar.snap-detected')
       const reopenedBars = wrapper.findAll('.gantt-bar.snap-reopened')
       const resolvedBars = wrapper.findAll('.gantt-bar.snap-resolved')
 
-      // At least one of each type should exist in DEMO data
+      // At least one of each type should exist in mock data
       expect(detectedBars.length).toBeGreaterThan(0)
       expect(reopenedBars.length).toBeGreaterThan(0)
       expect(resolvedBars.length).toBeGreaterThan(0)
     })
 
     it('renders updated legend items', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
 
       expect(wrapper.text()).toContain('Activo')
       expect(wrapper.text()).toContain('Reabierto')
@@ -83,7 +178,9 @@ describe('GanttTab.vue', () => {
     })
 
     it('renders zoom controls', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
 
       const zoomBtns = wrapper.findAll('.zoom-btn')
       expect(zoomBtns.length).toBe(2)
@@ -93,16 +190,38 @@ describe('GanttTab.vue', () => {
     })
   })
 
+  describe('empty state', () => {
+    it('shows empty state when snapshots is an empty array', () => {
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: [] }
+      })
+
+      expect(wrapper.find('.gantt-empty-state').exists()).toBe(true)
+      expect(wrapper.text()).toContain('No hay datos de vulnerabilidades para mostrar')
+      expect(wrapper.find('.gantt-body').exists()).toBe(false)
+    })
+
+    it('shows loading state when snapshots is null/undefined', () => {
+      const wrapper = mount(GanttTab, {})
+      expect(wrapper.find('.gantt-loading-state').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Cargando datos')
+    })
+  })
+
   describe('zoom controls', () => {
     it('starts at month zoom level', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       expect(wrapper.vm.zoomIndex).toBe(1)
       expect(wrapper.vm.zoomLabel).toBe('Mes')
       expect(wrapper.vm.MONTH_WIDTH).toBe(100)
     })
 
     it('zoomIn increases zoom index', async () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       expect(wrapper.vm.zoomIndex).toBe(1)
 
       await wrapper.find('.zoom-btn:last-child').trigger('click')
@@ -112,7 +231,9 @@ describe('GanttTab.vue', () => {
     })
 
     it('zoomOut decreases zoom index', async () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       await wrapper.find('.zoom-btn:last-child').trigger('click')
       expect(wrapper.vm.zoomIndex).toBe(2)
 
@@ -121,7 +242,9 @@ describe('GanttTab.vue', () => {
     })
 
     it('does not zoom out below minimum', async () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       await wrapper.find('.zoom-btn:first-child').trigger('click')
       expect(wrapper.vm.zoomIndex).toBe(0)
       expect(wrapper.vm.zoomLabel).toBe('Año')
@@ -132,7 +255,9 @@ describe('GanttTab.vue', () => {
     })
 
     it('does not zoom in above maximum', async () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       for (let i = 0; i < 3; i++) {
         await wrapper.find('.zoom-btn:last-child').trigger('click')
       }
@@ -145,7 +270,9 @@ describe('GanttTab.vue', () => {
     })
 
     it('changes time labels when zooming', async () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
 
       const monthText = wrapper.find('.month-label').text()
       expect(monthText.length).toBeGreaterThan(0)
@@ -157,51 +284,53 @@ describe('GanttTab.vue', () => {
   })
 
   describe('pagination', () => {
-    it('shows pagination when DEMO data exceeds ITEMS_PER_PAGE', () => {
-      const wrapper = emptyWrapper()
-
-      const totalPages = wrapper.vm.totalPages
-      if (totalPages > 1) {
-        expect(wrapper.find('.gantt-pagination').exists()).toBe(true)
-        expect(wrapper.find('.page-info').text()).toContain(`Pagina 1 de ${totalPages}`)
-      }
+    it('hides pagination when totalPages prop is 1', () => {
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS, currentPage: 1, totalPages: 1 }
+      })
+      expect(wrapper.find('.gantt-pagination').exists()).toBe(false)
     })
 
-    it('navigates pages when clicking Next', async () => {
-      const wrapper = emptyWrapper()
-
-      if (wrapper.vm.totalPages > 1) {
-        const nextBtn = wrapper.find('.page-btn:last-child')
-        expect(nextBtn.exists()).toBe(true)
-        expect(nextBtn.element.disabled).toBe(false)
-
-        await nextBtn.trigger('click')
-        expect(wrapper.vm.currentPage).toBe(2)
-        expect(wrapper.find('.page-info').text()).toContain('Pagina 2')
-      }
+    it('shows pagination when totalPages prop > 1', () => {
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS, currentPage: 1, totalPages: 3 }
+      })
+      expect(wrapper.find('.gantt-pagination').exists()).toBe(true)
+      expect(wrapper.find('.page-info').text()).toContain('Pagina 1 de 3')
     })
 
     it('disables Previous on first page', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS, currentPage: 1, totalPages: 3 }
+      })
+      const pageBtns = wrapper.findAll('.page-btn')
+      expect(pageBtns[0].element.disabled).toBe(true)
+      expect(pageBtns[1].element.disabled).toBe(false)
+    })
 
-      if (wrapper.vm.totalPages > 1) {
-        const pageBtns = wrapper.findAll('.page-btn')
-        const prevBtn = pageBtns.at(0)
-        expect(prevBtn.exists()).toBe(true)
-        expect(prevBtn.element.disabled).toBe(true)
-      }
+    it('disables Siguiente on last page', () => {
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS, currentPage: 3, totalPages: 3 }
+      })
+      const pageBtns = wrapper.findAll('.page-btn')
+      expect(pageBtns[0].element.disabled).toBe(false)
+      expect(pageBtns[1].element.disabled).toBe(true)
     })
   })
 
   describe('toLocalDate helper', () => {
     it('handles null/undefined input', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const result = wrapper.vm.toLocalDate(null)
       expect(result).toBeInstanceOf(Date)
     })
 
     it('handles Date object input', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const now = new Date('2026-05-15T10:30:00Z')
       const result = wrapper.vm.toLocalDate(now)
       expect(result).toBeInstanceOf(Date)
@@ -209,16 +338,18 @@ describe('GanttTab.vue', () => {
     })
 
     it('handles ISO date string with time', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const result = wrapper.vm.toLocalDate('2026-03-15T14:30:00Z')
       expect(result).toBeInstanceOf(Date)
-      // parseServerDate correctly converts UTC string to Date object
-      // getTime() is timezone-independent, so we compare absolute timestamps
       expect(result.getTime()).toBe(new Date('2026-03-15T14:30:00Z').getTime())
     })
 
     it('handles ISO date string without time', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const result = wrapper.vm.toLocalDate('2026-03-15')
       expect(result).toBeInstanceOf(Date)
     })
@@ -226,22 +357,26 @@ describe('GanttTab.vue', () => {
 
   describe('formatDate helper', () => {
     it('returns dash for null input', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       expect(wrapper.vm.formatDate(null)).toBe('-')
     })
 
     it('formats date string correctly', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const result = wrapper.vm.formatDate('2026-03-15')
       expect(result).toContain('2026')
     })
   })
 
   describe('getSnapshotBarStyle helper', () => {
-    it('returns empty object when no time labels', () => {
-      const wrapper = emptyWrapper()
-      // Mount with no data and force empty state to test guard
-      // Use a minimal CVE with a snapshot to test positioning
+    it('returns left and width properties', () => {
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const cve = wrapper.vm.cveSnapshots[0]
       if (cve && cve.snapshots.length > 0) {
         const style = wrapper.vm.getSnapshotBarStyle(cve, 0)
@@ -252,8 +387,10 @@ describe('GanttTab.vue', () => {
   })
 
   describe('timeLabels computed', () => {
-    it('returns non-empty labels with DEMO data', () => {
-      const wrapper = emptyWrapper()
+    it('returns non-empty labels with snapshots data', () => {
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       expect(wrapper.vm.timeLabels.length).toBeGreaterThan(0)
 
       wrapper.vm.timeLabels.forEach(label => {
@@ -265,7 +402,9 @@ describe('GanttTab.vue', () => {
     })
 
     it('generates year labels at year zoom', async () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       await wrapper.find('.zoom-btn:first-child').trigger('click')
 
       expect(wrapper.vm.zoomLabel).toBe('Año')
@@ -275,7 +414,9 @@ describe('GanttTab.vue', () => {
     })
 
     it('generates day labels at day zoom', async () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       await wrapper.find('.zoom-btn:last-child').trigger('click')
 
       expect(wrapper.vm.zoomLabel).toBe('Dia')
@@ -287,40 +428,51 @@ describe('GanttTab.vue', () => {
 
   describe('msPerUnit computed', () => {
     it('returns correct ms for year unit', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       wrapper.vm.zoomIndex = 0
       expect(wrapper.vm.msPerUnit).toBeCloseTo(365.25 * 24 * 60 * 60 * 1000, 0)
     })
 
     it('returns correct ms for month unit', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       wrapper.vm.zoomIndex = 1
       expect(wrapper.vm.msPerUnit).toBeCloseTo(30.44 * 24 * 60 * 60 * 1000, 0)
     })
 
     it('returns correct ms for day unit', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       wrapper.vm.zoomIndex = 2
       expect(wrapper.vm.msPerUnit).toBe(24 * 60 * 60 * 1000)
     })
 
     it('returns correct ms for hour unit', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       wrapper.vm.zoomIndex = 3
       expect(wrapper.vm.msPerUnit).toBe(60 * 60 * 1000)
     })
   })
 
   describe('cveSnapshots computed', () => {
-    it('uses DEMO data when ganttData is empty', () => {
-      const wrapper = emptyWrapper()
+    it('returns snapshots as-is from the prop with zoom merging applied', () => {
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const snapshots = wrapper.vm.cveSnapshots
-
-      expect(snapshots.length).toBe(5) // 5 DEMO CVEs
+      expect(snapshots.length).toBe(5)
     })
 
     it('each CVE snapshot has correct shape', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const snapshots = wrapper.vm.cveSnapshots
 
       snapshots.forEach(cve => {
@@ -343,7 +495,9 @@ describe('GanttTab.vue', () => {
     })
 
     it('marks CVE-2026-0004 as resolved (last snapshot has 0 agents)', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const cve = wrapper.vm.cveSnapshots.find(c => c.cve_id === 'CVE-2026-0004')
       expect(cve.cve_id).toBe('CVE-2026-0004')
       expect(cve.isResolved).toBe(true)
@@ -351,129 +505,21 @@ describe('GanttTab.vue', () => {
       expect(lastSnap.agentCount).toBe(0)
     })
 
-    it('parses real ganttData into CVE snapshots', () => {
-      const realData = [
-        {
-          cve_id: 'CVE-REAL-001',
-          severity: 'HIGH',
-          description: 'Real vuln',
-          agent_name: 'srv-web-01',
-          agent_id: 'a1',
-          first_seen: '2026-01-01T00:00:00Z',
-          historySorted: [
-            { action: 'RESOLVED', timestamp: '2026-03-01T00:00:00Z' }
-          ]
-        }
-      ]
+    it('applies mergeSnapshotsByZoom to each CVE snapshots', () => {
       const wrapper = mount(GanttTab, {
-        props: { ganttData: realData }
+        props: { snapshots: MOCK_SNAPSHOTS }
       })
-
-      expect(wrapper.text()).toContain('CVE-REAL-001')
-      expect(wrapper.text()).not.toContain('DEMO')
-      expect(wrapper.text()).toContain('HIGH')
-
       const snapshots = wrapper.vm.cveSnapshots
-      expect(snapshots.length).toBe(1)
-      expect(snapshots[0].snapshots).toHaveLength(1) // only history timestamps (Gantt uses syncs, not first_seen)
-    })
-
-    it('builds snapshots with real data correctly', () => {
-      const realData = [
-        {
-          cve_id: 'CVE-MULTI',
-          severity: 'MEDIUM',
-          description: 'Multi agent test',
-          agent_name: 'agent-01',
-          agent_id: 'a1',
-          first_seen: '2026-02-01T00:00:00Z',
-          historySorted: [
-            { action: 'RESOLVED', timestamp: '2026-04-01T00:00:00Z' }
-          ]
-        },
-        {
-          cve_id: 'CVE-MULTI',
-          severity: 'MEDIUM',
-          description: 'Multi agent test',
-          agent_name: 'agent-02',
-          agent_id: 'a2',
-          first_seen: '2026-03-01T00:00:00Z',
-          historySorted: []
-        }
-      ]
-      const wrapper = mount(GanttTab, {
-        props: { ganttData: realData }
+      snapshots.forEach(cve => {
+        expect(Array.isArray(cve.snapshots)).toBe(true)
       })
-
-      const cve = wrapper.vm.cveSnapshots.find(c => c.cve_id === 'CVE-MULTI')
-      expect(cve.cve_id).toBe('CVE-MULTI')
-      // Only 1 timestamp: Apr 1 (agent-01 history RESOLVED)
-      // first_seen is excluded — Gantt is driven by syncs, not first detection
-      expect(cve.snapshots).toHaveLength(1)
-
-      const snapTimestamps = cve.snapshots.map(s => s.syncTimestamp)
-      expect(snapTimestamps.some(ts => ts.includes('2026-04-01'))).toBe(true)
-      expect(snapTimestamps.some(ts => ts.includes('2026-02-01'))).toBe(false)
-      expect(snapTimestamps.some(ts => ts.includes('2026-03-01'))).toBe(false)
-    })
-
-    it('groups agents by shared last_seen (sync) timestamp', () => {
-      const realData = [
-        {
-          cve_id: 'CVE-SHARED-SYNC',
-          severity: 'HIGH',
-          description: 'Same CVE on multiple machines at same sync',
-          agent_name: 'server-a',
-          agent_id: 'a1',
-          first_seen: '2026-01-15T00:00:00Z',
-          last_seen: '2026-06-01T12:00:00Z',
-          historySorted: []
-        },
-        {
-          cve_id: 'CVE-SHARED-SYNC',
-          severity: 'HIGH',
-          description: 'Same CVE on multiple machines at same sync',
-          agent_name: 'server-b',
-          agent_id: 'a2',
-          first_seen: '2026-02-10T00:00:00Z',
-          last_seen: '2026-06-01T12:00:00Z',
-          historySorted: []
-        },
-        {
-          cve_id: 'CVE-SHARED-SYNC',
-          severity: 'HIGH',
-          description: 'Same CVE on multiple machines at same sync',
-          agent_name: 'server-c',
-          agent_id: 'a3',
-          first_seen: '2026-03-05T00:00:00Z',
-          last_seen: '2026-06-01T12:00:00Z',
-          historySorted: []
-        }
-      ]
-      const wrapper = mount(GanttTab, {
-        props: { ganttData: realData }
-      })
-
-      const cve = wrapper.vm.cveSnapshots.find(c => c.cve_id === 'CVE-SHARED-SYNC')
-      expect(cve.cve_id).toBe('CVE-SHARED-SYNC')
-
-      // 1 snapshot: only the shared sync last_seen (first_seen excluded from Gantt)
-      expect(cve.snapshots).toHaveLength(1)
-
-      // The shared sync snapshot has all 3 agents
-      const syncSnap = cve.snapshots.find(s => s.syncTimestamp.includes('2026-06-01'))
-      expect(syncSnap.syncTimestamp).toContain('2026-06-01')
-      expect(syncSnap.agentCount).toBe(3)
-      expect(syncSnap.agents).toContain('server-a')
-      expect(syncSnap.agents).toContain('server-b')
-      expect(syncSnap.agents).toContain('server-c')
     })
   })
 
   describe('mergeSnapshotsByZoom', () => {
     it('merges snapshots within daily threshold at month zoom', () => {
       const wrapper = mount(GanttTab, {
-        props: { ganttData: [] }
+        props: { snapshots: [] }
       })
       // Set zoom to 'Mes' (index 1)
       wrapper.vm.zoomIndex = 1
@@ -495,7 +541,7 @@ describe('GanttTab.vue', () => {
 
     it('keeps distant timestamps separate', () => {
       const wrapper = mount(GanttTab, {
-        props: { ganttData: [] }
+        props: { snapshots: [] }
       })
       wrapper.vm.zoomIndex = 1
 
@@ -508,24 +554,18 @@ describe('GanttTab.vue', () => {
     })
   })
 
-  describe('paginatedCveSnapshots', () => {
-    it('returns correct page slice', () => {
-      const wrapper = emptyWrapper()
-      const page1 = wrapper.vm.paginatedCveSnapshots
-
-      expect(page1.length).toBeLessThanOrEqual(20)
-      expect(page1[0]).toHaveProperty('cve_id')
-    })
-  })
-
   describe('scrollToDate', () => {
     it('handles empty searchDate gracefully', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       expect(() => wrapper.vm.scrollToDate()).not.toThrow()
     })
 
     it('handles missing scrollTo method gracefully', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       wrapper.vm.searchDate = '2026-04-01T00:00'
 
       if (wrapper.vm.scrollWrapper && typeof wrapper.vm.scrollWrapper.scrollTo !== 'function') {
@@ -536,102 +576,47 @@ describe('GanttTab.vue', () => {
     })
   })
 
-  describe('watch ganttData', () => {
-    it('resets currentPage to 1 when ganttData changes', async () => {
-      const wrapper = emptyWrapper()
-
-      if (wrapper.vm.totalPages > 1) {
-        wrapper.vm.currentPage = 2
-        expect(wrapper.vm.currentPage).toBe(2)
-
-        await wrapper.setProps({
-          ganttData: [{
-            cve_id: 'CVE-NEW',
-            severity: 'HIGH',
-            description: 'Test',
-            agent_name: 'test',
-            agent_id: 't1',
-            first_seen: new Date().toISOString(),
-            historySorted: []
-          }]
-        })
-
-        expect(wrapper.vm.currentPage).toBe(1)
-      }
-    })
-  })
-
-  describe('totalPages computed', () => {
-    it('computes totalPages from CVE count, not flat segments', () => {
-      const wrapper = emptyWrapper()
-      const cveCount = wrapper.vm.cveSnapshots.length
-      const expectedPages = Math.max(1, Math.ceil(cveCount / 20))
-      expect(wrapper.vm.totalPages).toBe(expectedPages)
-    })
-  })
-
-  describe('DEMO data gating', () => {
-    it('hides DEMO data when real ganttData is provided', () => {
-      const realData = [
-        {
-          cve_id: 'CVE-REAL-001',
-          severity: 'HIGH',
-          description: 'Real vulnerability - test only',
-          agent_name: 'srv-test-01',
-          agent_id: 't-001',
-          first_seen: '2026-01-01T00:00:00Z',
-          historySorted: []
-        }
-      ]
+  describe('page-change emit', () => {
+    it('emits page-change when goToPage is called', () => {
       const wrapper = mount(GanttTab, {
-        props: { ganttData: realData }
+        props: { snapshots: MOCK_SNAPSHOTS, currentPage: 1, totalPages: 3 }
       })
-
-      expect(wrapper.text()).not.toContain('DEMO')
-      expect(wrapper.text()).toContain('CVE-REAL-001')
+      wrapper.vm.goToPage(2)
+      expect(wrapper.emitted('page-change')).toBeTruthy()
+      expect(wrapper.emitted('page-change')[0]).toEqual([2])
     })
   })
 
-  describe('Loading state', () => {
-    it('shows loading state when ganttData is null', () => {
+  describe('totalPages prop', () => {
+    it('uses totalPages from prop', () => {
       const wrapper = mount(GanttTab, {
-        props: { ganttData: null }
+        props: { snapshots: MOCK_SNAPSHOTS, totalPages: 3 }
       })
-
-      expect(wrapper.text()).toContain('Cargando')
-      expect(wrapper.find('.gantt-controls').exists()).toBe(false)
-      expect(wrapper.find('.gantt-body').exists()).toBe(false)
+      expect(wrapper.vm.totalPages).toBe(3)
     })
-  })
 
-  describe('Empty state fallback', () => {
-    it('shows DEMO_SNAPSHOTS as fallback when ganttData is empty', () => {
-      const wrapper = emptyWrapper()
-
-      expect(wrapper.text()).toContain('CVE-2026-0001')
-      expect(wrapper.find('.gantt-body').exists()).toBe(true)
-      expect(wrapper.findAll('.gantt-bar').length).toBeGreaterThan(0)
-    })
-  })
-
-  describe('Title', () => {
-    it('shows title without "Criticos"', () => {
-      const wrapper = emptyWrapper()
-      expect(wrapper.text()).toContain('Seguimiento de CVEs')
-      expect(wrapper.text()).not.toContain('Criticos')
+    it('defaults to 1 when totalPages is not provided', () => {
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
+      expect(wrapper.vm.totalPages).toBe(1)
     })
   })
 
   describe('Tooltip interactions', () => {
     it('initial tooltip state is hidden', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       expect(wrapper.vm.isHovering).toBe(false)
       expect(wrapper.vm.hoveredSnapshot).toBe(null)
       expect(wrapper.find('.gantt-tooltip').exists()).toBe(false)
     })
 
     it('handleBarMouseEnter sets hover state', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const cve = wrapper.vm.cveSnapshots[0]
       const snap = cve.snapshots[0]
       const event = { clientX: 100, clientY: 200 }
@@ -647,7 +632,9 @@ describe('GanttTab.vue', () => {
     })
 
     it('handleBarMouseLeave clears hover state after delay', async () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const cve = wrapper.vm.cveSnapshots[0]
       const snap = cve.snapshots[0]
 
@@ -666,7 +653,9 @@ describe('GanttTab.vue', () => {
     })
 
     it('handleBarMouseMove updates tooltip position', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       wrapper.vm.isHovering = true
 
       wrapper.vm.handleBarMouseMove({ clientX: 300, clientY: 150 })
@@ -679,25 +668,33 @@ describe('GanttTab.vue', () => {
     const makeCve = (snapshots) => ({ snapshots })
 
     it('returns snap-resolved when agentCount is 0', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const cve = makeCve([{ agentCount: 0 }])
       expect(wrapper.vm.getSnapshotBarClass(cve, 0)).toBe('snap-resolved')
     })
 
     it('returns snap-detected when first snapshot has agents', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const cve = makeCve([{ agentCount: 2 }])
       expect(wrapper.vm.getSnapshotBarClass(cve, 0)).toBe('snap-detected')
     })
 
     it('returns snap-detected when agentCount > 0 and previous was also > 0', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const cve = makeCve([{ agentCount: 1 }, { agentCount: 3 }])
       expect(wrapper.vm.getSnapshotBarClass(cve, 1)).toBe('snap-detected')
     })
 
     it('returns snap-reopened when previous snapshot had 0 agents', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const cve = makeCve([{ agentCount: 0 }, { agentCount: 2 }])
       expect(wrapper.vm.getSnapshotBarClass(cve, 1)).toBe('snap-reopened')
     })
@@ -707,19 +704,25 @@ describe('GanttTab.vue', () => {
     const makeCve = (snapshots) => ({ snapshots })
 
     it('returns Resuelto for 0 agents', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const cve = makeCve([{ agentCount: 0 }])
       expect(wrapper.vm.getSnapshotStatusLabel(cve, 0)).toBe('Resuelto')
     })
 
     it('returns Activo for first snapshot with agents', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const cve = makeCve([{ agentCount: 1 }])
       expect(wrapper.vm.getSnapshotStatusLabel(cve, 0)).toBe('Activo')
     })
 
     it('returns Reabierto when previous snapshot had 0 agents', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const cve = makeCve([{ agentCount: 0 }, { agentCount: 3 }])
       expect(wrapper.vm.getSnapshotStatusLabel(cve, 1)).toBe('Reabierto')
     })
@@ -727,7 +730,9 @@ describe('GanttTab.vue', () => {
 
   describe('CSS cleanup — title label style', () => {
     it('uses CSS class instead of inline style on searchDate label', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const label = wrapper.find('label[for="ganttSearchDate"]')
       expect(label.exists()).toBe(true)
       expect(label.attributes('style')).toBeUndefined()
@@ -736,13 +741,17 @@ describe('GanttTab.vue', () => {
 
   describe('Date picker and search', () => {
     it('onGanttDatePickerChange sets searchDate from Date object', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       wrapper.vm.onGanttDatePickerChange(new Date('2026-07-15T14:30:00'))
       expect(wrapper.vm.searchDate).toBe('2026-07-15T14:30')
     })
 
     it('onGanttDatePickerChange ignores null date', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       wrapper.vm.onGanttDatePickerChange(null)
       expect(wrapper.vm.searchDate).toBe('')
     })
@@ -750,38 +759,44 @@ describe('GanttTab.vue', () => {
 
   describe('Bar click navigation', () => {
     it('handleBarClick navigates to timeline with query params', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const cve = {
         cve_id: 'CVE-TEST',
         snapshots: [
-          { syncTimestamp: '2026-07-01T10:00:00', agents: ['agent-1', 'agent-2'] },
-          { syncTimestamp: '2026-07-10T10:00:00' }
+          { syncTimestamp: '2026-07-01T10:00:00Z', agents: ['agent-1', 'agent-2'] },
+          { syncTimestamp: '2026-07-10T10:00:00Z' }
         ]
       }
       wrapper.vm.handleBarClick(cve, 0)
       expect(mockRouterPush).toHaveBeenCalledWith({
         path: '/timeline',
-        query: { cve: 'CVE-TEST', agents: 'agent-1,agent-2', syncStart: '2026-07-01T10:00:00', syncEnd: '2026-07-10T10:00:00' }
+        query: { cve: 'CVE-TEST', agents: 'agent-1,agent-2', syncStart: '2026-07-01T10:00:00Z', syncEnd: '2026-07-10T10:00:00Z' }
       })
     })
 
     it('handleBarClick with no agents uses empty string', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const cve = {
         cve_id: 'CVE-NOAGENTS',
-        snapshots: [{ syncTimestamp: '2026-07-01T10:00:00' }]
+        snapshots: [{ syncTimestamp: '2026-07-01T10:00:00Z' }]
       }
       wrapper.vm.handleBarClick(cve, 0)
       expect(mockRouterPush).toHaveBeenCalledWith({
         path: '/timeline',
-        query: { cve: 'CVE-NOAGENTS', agents: '', syncStart: '2026-07-01T10:00:00', syncEnd: expect.any(String) }
+        query: { cve: 'CVE-NOAGENTS', agents: '', syncStart: '2026-07-01T10:00:00Z', syncEnd: expect.any(String) }
       })
     })
   })
 
   describe('Tooltip edge cases', () => {
     it('cancelLeaveTimeout clears the leave timeout', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       wrapper.vm.startLeaveTimeout()
       expect(wrapper.vm.leaveTimeout).not.toBeNull()
       wrapper.vm.cancelLeaveTimeout()
@@ -789,7 +804,9 @@ describe('GanttTab.vue', () => {
     })
 
     it('handleBarMouseEnter clears existing leaveTimeout', () => {
-      const wrapper = emptyWrapper()
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
       const cve = wrapper.vm.cveSnapshots[0]
       const snap = cve.snapshots[0]
 
@@ -802,6 +819,27 @@ describe('GanttTab.vue', () => {
       expect(wrapper.vm.isHovering).toBe(true)
       expect(wrapper.vm.leaveTimeout).toBeNull()
     })
+
+    it('refineTooltipPos flips tooltip when near viewport edges', () => {
+      const wrapper = mount(GanttTab, {
+        props: { snapshots: MOCK_SNAPSHOTS }
+      })
+      wrapper.vm.isHovering = true
+      wrapper.vm.hoveredSnapshot = { cve_id: 'CVE-TEST', syncTimestamp: '2026-07-01T10:00:00Z', agents: [] }
+      wrapper.vm.tooltipRef = { offsetHeight: 100, offsetWidth: 200 }
+
+      // Near bottom edge — should flip above cursor
+      const nearBottom = { clientX: 100, clientY: window.innerHeight - 5 }
+      wrapper.vm.refineTooltipPos(nearBottom)
+      // y becomes clientY - tooltipHeight - 12 = (innerH - 5) - 100 - 12
+      expect(wrapper.vm.tooltipPos.y).toBe(window.innerHeight - 117)
+
+      // Near right edge — should flip left
+      const nearRight = { clientX: window.innerWidth - 10, clientY: 100 }
+      wrapper.vm.refineTooltipPos(nearRight)
+      // x becomes clientX - tooltipWidth - 12 = (innerW - 10) - 200 - 12
+      expect(wrapper.vm.tooltipPos.x).toBe(window.innerWidth - 222)
+    })
   })
 
   describe('Pagination', () => {
@@ -809,46 +847,80 @@ describe('GanttTab.vue', () => {
       cve_id: `CVE-PAG-${String(i + 1).padStart(4, '0')}`,
       severity: 'HIGH',
       description: `Pagination CVE ${i + 1}`,
-      snapshots: [{ syncTimestamp: '2026-07-01T10:00:00', agentCount: 1 }]
+      snapshots: [{ syncTimestamp: '2026-07-01T10:00:00Z', agentCount: 1 }]
     }))
 
-    it('shows pagination when ganttData has more than 20 CVEs', () => {
-      const wrapper = mount(GanttTab, { props: { ganttData: manyCves } })
-      expect(wrapper.vm.totalPages).toBe(2)
+    it('shows pagination when totalPages prop > 1', () => {
+      const wrapper = mount(GanttTab, { props: { snapshots: manyCves, currentPage: 1, totalPages: 2 } })
       expect(wrapper.find('.gantt-pagination').exists()).toBe(true)
     })
 
-    it('clicking Siguiente advances to page 2', async () => {
-      const wrapper = mount(GanttTab, { props: { ganttData: manyCves } })
-      expect(wrapper.vm.currentPage).toBe(1)
+    it('clicking Siguiente emits page-change with next page', async () => {
+      const wrapper = mount(GanttTab, { props: { snapshots: manyCves, currentPage: 1, totalPages: 2 } })
+      expect(wrapper.find('.page-btn:last-child').element.disabled).toBe(false)
 
       await wrapper.find('.page-btn:last-child').trigger('click')
-      expect(wrapper.vm.currentPage).toBe(2)
+      expect(wrapper.emitted('page-change')).toBeTruthy()
+      expect(wrapper.emitted('page-change')[0]).toEqual([2])
     })
 
-    it('clicking Anterior goes back to page 1', async () => {
-      const wrapper = mount(GanttTab, { props: { ganttData: manyCves } })
-      wrapper.vm.currentPage = 2
+    it('clicking Anterior emits page-change with prev page', async () => {
+      const wrapper = mount(GanttTab, { props: { snapshots: manyCves, currentPage: 2, totalPages: 2 } })
       await wrapper.vm.$nextTick()
 
       const btns = wrapper.findAll('.page-btn')
-      const prevBtn = btns[0]
-      await prevBtn.trigger('click')
-      expect(wrapper.vm.currentPage).toBe(1)
+      await btns[0].trigger('click')
+      expect(wrapper.emitted('page-change')).toBeTruthy()
+      expect(wrapper.emitted('page-change')[0]).toEqual([1])
     })
 
     it('Anterior button is disabled on page 1', () => {
-      const wrapper = mount(GanttTab, { props: { ganttData: manyCves } })
+      const wrapper = mount(GanttTab, { props: { snapshots: manyCves, currentPage: 1, totalPages: 2 } })
       const btns = wrapper.findAll('.page-btn')
       expect(btns[0].element.disabled).toBe(true)
     })
 
-    it('Siguiente button is disabled on last page', async () => {
-      const wrapper = mount(GanttTab, { props: { ganttData: manyCves } })
-      wrapper.vm.currentPage = 2
-      await wrapper.vm.$nextTick()
+    it('Siguiente button is disabled on last page', () => {
+      const wrapper = mount(GanttTab, { props: { snapshots: manyCves, currentPage: 2, totalPages: 2 } })
       const btns = wrapper.findAll('.page-btn')
       expect(btns[1].element.disabled).toBe(true)
+    })
+
+    it('bar click calls handleBarClick via template event', async () => {
+      const wrapper = mount(GanttTab, { props: { snapshots: MOCK_SNAPSHOTS, currentPage: 1, totalPages: 1 } })
+      const firstBar = wrapper.find('.gantt-bar')
+      expect(firstBar.exists()).toBe(true)
+      await firstBar.trigger('click')
+      expect(mockRouterPush).toHaveBeenCalled()
+    })
+  })
+
+  describe('zoom edge cases', () => {
+    it('zoom at max level does not increment further', async () => {
+      const wrapper = mount(GanttTab, { props: { snapshots: MOCK_SNAPSHOTS } })
+      // Start at Mes (index 1), go to Hora (index 3)
+      for (let i = 0; i < 3; i++) {
+        await wrapper.find('.zoom-btn:last-child').trigger('click')
+      }
+      expect(wrapper.vm.zoomIndex).toBe(3)
+      expect(wrapper.vm.zoomLabel).toBe('Hora')
+      // One more click should stay at 3
+      await wrapper.find('.zoom-btn:last-child').trigger('click')
+      expect(wrapper.vm.zoomIndex).toBe(3)
+      // At hour zoom, msPerUnit should be 3600000
+      expect(wrapper.vm.msPerUnit).toBe(60 * 60 * 1000)
+    })
+
+    it('zoom at min level does not decrement further', async () => {
+      const wrapper = mount(GanttTab, { props: { snapshots: MOCK_SNAPSHOTS } })
+      await wrapper.find('.zoom-btn:first-child').trigger('click')
+      expect(wrapper.vm.zoomIndex).toBe(0)
+      expect(wrapper.vm.zoomLabel).toBe('Año')
+      // One more click should stay at 0
+      await wrapper.find('.zoom-btn:first-child').trigger('click')
+      expect(wrapper.vm.zoomIndex).toBe(0)
+      // At year zoom, msPerUnit should be year ms
+      expect(wrapper.vm.msPerUnit).toBeCloseTo(365.25 * 24 * 60 * 60 * 1000, 0)
     })
   })
 })

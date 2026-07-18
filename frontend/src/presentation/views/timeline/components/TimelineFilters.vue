@@ -25,19 +25,21 @@
       <div class="f-group popover-wrap" v-click-outside="() => (activeDropdown = '')">
         <label>Equipos / Agentes</label>
         <button class="filter-input dd-btn" @click="activeDropdown = activeDropdown === 'agents' ? '' : 'agents'">
-          <span :class="selectedAgentsModel.length ? 'sel-badge' : ''">{{ selectedAgentsModel.length ? selectedAgentsModel.length + ' sel.' : 'Todos' }}</span>
+          <span :class="selectedAgentsModel.length ? 'sel-badge' : ''">{{ selectedAgentsModel.length ? selectedAgentsModel[0] : 'Todos' }}</span>
           <span>▼</span>
         </button>
         <div v-if="activeDropdown === 'agents'" class="dd-panel fade-in">
           <input type="text" id="search-agent" v-model="search.agent" placeholder="Buscar agente..." class="dd-search" aria-label="Buscar agente">
           <div class="dd-actions">
-            <span @click="selectedAgentsModel = [...agentOptions]">Todos</span>
-            <span @click="selectedAgentsModel = []">Limpiar</span>
+            <span @click="selectedAgentsModel = []; activeDropdown = ''">Limpiar</span>
           </div>
           <div class="dd-list custom-scroll">
-            <label v-for="agent in filteredAgents" :key="agent" class="dd-item">
-              <input type="checkbox" :value="agent" v-model="selectedAgentsModel"> {{ agent }}
-            </label>
+            <button v-for="agent in filteredAgents" :key="agent"
+              class="dd-item dd-item-btn"
+              :class="{ 'dd-item-selected': selectedAgentsModel[0] === agent }"
+              @click="selectedAgentsModel = selectedAgentsModel[0] === agent ? [] : [agent]; activeDropdown = ''">
+              {{ agent }}
+            </button>
           </div>
         </div>
       </div>
@@ -45,19 +47,21 @@
       <div class="f-group popover-wrap" v-click-outside="() => (activeDropdown = '')">
         <label>Vulnerabilidad</label>
         <button class="filter-input dd-btn" @click="activeDropdown = activeDropdown === 'vulns' ? '' : 'vulns'">
-          <span :class="selectedVulnsModel.length ? 'sel-badge' : ''">{{ selectedVulnsModel.length ? selectedVulnsModel.length + ' sel.' : 'Todas' }}</span>
+          <span :class="selectedVulnsModel.length ? 'sel-badge' : ''">{{ selectedVulnsModel.length ? selectedVulnsModel[0] : 'Todas' }}</span>
           <span>▼</span>
         </button>
         <div v-if="activeDropdown === 'vulns'" class="dd-panel fade-in">
           <input type="text" id="search-vuln" v-model="search.vuln" placeholder="Buscar CVE..." class="dd-search" aria-label="Buscar CVE">
           <div class="dd-actions">
-            <span @click="selectedVulnsModel = [...vulnOptions]">Todas</span>
-            <span @click="selectedVulnsModel = []">Limpiar</span>
+            <span @click="selectedVulnsModel = []; activeDropdown = ''">Limpiar</span>
           </div>
           <div class="dd-list custom-scroll">
-            <label v-for="vuln in filteredVulns" :key="vuln" class="dd-item">
-              <input type="checkbox" :value="vuln" v-model="selectedVulnsModel"> {{ vuln }}
-            </label>
+            <button v-for="vuln in filteredVulns" :key="vuln"
+              class="dd-item dd-item-btn"
+              :class="{ 'dd-item-selected': selectedVulnsModel[0] === vuln }"
+              @click="selectedVulnsModel = selectedVulnsModel[0] === vuln ? [] : [vuln]; activeDropdown = ''">
+              {{ vuln }}
+            </button>
           </div>
         </div>
       </div>
@@ -69,10 +73,13 @@
             v-for="sev in severityOptions"
             :key="sev.value"
             class="chip"
-            :class="{ on: selectedSeveritiesModel.includes(sev.value) }"
-            @click="toggleSeverity(sev.value)"
+            :class="{ on: selectedSeveritiesModel[0] === sev.value }"
+            @click="selectSeverity(sev.value)"
           >
             {{ sev.label }}
+          </button>
+          <button v-if="selectedSeveritiesModel.length" class="chip chip-clear" @click="selectedSeveritiesModel = []">
+            ✕
           </button>
         </div>
       </div>
@@ -210,12 +217,8 @@ const selectedSeveritiesModel = computed({
   set: value => emit('update:selectedSeverities', value)
 })
 
-const toggleSeverity = (sev) => {
-  const current = [...props.selectedSeverities]
-  const idx = current.indexOf(sev)
-  if (idx >= 0) current.splice(idx, 1)
-  else current.push(sev)
-  emit('update:selectedSeverities', current)
+const selectSeverity = (sev) => {
+  emit('update:selectedSeverities', selectedSeveritiesModel.value[0] === sev ? [] : [sev])
 }
 </script>
 
