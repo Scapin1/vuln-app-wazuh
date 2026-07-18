@@ -146,3 +146,23 @@ class CriticalVulnViewDTO(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AffectedAgentDTO(BaseModel):
+    asset_id: UUID
+    hostname: str
+    wazuh_connection_id: int
+
+class CatalogActiveAgentsView(BaseModel):
+    cve_id: str
+    severity: str
+    description: Optional[str]
+    cvss_score: Optional[float]
+    total_affected_agents: int
+    affected_agents_details: List[AffectedAgentDTO]
+
+class PaginatedCatalogAgentsResponse(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    data: List[CatalogActiveAgentsView]

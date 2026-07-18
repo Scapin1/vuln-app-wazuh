@@ -225,3 +225,46 @@ $$ LANGUAGE plpgsql;
 
 GRANT SELECT ON mv_critical_vulnerabilities TO vulnadmin;
 
+
+
+CREATE MATERIALIZED VIEW mv_catalog_active_agents AS
+WITH latest_package_status AS (
+    SELECT DISTINCT ON (vd.asset_id, vd.cve_id, vd.package_name)
+        vd.asset_id,
+        vd.cve_id,
+        vd.status
+    FROM vulnerability_detections vd
+    ORDER BY vd.asset_id, vd.cve_id, vd.package_name, vd.timestamp DESC
+),
+active_agents_per_cve AS (
+    SELECT DISTINCT
+        lps.cve_id,
+        lps.asset_id
+    FROM latest_package_status lps
+    WHERE lps.status IN ('Detected', 'Re-emerged')
+)
+SELECT 
+    vc.cve_id,
+    vc.severity,
+    vc.description,
+    vc.cvss_score,
+    COUNT(a.asset_id) AS total_affected_agents,
+    jsonb_agg(
+        jsonb_build_object(
+            'asset_id', a.asset_id,
+            'hostname', a.hostname,
+            'wazuh_connection_id', a.wazuh_connection_id
+        )
+    ) AS affected_agents_details
+FROM vulnerability_catalog vc
+JOIN active_agents_per_cve aac ON vc.cve_id = aac.cve_id
+JOIN assets a ON aac.asset_id = a.asset_id
+GROUP BY 
+    vc.cve_id, 
+    vc.severity, 
+    vc.description, 
+    vc.cvss_score;
+
+CREATE UNIQUE INDEX idx_mv_catalog_active_agents_cve ON mv_catalog_active_agents (cve_id);
+
+GRANT SELECT ON mv_catalog_active_agents TO vulnadmin;
