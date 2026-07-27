@@ -422,6 +422,7 @@ async def get_vulns_timeline_gantt(
             )
             .select_from(VulnerabilityDetection)
             .join(Asset, VulnerabilityDetection.asset_id == Asset.asset_id)
+            .join(VulnerabilityCatalog, VulnerabilityDetection.cve_id == VulnerabilityCatalog.cve_id)
             .where(and_(VulnerabilityDetection.cve_id.in_(target_cve_ids), *where_clauses))
             .order_by(VulnerabilityDetection.cve_id, VulnerabilityDetection.timestamp.asc())
         )
