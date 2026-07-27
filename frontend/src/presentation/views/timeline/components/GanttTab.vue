@@ -233,11 +233,13 @@ const mergeSnapshotsByZoom = (snapshots) => {
     const gap = new Date(snapshots[i].syncTimestamp).getTime() - new Date(current.syncTimestamp).getTime()
     if (gap < MIN_SNAP_GAP_MS.value) {
       // Merge: union agents, keep earlier timestamp
+      // When agents is empty but agentCount is positive (backend omitted
+      // the agent list — >500 threshold), preserve the larger count.
       const agentSet = new Set([...current.agents, ...snapshots[i].agents])
       current = {
         ...current,
         agents: Array.from(agentSet),
-        agentCount: agentSet.size,
+        agentCount: agentSet.size > 0 ? agentSet.size : Math.max(current.agentCount, snapshots[i].agentCount),
       }
     } else {
       merged.push(current)

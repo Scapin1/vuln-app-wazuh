@@ -217,7 +217,9 @@ RETURNS void AS $$
 BEGIN
     REFRESH MATERIALIZED VIEW CONCURRENTLY mv_critical_vulnerabilities;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
+ALTER MATERIALIZED VIEW mv_critical_vulnerabilities OWNER TO vulnadmin;
 GRANT SELECT ON mv_critical_vulnerabilities TO vulnadmin;
+GRANT EXECUTE ON FUNCTION refresh_critical_vulns_view() TO vulnadmin;
 
