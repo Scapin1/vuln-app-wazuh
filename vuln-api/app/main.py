@@ -658,17 +658,20 @@ async def sync_connection(
         raise HTTPException(status_code=404, detail="Conexión no encontrada")
     if not conn.is_active:
         raise HTTPException(status_code=400, detail="La conexión está inactiva")
-
-    raw_vulns = await fetch_all_vulns(
+    
+    total_synced = 0
+    
+    async for batch in fetch_all_vulns(
         conn.indexer_url, 
         conn.wazuh_user, 
         decrypt(conn.wazuh_password)
-    )
+    ):
+        count = await process_wazuh_vulnerabilities(db, conn.id, batch)
+        total_synced += count
 
-    count = await process_wazuh_vulnerabilities(db, conn.id, raw_vulns)
     await db.commit()
 
-    return {"synced": count, "connection": conn.name}
+    return {"synced": total_synced, "connection": conn.name}
 
 def chunk_list(data_list: list, chunk_size: int):
     for i in range(0, len(data_list), chunk_size):
