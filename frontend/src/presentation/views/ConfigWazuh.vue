@@ -90,28 +90,28 @@
             <label class="form-label">Nombre</label>
             <div class="input-icon">
               <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-              <input type="text" v-model="newConn.name" class="form-input" required placeholder="Mi conexión">
+              <input type="text" v-model="newConn.name" class="form-input" required placeholder="Mi conexión" title="Ej: Wazuh Principal, Servidor Pruebas">
             </div>
           </div>
           <div class="form-group">
             <label class="form-label">URL del Indexer</label>
             <div class="input-icon">
               <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-              <input type="url" v-model="newConn.indexer_url" class="form-input" required placeholder="https://indexer-url:9200">
+              <input type="url" v-model="newConn.indexer_url" class="form-input" required placeholder="https://indexer-url:9200" title="Ej: https://192.168.1.100:9200 o https://indexer.ejemplo.com:9200">
             </div>
           </div>
           <div class="form-group">
-            <label class="form-label">Usuario Wazuh</label>
+            <label class="form-label">Credenciales Wazuh</label>
             <div class="input-icon">
               <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-              <input type="text" v-model="newConn.wazuh_user" class="form-input" required placeholder="admin">
+              <input type="text" v-model="newConn.wazuh_user" class="form-input" required placeholder="admin" title="Ej: admin o wazuh_user">
             </div>
           </div>
           <div class="form-group">
             <label class="form-label">Contraseña Wazuh <span v-if="isEditing" style="font-weight:400; color:var(--text-muted);"></span></label>
             <div class="input-icon">
               <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-              <input :type="showPassword ? 'text' : 'password'" v-model="newConn.wazuh_password" class="form-input" :required="!isEditing" placeholder="••••••••">
+              <input :type="showPassword ? 'text' : 'password'" v-model="newConn.wazuh_password" class="form-input" :required="!isEditing" placeholder="••••••••" title="Contraseña segura del usuario Wazuh">
               <button type="button" class="eye-btn" @click="showPassword = !showPassword">
                 <svg v-if="!showPassword" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                 <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
