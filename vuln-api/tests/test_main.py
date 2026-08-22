@@ -1,3 +1,4 @@
+"""
 # test_main.py
 
 from http.client import HTTPException
@@ -38,7 +39,7 @@ mock_user = User(
 mock_user.user_id = 1 
 
 class MockConnection:
-    """Objeto falso para sortear validaciones de atributos (conn.user_id, conn.is_active, etc.)"""
+    //Objeto falso para sortear validaciones de atributos (conn.user_id, conn.is_active, etc.)
     id = 1
     user_id = 1  
     status = "active"
@@ -197,7 +198,7 @@ async def test_sync_process_complete_flow():
 
 @pytest.mark.asyncio
 async def test_list_connections_success():
-    """Cubre GET /wazuh-connections"""
+    //Cubre GET /wazuh-connections
     mock_db = AsyncMock(spec=AsyncSession)
     
     conn1 = WazuhConnection(id=1, name="Lab 1", indexer_url="http://u1", wazuh_user="u1", is_active=True)
@@ -219,7 +220,7 @@ async def test_list_connections_success():
 
 @pytest.mark.asyncio
 async def test_create_connection_success():
-    """Cubre POST /wazuh-connections (Ruta exitosa)"""
+    //Cubre POST /wazuh-connections (Ruta exitosa)
     mock_db = AsyncMock(spec=AsyncSession)
     mock_db.add = MagicMock()
     mock_db.commit = AsyncMock()
@@ -252,7 +253,7 @@ async def test_create_connection_success():
 
 @pytest.mark.asyncio
 async def test_update_connection_success():
-    """Cubre PUT /wazuh-connections/{conn_id}"""
+    //Cubre PUT /wazuh-connections/{conn_id}
     mock_db = AsyncMock(spec=AsyncSession)
     mock_db.commit = AsyncMock()
     
@@ -280,7 +281,7 @@ async def test_update_connection_success():
 
 @pytest.mark.asyncio
 async def test_update_connection_404():
-    """Cubre PUT /wazuh-connections/{conn_id} (No encontrado)"""
+    //Cubre PUT /wazuh-connections/{conn_id} (No encontrado)
     mock_db = AsyncMock(spec=AsyncSession)
     mock_db.get.return_value = None
     app.dependency_overrides[get_db] = lambda: mock_db
@@ -294,7 +295,7 @@ async def test_update_connection_404():
 
 @pytest.mark.asyncio
 async def test_test_existing_connection_flow():
-    """Cubre POST /wazuh-connections/{conn_id}/test"""
+    //Cubre POST /wazuh-connections/{conn_id}/test
     mock_db = AsyncMock(spec=AsyncSession)
     mock_db.commit = AsyncMock()
     
@@ -318,7 +319,7 @@ async def test_test_existing_connection_flow():
 
 @pytest.mark.asyncio
 async def test_delete_connection_success():
-    """Cubre DELETE /wazuh-connections/{conn_id} (Ruta exitosa)"""
+    //Cubre DELETE /wazuh-connections/{conn_id} (Ruta exitosa)
     mock_db = AsyncMock(spec=AsyncSession)
     mock_db.delete = AsyncMock()
     mock_db.commit = AsyncMock()
@@ -342,7 +343,7 @@ async def test_delete_connection_success():
 
 @pytest.mark.asyncio
 async def test_create_connection_already_exists():
-    """Cubre el error 400 cuando el nombre de la conexión ya existe"""
+    //Cubre el error 400 cuando el nombre de la conexión ya existe
     mock_db = AsyncMock(spec=AsyncSession)
     mock_result = MagicMock()
     mock_result.scalar_one_or_none.return_value = WazuhConnection(name="Lab")
@@ -365,7 +366,7 @@ async def test_create_connection_already_exists():
 
 @pytest.mark.asyncio
 async def test_delete_connection_not_found():
-    """Cubre el error 404 en el borrado de conexiones"""
+    //Cubre el error 404 en el borrado de conexiones
     mock_db = AsyncMock(spec=AsyncSession)
     mock_db.get.return_value = None  # No encontrada
     app.dependency_overrides[get_db] = lambda: mock_db
@@ -615,10 +616,9 @@ async def test_update_asset_not_found_trigger():
 
 @pytest.mark.asyncio
 async def test_sync_process_batching_logic(mock_wazuh_raw_data):
-    """
-    Verifica que la función process_wazuh_vulnerabilities ejecute 
-    correctamente los 5 comandos SQL masivos (batch) en el orden esperado.
-    """
+    //Verifica que la función process_wazuh_vulnerabilities ejecute 
+    //correctamente los 5 comandos SQL masivos (batch) en el orden esperado.
+    
     mock_db = AsyncMock(spec=AsyncSession)
     mock_db.commit = AsyncMock()
 
@@ -687,7 +687,7 @@ async def test_sync_process_batching_logic(mock_wazuh_raw_data):
 
 @pytest.mark.asyncio
 async def test_create_user_success():
-    """Cubre la creación exitosa de un usuario (POST /users)"""
+    //Cubre la creación exitosa de un usuario (POST /users)
     mock_db = AsyncMock(spec=AsyncSession)
     mock_res = MagicMock()
     mock_res.scalar_one_or_none.return_value = None
@@ -711,7 +711,7 @@ async def test_create_user_success():
 
 @pytest.mark.asyncio
 async def test_create_asset():
-    """Cubre la creación exitosa de un asset con el UUID corregido (POST /assets)"""
+    //Cubre la creación exitosa de un asset con el UUID corregido (POST /assets)
     import uuid
     mock_db = AsyncMock(spec=AsyncSession)
     mock_db.refresh.side_effect = lambda x: setattr(x, 'asset_id', uuid.uuid4())
@@ -735,7 +735,7 @@ async def test_create_asset():
 
 @pytest.mark.asyncio
 async def test_validation_errors_coverage():
-    """Cubre las ramas de error 422 (Unprocessable Entity) para subir coverage en validaciones"""
+    //Cubre las ramas de error 422 (Unprocessable Entity) para subir coverage en validaciones
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         res_user = await ac.post("/users", json={"bad_field": "error"})
@@ -851,10 +851,9 @@ async def test_get_vulns_events_not_found():
 
 @pytest.mark.anyio
 async def test_get_vulns_timeline_gantt_success():
-    """
-    Verifica que el endpoint del diagrama de Gantt retorne la estructura 
-    correcta realizando un mock de las 4 consultas secuenciales de SQLAlchemy.
-    """
+    //Verifica que el endpoint del diagrama de Gantt retorne la estructura 
+    //correcta realizando un mock de las 4 consultas secuenciales de SQLAlchemy.
+    
     # 1. Preparar las fechas de prueba
     mock_now = datetime(2026, 7, 13, 12, 0, 0, tzinfo=timezone.utc)
     
@@ -941,10 +940,8 @@ async def test_get_vulns_timeline_gantt_success():
 
 @pytest.mark.anyio
 async def test_get_vulns_timeline_gantt_with_filters():
-    """
-    Verifica que el endpoint procese correctamente los parámetros opcionales
-    agent, severity y search para alcanzar cobertura en esas ramas (if).
-    """
+    //Verifica que el endpoint procese correctamente los parámetros opcionales
+    //agent, severity y search para alcanzar cobertura en esas ramas (if).
     mock_now = datetime(2026, 7, 13, 12, 0, 0, tzinfo=timezone.utc)
     
     mock_result_bounds = MagicMock()
@@ -992,10 +989,10 @@ async def test_get_vulns_timeline_gantt_with_filters():
 
 @pytest.mark.anyio
 async def test_get_vulns_timeline_gantt_empty_results():
-    """
-    Verifica el comportamiento cuando no hay vulnerabilidades detectadas,
-    cubriendo el escenario donde 'page_cves' está vacío.
-    """
+
+    //Verifica el comportamiento cuando no hay vulnerabilidades detectadas,
+    //cubriendo el escenario donde 'page_cves' está vacío.
+
     # Query 1: res_bounds (Sin fechas registradas)
     mock_result_bounds = MagicMock()
     mock_result_bounds.one_or_none.return_value = (None, None)
@@ -1044,10 +1041,10 @@ async def test_get_vulns_timeline_gantt_empty_results():
 
 @pytest.mark.anyio
 async def test_get_vulns_analytics_summary_success():
-    """
-    Verifica que el endpoint de analíticas retorne las distribuciones correctas,
-    simulando las 4 consultas secuenciales (Severity, Status, Top Agents, Top CVE).
-    """
+
+    //Verifica que el endpoint de analíticas retorne las distribuciones correctas,
+    //simulando las 4 consultas secuenciales (Severity, Status, Top Agents, Top CVE).
+
     # 1. Configurar los resultados simulados (Mocks) para cada query
 
     # Query 1: res_severity (severity, count)
@@ -1136,10 +1133,10 @@ async def test_get_vulns_analytics_summary_success():
     assert data["top_critical_cve"] == "CVE-2024-9999"
 
 def test_get_date_filters_valid_periods():
-    """
-    Verifica que los periodos predefinidos devuelvan la cantidad 
-    correcta de filtros usando una columna real de SQLAlchemy.
-    """
+
+    //Verifica que los periodos predefinidos devuelvan la cantidad 
+    //correcta de filtros usando una columna real de SQLAlchemy.
+
     # Usamos una columna ficticia de SQLAlchemy en vez de MagicMock
     mock_col = Column('timestamp', DateTime)
     
@@ -1150,9 +1147,8 @@ def test_get_date_filters_valid_periods():
 
 
 def test_get_date_filters_day_valid():
-    """
-    Verifica el periodo 'day' cuando se pasa una fecha correcta.
-    """
+    //Verifica el periodo 'day' cuando se pasa una fecha correcta.
+
     mock_col = Column('timestamp', DateTime)
     filters = get_date_filters("day", "2026-07-13", mock_col)
     
@@ -1160,9 +1156,9 @@ def test_get_date_filters_day_valid():
 
 
 def test_get_date_filters_day_missing_date():
-    """
-    Verifica que arroje error 400 si se pide 'day' pero no se envía la fecha.
-    """
+
+    //Verifica que arroje error 400 si se pide 'day' pero no se envía la fecha.
+
     mock_col = Column('timestamp', DateTime)
     
     # Usamos el alias FastAPIException para garantizar que atrapamos la correcta
@@ -1174,9 +1170,9 @@ def test_get_date_filters_day_missing_date():
 
 
 def test_get_date_filters_day_invalid_date():
-    """
-    Verifica que arroje error 400 si se pide 'day' con un formato de fecha incorrecto.
-    """
+
+    //Verifica que arroje error 400 si se pide 'day' con un formato de fecha incorrecto.
+
     mock_col = Column('timestamp', DateTime)
     
     with pytest.raises(FastAPIException) as exc_info:
@@ -1187,9 +1183,9 @@ def test_get_date_filters_day_invalid_date():
 
 
 def test_get_date_filters_invalid_period():
-    """
-    Verifica que arroje error 400 si se pasa un periodo que no existe.
-    """
+
+    //Verifica que arroje error 400 si se pasa un periodo que no existe.
+
     mock_col = Column('timestamp', DateTime)
     
     with pytest.raises(FastAPIException) as exc_info:
@@ -1200,10 +1196,10 @@ def test_get_date_filters_invalid_period():
 
 @pytest.mark.anyio
 async def test_get_vulns_dashboard_success():
-    """
-    Verifica que el endpoint del dashboard retorne las distribuciones
-    correctas de severidad y estado haciendo un mock de las 2 consultas.
-    """
+
+    //Verifica que el endpoint del dashboard retorne las distribuciones
+    //correctas de severidad y estado haciendo un mock de las 2 consultas.
+
     # 1. Configurar Mocks para las 2 queries
     
     # Query 1: res_sev (severity, count)
@@ -1273,10 +1269,10 @@ async def test_get_vulns_dashboard_success():
 
 @pytest.mark.anyio
 async def test_get_critical_vulnerabilities_view_success():
-    """
-    Verifica que el endpoint de la vista materializada procese correctamente 
-    los resultados de la query cruda simulando diccionarios.
-    """
+
+    #Verifica que el endpoint de la vista materializada procese correctamente 
+    #los resultados de la query cruda simulando diccionarios.
+
     # 1. Configurar el Mock de la Base de Datos para mappings().all()
     mock_result = MagicMock()
     mock_result.mappings().all.return_value = [
@@ -1340,10 +1336,10 @@ async def test_get_critical_vulnerabilities_view_success():
 
 @pytest.mark.anyio
 async def test_get_critical_vulnerabilities_view_empty():
-    """
-    Verifica que el endpoint devuelva una lista vacía si la vista materializada 
-    no tiene registros.
-    """
+
+    #Verifica que el endpoint devuelva una lista vacía si la vista materializada 
+    #no tiene registros.
+
     mock_result = MagicMock()
     mock_result.mappings().all.return_value = []
     
@@ -1375,3 +1371,5 @@ async def test_get_critical_vulnerabilities_view_empty():
 
 def teardown_module(module):
     app.dependency_overrides.clear()
+
+    """

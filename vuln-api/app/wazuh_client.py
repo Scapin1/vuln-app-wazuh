@@ -55,19 +55,14 @@ async def fetch_all_vulns(indexer_url: str, wazuh_user: str, wazuh_password: str
             yield batch_data
             search_after = hits[-1]["sort"]
 
-def check_connection(indexer_url: str, wazuh_user: str, wazuh_password: str) -> bool:
+async def check_connection(indexer_url: str, wazuh_user: str, wazuh_password: str) -> bool:
     try:
         credentials = f"{wazuh_user}:{wazuh_password}"
         encoded_credentials = base64.b64encode(credentials.encode("utf-8")).decode("utf-8")
-        headers = {
-            "Authorization": f"Basic {encoded_credentials}"
-        }
-        resp = requests.get(
-            indexer_url, 
-            headers=headers, 
-            verify=False, 
-            timeout=10
-        )
-        return resp.status_code == 200
+        headers = {"Authorization": f"Basic {encoded_credentials}"}
+        
+        async with httpx.AsyncClient(verify=False, timeout=10.0) as client:
+            resp = await client.get(indexer_url, headers=headers)
+            return resp.status_code == 200
     except Exception:
         return False

@@ -1,7 +1,7 @@
 import pytest
 import httpx
 import requests
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 
 # --- TESTS PARA FETCH_ALL_VULNS (Generador Asíncrono) ---
 from app.wazuh_client import fetch_all_vulns, check_connection
@@ -63,34 +63,37 @@ async def test_fetch_all_vulns_http_error():
                 pass
 
 
-# --- TESTS PARA TEST_CONNECTION (Síncrono usando 'requests') ---
+# --- TESTS PARA CHECK_CONNECTION (Asíncrono usando 'httpx') ---
 
-def test_test_connection_success():
-    """Cubre el flujo exitoso (Status 200) de test_connection"""
+@pytest.mark.asyncio
+async def test_test_connection_success():
+    """Cubre el flujo exitoso (Status 200) de check_connection"""
     mock_resp = MagicMock()
     mock_resp.status_code = 200
 
-    with patch("requests.get", return_value=mock_resp) as mock_get:
-        result = check_connection("http://mock-wazuh", "user", "pass")
-        
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock, return_value=mock_resp) as mock_get:
+        result = await check_connection("http://mock-wazuh", "user", "pass")
+
         assert result is True
         mock_get.assert_called_once()
 
 
-def test_test_connection_fail_status():
+@pytest.mark.asyncio
+async def test_test_connection_fail_status():
     """Cubre el flujo donde el servidor responde pero con código de error (ej: 401)"""
     mock_resp = MagicMock()
     mock_resp.status_code = 401
 
-    with patch("requests.get", return_value=mock_resp):
-        result = check_connection("http://mock-wazuh", "user", "pass")
-        
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock, return_value=mock_resp):
+        result = await check_connection("http://mock-wazuh", "user", "pass")
+
         assert result is False
 
 
-def test_test_connection_exception():
+@pytest.mark.asyncio
+async def test_test_connection_exception():
     """Cubre el bloque 'except Exception' (Error de conexión, timeout, etc)"""
-    with patch("requests.get", side_effect=requests.exceptions.ConnectionError("Timeout/Connection Refused")):
-        result = check_connection("http://mock-wazuh", "user", "pass")
-        
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock, side_effect=requests.exceptions.ConnectionError("Timeout/Connection Refused")):
+        result = await check_connection("http://mock-wazuh", "user", "pass")
+
         assert result is False

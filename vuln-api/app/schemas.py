@@ -1,5 +1,5 @@
 # schemas.py
-from pydantic import BaseModel, ConfigDict, EmailStr, IPvAnyAddress
+from pydantic import BaseModel, ConfigDict, IPvAnyAddress
 from uuid import UUID
 from typing import Dict, Optional, List
 from datetime import datetime
@@ -7,12 +7,10 @@ from .models import VulnStatus # SeverityLevel lo manejamos como str según init
 
 # --- USER SCHEMAS ---
 class UserBase(BaseModel):
-    user_email: EmailStr
     user_name: str
     user_rol: str
 
 class UserCreate(UserBase):
-    user_email: EmailStr
     user_name: str
     user_rol: str
     user_password: str
@@ -23,13 +21,29 @@ class UserOut(UserBase):
     user_delete: bool
     model_config = ConfigDict(from_attributes=True)
 
+# --- ROL SCHEMAS ---
+class RolBase(BaseModel):
+    rol_name: str
+    rol_description: Optional[str] = None
+
+class RolCreate(RolBase):
+    pass
+
+class RolUpdate(BaseModel):
+    rol_name: Optional[str] = None
+    rol_description: Optional[str] = None
+
+class RolOut(RolBase):
+    rol_id: int
+    model_config = ConfigDict(from_attributes=True)
+
 # --- ASSET SCHEMAS ---
 class AssetBase(BaseModel):
     wazuh_agent_id: str
     hostname: str
     os_version: Optional[str] = None
     ip_address: Optional[IPvAnyAddress] = None
-    wazuh_connection_id: UUID
+    wazuh_connection_id: int
 
 class AssetCreate(AssetBase):
     pass
@@ -42,7 +56,7 @@ class AssetUpdate(BaseModel):
     hostname: Optional[str] = None
     os_version: Optional[str] = None
     ip_address: Optional[IPvAnyAddress] = None
-    wazuh_connection_id: Optional[UUID] = None
+    wazuh_connection_id: int = None
 
 # --- CATALOG SCHEMAS ---
 class CatalogCreate(BaseModel):

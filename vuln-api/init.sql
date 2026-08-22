@@ -66,12 +66,18 @@ CREATE TABLE wazuh_connections(
 -- 3. ENTIDADES
 -- ==========================================================
 
+-- Tabla Roles (catálogo de roles del sistema)
+CREATE TABLE roles (
+    rol_id SERIAL PRIMARY KEY,
+    rol_name VARCHAR(100) UNIQUE NOT NULL,
+    rol_description TEXT
+);
+
 -- Tabla User (según modelo class User)
 CREATE TABLE "user" (
     user_id SERIAL PRIMARY KEY,
-    user_rol VARCHAR(100),
-    user_name VARCHAR(255),
-    user_email VARCHAR(255) UNIQUE NOT NULL,
+    user_rol INTEGER REFERENCES roles(rol_id),
+    user_name VARCHAR(255) UNIQUE NOT NULL,
     user_password VARCHAR(255),
     user_status BOOLEAN DEFAULT TRUE,
     user_delete BOOLEAN DEFAULT FALSE,
@@ -88,7 +94,7 @@ CREATE TABLE assets (
     wazuh_connection_id BIGINT REFERENCES wazuh_connections(id) ON DELETE RESTRICT
 );
 
--- Tabla para registrar interacciones de los usuarios con la API 
+-- Tabla para registrar interacciones de los usuarios con la API
 CREATE TABLE user_interactions (
     user_interaction_id SERIAL PRIMARY KEY,
     user_id BIGINT REFERENCES "user"(user_id) ON DELETE CASCADE,
@@ -96,6 +102,26 @@ CREATE TABLE user_interactions (
     method VARCHAR(50),
     details TEXT,
     timestamp TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ==========================================================
+-- TABLAS INTERMEDIAS (ASIGNACIONES)
+-- ==========================================================
+
+-- Asignación Usuario <-> Asset
+CREATE TABLE user_assets (
+    user_id INTEGER NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
+    asset_id UUID NOT NULL REFERENCES assets(asset_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (user_id, asset_id)
+);
+
+-- Asignación Rol <-> Asset
+CREATE TABLE rol_assets (
+    rol_id INTEGER NOT NULL REFERENCES roles(rol_id) ON DELETE CASCADE,
+    asset_id UUID NOT NULL REFERENCES assets(asset_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (rol_id, asset_id)
 );
 
 -- ==========================================================
@@ -126,34 +152,6 @@ SELECT create_hypertable('vulnerability_detections', 'timestamp');
 -- 6. FUNCIONES INTERNAS Y LÓGICA
 -- ==========================================================
 
--- Lógica de Evolución (Check Evolution)
-CREATE OR REPLACE FUNCTION check_vulnerability_evolution()
-RETURNS TRIGGER AS $$
-DECLARE
-    last_status vulnerability_detections.status%TYPE;
-BEGIN
-    SELECT status INTO last_status
-    FROM vulnerability_detections
-    WHERE asset_id = NEW.asset_id 
-        AND cve_id = NEW.cve_id
-        AND timestamp < NEW.timestamp
-    ORDER BY timestamp DESC
-    LIMIT 1;
-
-    IF last_status IS NULL THEN
-        NEW.status := 'Detected';
-    ELSIF last_status = 'Resolved' THEN
-        NEW.status := 'Re-emerged';
-    ELSE
-        NEW.status := 'Detected';
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_check_evolution
-BEFORE INSERT ON vulnerability_detections
-FOR EACH ROW EXECUTE FUNCTION check_vulnerability_evolution();
 
 -- ==========================================================
 -- 7. OPTIMIZACIÓN
@@ -172,17 +170,23 @@ SELECT add_compression_policy('vulnerability_detections', INTERVAL '7 days');
 -- ==========================================================
 
 
+-- Insertar el ROL base del sistema
+INSERT INTO roles (rol_name, rol_description)
+VALUES (
+    'ADMIN',
+    'Administrador del sistema con acceso total'
+) ON CONFLICT (rol_name) DO NOTHING;
+
 -- . Insertar el Usuario con los nuevos nombres de columna
 -- Nota: La tabla es "user" (en minúsculas y entre comillas)
-INSERT INTO "user" (user_rol, user_password, user_name, user_email, user_status, user_delete)
+INSERT INTO "user" (user_rol, user_password, user_name, user_status, user_delete)
 VALUES (
-    'ADMIN', 
-    '$2b$12$r.qDNsr69vZab3VD6J.1/ugXuWLydd7bDfdVJE58kp8seyJX6LTqS', 
-    'Administrador Sistema', 
-    'admin@tuproyecto.cl', 
-    TRUE, 
+    (SELECT rol_id FROM roles WHERE rol_name = 'ADMIN'),
+    '$2b$12$r.qDNsr69vZab3VD6J.1/ugXuWLydd7bDfdVJE58kp8seyJX6LTqS',
+    'admin',
+    TRUE,
     FALSE
-) ON CONFLICT (user_email) DO NOTHING;
+);
 
 -- ==========================================================
 -- 9. VISTAS MATERIALIZADAS

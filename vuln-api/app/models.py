@@ -39,18 +39,28 @@ class VulnStatus(enum.Enum):
 # 2. MODELOS DE GESTIÓN (CORE)
 # ==========================================================
 
+class Rol(Base):
+    __tablename__ = "roles"
+    rol_id = Column(Integer, primary_key=True, index=True)
+    rol_name = Column(String(100), unique=True, nullable=False)
+    rol_description = Column(Text)
+
+    users = relationship("User", back_populates="role")
+    asset_links = relationship("RolAsset", back_populates="rol")
+
 class User(Base):
     __tablename__ = "user"
     user_id = Column(Integer, primary_key=True, index=True)
-    user_rol = Column(String(100))
+    user_rol = Column(Integer, ForeignKey("roles.rol_id"))
     user_name = Column(String(255))
-    user_email = Column(String(255), unique=True, index=True, nullable=False)
     user_password = Column(String(255))
     user_status = Column(Boolean, default=True)
     user_delete = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     interactions = relationship("UserInteraction", back_populates="user")
+    role = relationship("Rol", back_populates="users")
+    asset_links = relationship("UserAsset", back_populates="user")
 
 
 class Asset(Base):
@@ -64,6 +74,28 @@ class Asset(Base):
     
     wazuh_connection = relationship("WazuhConnection", back_populates="assets")
     detections = relationship("VulnerabilityDetection", back_populates="asset")
+    user_links = relationship("UserAsset", back_populates="asset")
+    rol_links = relationship("RolAsset", back_populates="asset")
+
+
+class UserAsset(Base):
+    __tablename__ = "user_assets"
+    user_id = Column(Integer, ForeignKey("user.user_id", ondelete="CASCADE"), primary_key=True)
+    asset_id = Column(UUID(as_uuid=True), ForeignKey("assets.asset_id", ondelete="CASCADE"), primary_key=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="asset_links")
+    asset = relationship("Asset", back_populates="user_links")
+
+
+class RolAsset(Base):
+    __tablename__ = "rol_assets"
+    rol_id = Column(Integer, ForeignKey("roles.rol_id", ondelete="CASCADE"), primary_key=True)
+    asset_id = Column(UUID(as_uuid=True), ForeignKey("assets.asset_id", ondelete="CASCADE"), primary_key=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    rol = relationship("Rol", back_populates="asset_links")
+    asset = relationship("Asset", back_populates="rol_links")
 
 class UserInteraction(Base):
     __tablename__ = "user_interactions"
@@ -115,7 +147,15 @@ class VulnerabilityDetection(Base):
     asset_id = Column(UUID(as_uuid=True), ForeignKey("assets.asset_id", ondelete="CASCADE"), primary_key=True)
     cve_id = Column(Text, ForeignKey("vulnerability_catalog.cve_id", ondelete="CASCADE"), primary_key=True)
     first_seen_at = Column(DateTime(timezone=True), nullable=False)
-    status = Column(SQLEnum(VulnStatus, name="vuln_status", create_type=False), nullable=False)
+    status = Column(
+        SQLEnum(
+            VulnStatus,
+            name="vuln_status",
+            create_type=False,
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=False
+    )
     package_name = Column(Text)
     package_version = Column(Text)
 

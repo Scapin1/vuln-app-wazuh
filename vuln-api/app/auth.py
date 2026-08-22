@@ -7,7 +7,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,7 +35,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 async def authenticate_user(db: AsyncSession, username: str, password: str):
-    result = await db.execute(select(User).where(User.user_email == username))
+    result = await db.execute(select(User).where(User.user_name == username))
     user = result.scalar_one_or_none()
     
     if not user or user.user_delete:
@@ -61,9 +61,13 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
 
-    result = await db.execute(select(User).where(User.user_email == username))
+    result = await db.execute(
+        select(User)
+        .options(joinedload(User.role))
+        .where(User.user_name == username)
+    )
     user = result.scalar_one_or_none()
-    
+
     if user is None:
         raise credentials_exception
     return user
