@@ -1,93 +1,117 @@
 <template>
   <div class="fade-in">
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+    <!-- 1️⃣  HEADER CON ACCIONES (Sincronización) -->
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
     <div class="header-actions">
       <div>
         <h1 class="title">Analítica de Vulnerabilidades</h1>
         <p class="subtitle">Distribución de vulnerabilidades, agentes afectados y seguimiento por CVE.</p>
       </div>
       <div>
-        <button class="btn btn-primary" @click="syncVulns" :disabled="syncing">
+        <!-- <button class="btn btn-primary" @click="syncVulns" :disabled="syncing">
           <svg v-if="syncing" class="spin" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
           <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.5l1.75 1.93"></path></svg>
           {{ syncing ? 'Sincronizando con Wazuh...' : 'Forzar Sincronización' }}
-        </button>
+        </button> -->
       </div>
     </div>
 
     <div v-if="errorBanner" class="status-banner status-error">{{ errorBanner }}</div>
 
-    <div class="metrics-bar">
-      <div class="mini-chart">
-        <span class="mini-chart-label">Severidad</span>
-        <div class="chart-group">
-          <div class="mini-chart-inner">
-            <Pie :data="pieChartData" :options="pieOptions" />
-          </div>
-          <div class="chart-inline-legend">
-            <div v-for="sev in SEVERITY_ORDER" :key="sev" class="legend-item">
-              <span class="legend-dot" :style="{ background: SEVERITY_COLORS[sev] }"></span>
-              <span class="legend-label">{{ sev === 'CRITICAL' ? 'CRIT' : sev === 'MEDIUM' ? 'MED' : sev === 'LOW' ? 'LOW' : 'HIGH' }}</span>
-              <span class="legend-value">{{ severityDistribution[sev] }}</span>
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+    <!-- 2️⃣  FILTROS (Top-Down Section) -->
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+    <div class="filters-section">
+      <h2 class="section-title">Filtros de Búsqueda</h2>
+      <TimelineFilters
+        :connections="connections"
+        :agent-options="agentOpts"
+        :vuln-options="vulnOpts"
+        :selected-connection="selectedConnection"
+        :selected-agents="selectedAgents"
+        :selected-vulns="selectedVulns"
+        :severity-options="severityFilterOptions"
+        :selected-severities="selectedSeverities"
+        :period="period"
+        :periods="periods"
+        :custom-date="customDate"
+        :loading="loading"
+        compact
+        @update:selected-connection="selectedConnection = $event"
+        @update:selected-agents="selectedAgents = $event"
+        @update:selected-vulns="selectedVulns = $event"
+        @update:selected-severities="selectedSeverities = $event"
+        @update:custom-date="customDate = $event"
+        @connection-change="onConnectionChange"
+        @set-period="period = $event"
+        @build="buildAnalytics"
+      />
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+    <!-- 3️⃣  MÉTRICAS Y DIAGRAMAS (Top-Down Section) -->
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+    <div v-if="!loading" class="metrics-section">
+      <h2 class="section-title">Métricas Generales</h2>
+      <div class="metrics-bar">
+        <div class="mini-chart">
+          <span class="mini-chart-label">Severidad</span>
+          <div class="chart-group">
+            <div class="mini-chart-inner">
+              <Pie :data="pieChartData" :options="pieOptions" />
+            </div>
+            <div class="chart-inline-legend">
+              <div v-for="sev in SEVERITY_ORDER" :key="sev" class="legend-item">
+                <span class="legend-dot" :style="{ background: SEVERITY_COLORS[sev] }"></span>
+                <span class="legend-label">{{ sev === 'CRITICAL' ? 'CRIT' : sev === 'MEDIUM' ? 'MED' : sev === 'LOW' ? 'LOW' : 'HIGH' }}</span>
+                <span class="legend-value">{{ severityDistribution[sev] }}</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <div class="metric-divider"></div>
-      <div class="mini-chart">
-        <span class="mini-chart-label">Estado</span>
-        <div class="chart-group">
-          <div class="mini-chart-inner">
-            <Doughnut :data="doughnutChartData" :options="doughnutOptions" />
-          </div>
-          <div class="chart-inline-legend">
-            <div v-for="st in STATUS_ORDER" :key="st" class="legend-item">
-              <span class="legend-dot" :style="{ background: STATUS_COLORS[st] }"></span>
-              <span class="legend-label">{{ st === 'Reabierto' ? 'REAB' : st === 'Resuelto' ? 'RES' : 'ACT' }}</span>
-              <span class="legend-value">{{ statusDistribution[st] }}</span>
+        <div class="metric-divider"></div>
+        <div class="mini-chart">
+          <span class="mini-chart-label">Estado</span>
+          <div class="chart-group">
+            <div class="mini-chart-inner">
+              <Doughnut :data="doughnutChartData" :options="doughnutOptions" />
+            </div>
+            <div class="chart-inline-legend">
+              <div v-for="st in STATUS_ORDER" :key="st" class="legend-item">
+                <span class="legend-dot" :style="{ background: STATUS_COLORS[st] }"></span>
+                <span class="legend-label">{{ st === 'Reabierto' ? 'REAB' : st === 'Resuelto' ? 'RES' : 'ACT' }}</span>
+                <span class="legend-value">{{ statusDistribution[st] }}</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <div class="metric-divider"></div>
-      <div class="metric-group">
-        <span class="metric-label">Top agente</span>
-        <span class="metric-value">{{ topAgentsDistribution[0]?.agent || '—' }} ({{ topAgentsDistribution[0]?.count || 0 }})</span>
-      </div>
-      <div class="metric-divider"></div>
-      <div class="metric-group">
-        <span class="metric-label">Críticas</span>
-        <span class="metric-value critical-text">{{ criticalCount }}</span>
-        <span v-if="topCriticalCve" class="metric-cve">{{ topCriticalCve }}</span>
+        <div class="metric-divider"></div>
+        <div class="metric-group">
+          <span class="metric-label">Top agente</span>
+          <span class="metric-value">{{ topAgentsDistribution[0]?.agent || '—' }} ({{ topAgentsDistribution[0]?.count || 0 }})</span>
+        </div>
+        <div class="metric-divider"></div>
+        <div class="metric-group">
+          <span class="metric-label">Críticas</span>
+          <span class="metric-value critical-text">{{ criticalCount }}</span>
+          <span v-if="topCriticalCve" class="metric-cve">{{ topCriticalCve }}</span>
+        </div>
       </div>
     </div>
 
-    <TimelineFilters
-      :connections="connections"
-      :agent-options="agentOpts"
-      :vuln-options="vulnOpts"
-      :selected-connection="selectedConnection"
-      :selected-agents="selectedAgents"
-      :selected-vulns="selectedVulns"
-      :severity-options="severityFilterOptions"
-      :selected-severities="selectedSeverities"
-      :period="period"
-      :periods="periods"
-      :custom-date="customDate"
-      :loading="loading"
-      compact
-      @update:selected-connection="selectedConnection = $event"
-      @update:selected-agents="selectedAgents = $event"
-      @update:selected-vulns="selectedVulns = $event"
-      @update:selected-severities="selectedSeverities = $event"
-      @update:custom-date="customDate = $event"
-      @connection-change="onConnectionChange"
-      @set-period="period = $event"
-      @build="buildAnalytics"
-    />
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+    <!-- 4️⃣  CRONOGRAMA GANTT (Top-Down Section) -->
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+    <div v-if="!loading && hasBuilt" class="gantt-section">
+      <h2 class="section-title">Cronograma de Vulnerabilidades (Gantt)</h2>
+      <GanttTab :gantt-data="ganttData" />
+    </div>
 
-    <GanttTab v-if="!loading" :gantt-data="ganttData" />
-
-    <div v-else class="card loading-card">
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+    <!-- 5️⃣  LOADING STATE (Centered) -->
+    <!-- ════════════════════════════════════════════════════════════════════════════════ -->
+    <div v-if="loading" class="card loading-card">
       <div class="loading-progress">
         <div class="loading-info">
           <p class="loading-message">{{ loadingMessage || 'Cargando...' }}</p>
@@ -401,7 +425,11 @@ onUnmounted(() => {
 
 <style scoped>
 .header-actions {
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
 }
 
 .status-banner {
@@ -410,13 +438,44 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   font-size: 0.85rem;
   font-weight: 600;
-  margin-bottom: 1rem;
+  margin-bottom: 2rem;
 }
 
 .status-error {
   color: var(--danger);
   background: var(--danger-bg);
   border-color: rgba(220, 38, 38, 0.3);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════════ */
+/* TOP-DOWN SECTIONS (Full width cards) */
+/* ════════════════════════════════════════════════════════════════════════════════ */
+
+.filters-section,
+.metrics-section,
+.gantt-section {
+  margin-bottom: 2rem;
+}
+
+.section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.section-title::before {
+  content: '';
+  width: 4px;
+  height: 1.2rem;
+  background: var(--primary);
+  border-radius: 2px;
+  flex-shrink: 0;
 }
 
 /* ── Metrics Bar ── */
@@ -429,7 +488,7 @@ onUnmounted(() => {
   border: 1px solid var(--border, #e2e8f0);
   border-radius: var(--radius-md, 6px);
   padding: 0.6rem 1rem;
-  margin-bottom: 0.75rem;
+  min-height: 120px;
 }
 
 .mini-chart {
@@ -449,7 +508,7 @@ onUnmounted(() => {
   text-orientation: mixed;
 }
 
-/* Chart ra + inline legend next to it */
+/* Chart + inline legend next to it */
 .chart-group {
   display: flex;
   align-items: center;
