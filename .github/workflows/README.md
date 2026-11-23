@@ -32,7 +32,7 @@ Lo vas a ver al crear la organización o en la URL dentro de SonarQube Cloud.
   - Sonar: ejecuta scan y luego Quality Gate.
 
 - `.github/workflows/zap.yml`
-  - Corre **nightly** (cron) y **manual** (`workflow_dispatch`).
+  - Corre **manual** (`workflow_dispatch`). Se eliminó el programado (cron) nightly.
   - Levanta el stack con `docker compose up -d --build`.
   - Ejecuta `dev-tools/jenkins/scripts/run_zap.sh`.
   - Publica reportes HTML como artifacts del workflow.
